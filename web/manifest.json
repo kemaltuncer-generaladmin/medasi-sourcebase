@@ -1,11 +1,11 @@
 {
-    "name": "cardstation_app",
-    "short_name": "cardstation_app",
+    "name": "SourceBase",
+    "short_name": "SourceBase",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "MedAsi ekosistemi kaynak ve kart çalışma uygulaması.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

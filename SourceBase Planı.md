@@ -1,15 +1,15 @@
-# MedAsi Card Station Plani
+# MedAsi SourceBase Plani
 
 ## Amac
 
-MedAsi ekosisteminde Qlinik, Card Station / Flashcard ve ileride gelecek diger uygulamalar tek server ve tek Supabase/Postgres veritabani uzerinde calisacak. Buna ragmen uygulama verileri birbirine karismayacak; her uygulama kendi alaninda kalacak, ortak kullanici, ortak paket/cuzdan ve ortak ogrenme sinyalleri uzerinden kontrollu sekilde haberlesecek.
+MedAsi ekosisteminde Qlinik, SourceBase / Flashcard ve ileride gelecek diger uygulamalar tek server ve tek Supabase/Postgres veritabani uzerinde calisacak. Buna ragmen uygulama verileri birbirine karismayacak; her uygulama kendi alaninda kalacak, ortak kullanici, ortak paket/cuzdan ve ortak ogrenme sinyalleri uzerinden kontrollu sekilde haberlesecek.
 
 Bu planin ana hedefi sudur:
 
 - Bugun App Store'a gonderilecek Qlinik surumunu bozmamak.
 - Eski Qlinik mobil surumleri aylarca kullanilsa bile server kontratini korumak.
-- Card Station'i yeni bir uygulama olarak eklemek.
-- Qlinik ve Card Station arasinda akilli veri akisi kurmak.
+- SourceBase'i yeni bir uygulama olarak eklemek.
+- Qlinik ve SourceBase arasinda akilli veri akisi kurmak.
 - Tek database icinde duzenli, guvenli ve buyuyebilir MedAsi mimarisi kurmak.
 
 ## Temel Karar
@@ -20,7 +20,7 @@ Dogru model:
 
 - `core`: MedAsi ortak cekirdegi.
 - `qlinik`: Qlinik'e ait veri ve is kurallari.
-- `card_station`: Flashcard/Card Station'a ait veri ve is kurallari.
+- `card_station`: Flashcard/SourceBase'a ait veri ve is kurallari.
 - `admin`: admin panel, audit log, import ve operasyonel araclar.
 - `analytics`: uygulamalar arasi raporlama ve ozet gorunumler.
 
@@ -104,11 +104,11 @@ Onerilen core varliklari:
 - `core.taxonomy`
   - Ortak konu agaci.
   - Ornek: TUS > Dahiliye > Kardiyoloji > Aritmiler.
-  - Qlinik soru, Card Station kart ve ileride video/mini ders ayni taxonomy'ye baglanir.
+  - Qlinik soru, SourceBase kart ve ileride video/mini ders ayni taxonomy'ye baglanir.
 
 - `core.learning_events`
   - Uygulamalar arasi haberlesmenin ana mekanizmasi.
-  - Qlinik, Card Station'a direkt tablo uzerinden emir vermez; ogrenme olayi uretir.
+  - Qlinik, SourceBase'a direkt tablo uzerinden emir vermez; ogrenme olayi uretir.
 
 ### 2. Qlinik Katmani
 
@@ -126,7 +126,7 @@ Mevcut Qlinik varliklari:
 - dashboard
 - spot facts
 
-Qlinik, Card Station icin kart olusturmak zorunda degildir. Qlinik sadece su tur sinyalleri uretmelidir:
+Qlinik, SourceBase icin kart olusturmak zorunda degildir. Qlinik sadece su tur sinyalleri uretmelidir:
 
 - kullanici su konuda zayif
 - kullanici su soruyu yanlis yapti
@@ -136,9 +136,9 @@ Qlinik, Card Station icin kart olusturmak zorunda degildir. Qlinik sadece su tur
 
 Bu sinyaller `core.learning_events` veya kontrollu bir RPC ile paylasilir.
 
-### 3. Card Station Katmani
+### 3. SourceBase Katmani
 
-Card Station kendi verilerini tutar.
+SourceBase kendi verilerini tutar.
 
 Onerilen tablolar:
 
@@ -168,7 +168,7 @@ Onerilen tablolar:
   - bildirim tercihi
   - zorluk seviyesi
 
-Card Station'in API'si ayri olacak:
+SourceBase'in API'si ayri olacak:
 
 - `/functions/v1/card-station`
 
@@ -183,7 +183,7 @@ Olası action'lar:
 - `dismiss_card`
 - `deck_progress`
 
-## Qlinik ve Card Station Haberlesmesi
+## Qlinik ve SourceBase Haberlesmesi
 
 ### Senaryo 1: Qlinik Yanlisindan Kart Onerme
 
@@ -199,17 +199,17 @@ Akis:
    - `topic = Aritmiler`
    - `question_id = ...`
    - `user_id = ...`
-5. Card Station bu event'i okuyup kart onerisi uretir.
+5. SourceBase bu event'i okuyup kart onerisi uretir.
 6. Kullanici isterse karti destesine ekler.
 
-Qlinik, Card Station tablosuna dogrudan yazmak zorunda degildir. Bu daha guvenli ve daha esnektir.
+Qlinik, SourceBase tablosuna dogrudan yazmak zorunda degildir. Bu daha guvenli ve daha esnektir.
 
-### Senaryo 2: Card Station Tekrar Basarisi Qlinik Mentor'una Yansisin
+### Senaryo 2: SourceBase Tekrar Basarisi Qlinik Mentor'una Yansisin
 
 Akis:
 
-1. Kullanici Card Station'da Aritmiler kartlarini basariyla tekrarlar.
-2. Card Station kendi `card_reviews` kaydini yazar.
+1. Kullanici SourceBase'da Aritmiler kartlarini basariyla tekrarlar.
+2. SourceBase kendi `card_reviews` kaydini yazar.
 3. Ortak event olusturur:
    - `source_app = card_station`
    - `event_type = topic_reinforced`
@@ -228,10 +228,10 @@ Akis:
 1. Kullanici MedAsi coin satin alir.
 2. Coin core wallet'a yazilir.
 3. Qlinik AI soru analizi coin harcayabilir.
-4. Card Station AI kart uretimi coin harcayabilir.
+4. SourceBase AI kart uretimi coin harcayabilir.
 5. Her uygulama harcamayi kendi ozelligi icin yapar ama bakiye ortaktir.
 
-Burada kritik nokta: wallet core'a aittir, Qlinik veya Card Station'a ait degildir.
+Burada kritik nokta: wallet core'a aittir, Qlinik veya SourceBase'a ait degildir.
 
 ## RLS ve Guvenlik Modeli
 
@@ -250,7 +250,7 @@ Onerilen erisim modeli:
 - `service_role`: Edge Function ve admin operasyonlari.
 - Admin islemleri: Supabase Auth `app_metadata.is_admin` veya ayri admin yetki modeli.
 
-Card Station icin de Qlinik'teki model tekrar edilmeli:
+SourceBase icin de Qlinik'teki model tekrar edilmeli:
 
 - action router
 - auth middleware
@@ -293,9 +293,9 @@ Olası eklemeler:
 
 Bu fazda Qlinik hala eski sekilde calismaya devam eder.
 
-### Faz 2: Card Station MVP
+### Faz 2: SourceBase MVP
 
-Card Station ayri endpoint ve ayri tablo seti ile gelir.
+SourceBase ayri endpoint ve ayri tablo seti ile gelir.
 
 Minimum MVP:
 
@@ -306,7 +306,7 @@ Minimum MVP:
 - spaced repetition temel algoritmasi
 - Qlinik zayif konularindan kart onerisi
 
-Card Station bu fazda Qlinik tablolarina direkt yazmaz. Sadece event/summary/RPC uzerinden bilgi alir.
+SourceBase bu fazda Qlinik tablolarina direkt yazmaz. Sadece event/summary/RPC uzerinden bilgi alir.
 
 ### Faz 3: Uygulamalar Arasi Ogrenme Katmani
 
@@ -316,8 +316,8 @@ Eklenebilecekler:
 
 - ortak learning score
 - konu bazli gucluluk/zayiflik modeli
-- Qlinik dashboard'da Card Station tekrar etkisi
-- Card Station'da Qlinik yanlislarindan otomatik kart onerisi
+- Qlinik dashboard'da SourceBase tekrar etkisi
+- SourceBase'da Qlinik yanlislarindan otomatik kart onerisi
 - mentor'un tum MedAsi calisma gecmisini yorumlamasi
 
 ### Faz 4: Temiz Schema Ayrimi
@@ -332,11 +332,11 @@ Hedef:
 
 Bu faz dikkatli migration, backup ve rollback plani ister.
 
-## Card Station MVP Detayi
+## SourceBase MVP Detayi
 
 ### Ana Ekran
 
-Kullanici Card Station'i actiginda sunlari gormeli:
+Kullanici SourceBase'i actiginda sunlari gormeli:
 
 - Bugunku tekrar sayisi.
 - Yeni kart sayisi.
@@ -374,7 +374,7 @@ Her cevap sonraki tekrar tarihini belirler. Daha sonra FSRS veya SM-2 gibi daha 
 
 ### Qlinik Baglantisi
 
-Card Station'da "Qlinik'ten Onerilenler" bolumu olabilir.
+SourceBase'da "Qlinik'ten Onerilenler" bolumu olabilir.
 
 Kaynaklar:
 
@@ -383,7 +383,7 @@ Kaynaklar:
 - mentor onerileri
 - sik unutulan spot fact'ler
 
-Card Station bu kaynaklardan kart uretirken kullaniciya kontrol vermeli:
+SourceBase bu kaynaklardan kart uretirken kullaniciya kontrol vermeli:
 
 - karta ekle
 - daha sonra
@@ -447,7 +447,7 @@ Qlinik icin:
 - AI action'lari quota ile calisiyor mu?
 - auth olmayan istekler 401 donuyor mu?
 
-Card Station icin:
+SourceBase icin:
 
 - ayni Supabase kullanicisi ile giris.
 - deck listesi.
@@ -461,7 +461,7 @@ Ekosistem icin:
 
 - ayni kullanici iki uygulamada da ayni `user_id` ile gorunuyor mu?
 - core wallet/entitlement dogru okunuyor mu?
-- Qlinik ve Card Station olaylari birbirine karismadan `learning_events` uzerinden gorunuyor mu?
+- Qlinik ve SourceBase olaylari birbirine karismadan `learning_events` uzerinden gorunuyor mu?
 
 ## Riskler
 
@@ -475,11 +475,11 @@ Her uygulama kendi ayarini `profiles` tablosuna eklerse profil tablosu cop olur.
 
 ### Risk 3: Paket ve Cuzdanin Uygulama Icine Gomulmesi
 
-Qlinik icin yapilan wallet ileride Card Station ile ortak kullanilmak istenirse karmasa cikar. Cozum: wallet/entitlement core kavrami olarak ele alinmali.
+Qlinik icin yapilan wallet ileride SourceBase ile ortak kullanilmak istenirse karmasa cikar. Cozum: wallet/entitlement core kavrami olarak ele alinmali.
 
 ### Risk 4: Direkt Tablo Bagimliligi
 
-Card Station, Qlinik tablolarini direkt okursa ileride Qlinik refactor edilemez. Cozum: event, view veya RPC kontrati.
+SourceBase, Qlinik tablolarini direkt okursa ileride Qlinik refactor edilemez. Cozum: event, view veya RPC kontrati.
 
 ### Risk 5: Mobil Surumlerin Uzun Yasamasi
 
@@ -497,13 +497,13 @@ App Store'a giden surum uzun sure kullanilabilir. Cozum: API versioning ve geriy
 
 - Core taslak migration plani hazirlanir.
 - `learning_events` modeli netlestirilir.
-- Card Station MVP veri modeli cizilir.
+- SourceBase MVP veri modeli cizilir.
 - Qlinik'ten hangi sinyallerin paylasilacagi belirlenir.
 
 ### Sonraki Hafta
 
-- Card Station Edge Function iskeleti.
-- Card Station temel tablolar.
+- SourceBase Edge Function iskeleti.
+- SourceBase temel tablolar.
 - Deck ve review akisi.
 - Qlinik zayif konu sinyallerinden kart onerisi.
 
@@ -524,4 +524,4 @@ Ayni kullanici, ayni database, ayni server;
 ama ayri uygulama alanlari, kontrollu ortak cekirdek ve event tabanli haberlesme.
 ```
 
-Bu modelle Qlinik bugunku haliyle canli kalir, Card Station yarin eklenir, sonraki uygulamalar da sistemi dagitmadan ayni omurgaya baglanir.
+Bu modelle Qlinik bugunku haliyle canli kalir, SourceBase yarin eklenir, sonraki uygulamalar da sistemi dagitmadan ayni omurgaya baglanir.

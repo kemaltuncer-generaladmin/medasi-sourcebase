@@ -1,13 +1,13 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class CardStationAuthConfig {
-  static const appCode = 'cardstation';
-  static const supabaseUrl = String.fromEnvironment('CARDSTATION_SUPABASE_URL');
+class SourceBaseAuthConfig {
+  static const appCode = 'sourcebase';
+  static const supabaseUrl = String.fromEnvironment('SOURCEBASE_SUPABASE_URL');
   static const supabaseAnonKey = String.fromEnvironment(
-    'CARDSTATION_SUPABASE_ANON_KEY',
+    'SOURCEBASE_SUPABASE_ANON_KEY',
   );
   static const publicUrl = String.fromEnvironment(
-    'CARDSTATION_PUBLIC_URL',
+    'SOURCEBASE_PUBLIC_URL',
     defaultValue: 'http://localhost:8088',
   );
 
@@ -32,10 +32,10 @@ class AuthActionResult {
   bool get ok => error == null;
 }
 
-class CardStationAuthBackend {
+class SourceBaseAuthBackend {
   static bool _initialized = false;
 
-  static bool get isConfigured => CardStationAuthConfig.isConfigured;
+  static bool get isConfigured => SourceBaseAuthConfig.isConfigured;
   static bool get isInitialized => _initialized;
 
   static SupabaseClient? get client {
@@ -53,8 +53,8 @@ class CardStationAuthBackend {
     }
 
     await Supabase.initialize(
-      url: CardStationAuthConfig.supabaseUrl,
-      anonKey: CardStationAuthConfig.supabaseAnonKey,
+      url: SourceBaseAuthConfig.supabaseUrl,
+      anonKey: SourceBaseAuthConfig.supabaseAnonKey,
       authOptions: const FlutterAuthClientOptions(
         authFlowType: AuthFlowType.pkce,
       ),
@@ -80,16 +80,16 @@ class CardStationAuthBackend {
     await auth.signUp(
       email: email.trim(),
       password: password,
-      emailRedirectTo: CardStationAuthConfig.authRedirectTo,
+      emailRedirectTo: SourceBaseAuthConfig.authRedirectTo,
       data: {
-        'app_code': CardStationAuthConfig.appCode,
+        'app_code': SourceBaseAuthConfig.appCode,
         'display_name': fullName.trim(),
-        'signup_source': CardStationAuthConfig.appCode,
+        'signup_source': SourceBaseAuthConfig.appCode,
         'ecosystem': 'medasi',
       },
     );
     return const AuthActionResult.success(
-      'Doğrulama e-postası CardStation bağlantısıyla gönderildi.',
+      'Doğrulama e-postası SourceBase bağlantısıyla gönderildi.',
     );
   }
 
@@ -98,7 +98,7 @@ class CardStationAuthBackend {
     await auth.resend(
       email: email.trim(),
       type: OtpType.signup,
-      emailRedirectTo: CardStationAuthConfig.authRedirectTo,
+      emailRedirectTo: SourceBaseAuthConfig.authRedirectTo,
     );
     return const AuthActionResult.success(
       'Doğrulama e-postası yeniden gönderildi.',
@@ -109,10 +109,10 @@ class CardStationAuthBackend {
     final auth = _authOrThrow();
     await auth.resetPasswordForEmail(
       email.trim(),
-      redirectTo: CardStationAuthConfig.authRedirectTo,
+      redirectTo: SourceBaseAuthConfig.authRedirectTo,
     );
     return const AuthActionResult.success(
-      'Şifre sıfırlama e-postası CardStation bağlantısıyla gönderildi.',
+      'Şifre sıfırlama e-postası SourceBase bağlantısıyla gönderildi.',
     );
   }
 
@@ -134,7 +134,7 @@ class CardStationAuthBackend {
     final auth = client?.auth;
     if (auth == null) {
       throw const AuthException(
-        'CardStation Supabase bağlantısı yapılandırılmamış.',
+        'SourceBase Supabase bağlantısı yapılandırılmamış.',
       );
     }
     return auth;

@@ -1,9 +1,9 @@
-import 'package:cardstation_app/main.dart';
+import 'package:sourcebase/main.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('shows CardStation login flow entry', (tester) async {
-    await tester.pumpWidget(const CardStationApp());
+  testWidgets('shows SourceBase login flow entry', (tester) async {
+    await tester.pumpWidget(const SourceBaseApp());
 
     expect(
       find.text('Tekrar etmeye kaldığın\nyerden devam et'),

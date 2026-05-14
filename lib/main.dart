@@ -6,17 +6,17 @@ import 'auth_backend.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await CardStationAuthBackend.initialize();
-  runApp(const CardStationApp());
+  await SourceBaseAuthBackend.initialize();
+  runApp(const SourceBaseApp());
 }
 
-class CardStationApp extends StatelessWidget {
-  const CardStationApp({super.key});
+class SourceBaseApp extends StatelessWidget {
+  const SourceBaseApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'CardStation',
+      title: 'SourceBase',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -26,7 +26,7 @@ class CardStationApp extends StatelessWidget {
           cursorColor: AppColors.blue,
         ),
       ),
-      initialRoute: CardStationAuthBackend.currentUser == null
+      initialRoute: SourceBaseAuthBackend.currentUser == null
           ? LoginScreen.route
           : HomeScreen.route,
       routes: {
@@ -139,42 +139,50 @@ class BrandHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const SizedBox(
-              width: 66,
-              height: 54,
-              child: CustomPaint(painter: LogoMarkPainter()),
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      child: Image.asset(
+        'assets/brand/sourcebase_wordmark.png',
+        width: 318,
+        fit: BoxFit.contain,
+        semanticLabel: 'SourceBase',
+        filterQuality: FilterQuality.high,
+        errorBuilder: (context, error, stackTrace) {
+          return const Text(
+            'SourceBase',
+            style: TextStyle(
+              color: AppColors.navy,
+              fontSize: 34,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
             ),
-            const SizedBox(width: 12),
-            RichText(
-              text: const TextSpan(
-                style: TextStyle(
-                  fontSize: 34,
-                  height: 1,
-                  letterSpacing: 0,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'SF Pro Display',
-                ),
-                children: [
-                  TextSpan(
-                    text: 'Card',
-                    style: TextStyle(color: Color(0xFF111DB2)),
-                  ),
-                  TextSpan(
-                    text: 'Station',
-                    style: TextStyle(color: Color(0xFF12B9CB)),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
+    );
+  }
+}
+
+class SourceBaseMark extends StatelessWidget {
+  const SourceBaseMark({this.size = 86, super.key});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'assets/brand/sourcebase_mark.png',
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      semanticLabel: 'SourceBase logo',
+      filterQuality: FilterQuality.high,
+      errorBuilder: (context, error, stackTrace) {
+        return SizedBox(
+          width: size,
+          height: size,
+          child: const CustomPaint(painter: LogoMarkPainter()),
+        );
+      },
     );
   }
 }
@@ -209,7 +217,7 @@ class _LoginScreenState extends State<LoginScreen> {
       errorMessage = null;
     });
     try {
-      await CardStationAuthBackend.signIn(
+      await SourceBaseAuthBackend.signIn(
         email: emailController.text,
         password: passwordController.text,
       );
@@ -225,9 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) {
         return;
       }
-      setState(
-        () => errorMessage = CardStationAuthBackend.friendlyError(error),
-      );
+      setState(() => errorMessage = SourceBaseAuthBackend.friendlyError(error));
     } finally {
       if (mounted) {
         setState(() => loading = false);
@@ -383,7 +389,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       errorMessage = null;
     });
     try {
-      await CardStationAuthBackend.signUp(
+      await SourceBaseAuthBackend.signUp(
         fullName: nameController.text,
         email: emailController.text,
         password: passwordController.text,
@@ -400,9 +406,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) {
         return;
       }
-      setState(
-        () => errorMessage = CardStationAuthBackend.friendlyError(error),
-      );
+      setState(() => errorMessage = SourceBaseAuthBackend.friendlyError(error));
     } finally {
       if (mounted) {
         setState(() => loading = false);
@@ -574,7 +578,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       errorMessage = null;
     });
     try {
-      await CardStationAuthBackend.sendPasswordReset(emailController.text);
+      await SourceBaseAuthBackend.sendPasswordReset(emailController.text);
       if (!mounted) {
         return;
       }
@@ -587,9 +591,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       if (!mounted) {
         return;
       }
-      setState(
-        () => errorMessage = CardStationAuthBackend.friendlyError(error),
-      );
+      setState(() => errorMessage = SourceBaseAuthBackend.friendlyError(error));
     } finally {
       if (mounted) {
         setState(() => loading = false);
@@ -670,7 +672,7 @@ class ResetCodeScreen extends StatelessWidget {
         const ScreenTitle(
           title: 'Sıfırlama e-postanı kontrol et',
           subtitle:
-              'Şifreni yenilemek için e-postana\ngönderdiğimiz CardStation bağlantısını aç.',
+              'Şifreni yenilemek için e-postana\ngönderdiğimiz SourceBase bağlantısını aç.',
         ),
         const SizedBox(height: 22),
         SentToEmailBox(icon: Icons.mail_outline_rounded, email: email),
@@ -733,7 +735,7 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
       errorMessage = null;
     });
     try {
-      await CardStationAuthBackend.updatePassword(passwordController.text);
+      await SourceBaseAuthBackend.updatePassword(passwordController.text);
       if (!mounted) {
         return;
       }
@@ -746,9 +748,7 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
       if (!mounted) {
         return;
       }
-      setState(
-        () => errorMessage = CardStationAuthBackend.friendlyError(error),
-      );
+      setState(() => errorMessage = SourceBaseAuthBackend.friendlyError(error));
     } finally {
       if (mounted) {
         setState(() => loading = false);
@@ -903,7 +903,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       errorMessage = null;
     });
     try {
-      final result = await CardStationAuthBackend.resendSignupEmail(email);
+      final result = await SourceBaseAuthBackend.resendSignupEmail(email);
       if (!mounted) {
         return;
       }
@@ -912,9 +912,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       if (!mounted) {
         return;
       }
-      setState(
-        () => errorMessage = CardStationAuthBackend.friendlyError(error),
-      );
+      setState(() => errorMessage = SourceBaseAuthBackend.friendlyError(error));
     } finally {
       if (mounted) {
         setState(() => loading = false);
@@ -991,7 +989,7 @@ class EmailVerifiedScreen extends StatelessWidget {
         const ScreenTitle(
           title: 'E-posta doğrulandı',
           subtitle:
-              'Tebrikler! Hesabın başarıyla aktifleştirildi.\nArtık CardStation ile öğrenmeye başlayabilirsin.',
+              'Tebrikler! Hesabın başarıyla aktifleştirildi.\nArtık SourceBase ile öğrenmeye başlayabilirsin.',
         ),
         const SizedBox(height: 30),
         const NextStepCard(
@@ -1041,7 +1039,7 @@ class EmailTemplateScreen extends StatelessWidget {
         const ScreenTitle(
           title: 'Doğrulama Kodun',
           subtitle:
-              'Merhaba Kemal,\n\nCardStation hesabını doğrulamak için\naşağıdaki 6 haneli kodu gir.',
+              'Merhaba Kemal,\n\nSourceBase hesabını doğrulamak için\naşağıdaki 6 haneli kodu gir.',
           richSubtitleWord: 'Kemal,',
         ),
         const SizedBox(height: 24),
@@ -1085,7 +1083,7 @@ class AuthCallbackScreen extends StatelessWidget {
         const HeroArt(kind: HeroKind.emailVerified),
         const SizedBox(height: 26),
         const ScreenTitle(
-          title: 'CardStation bağlantısı açıldı',
+          title: 'SourceBase bağlantısı açıldı',
           subtitle:
               'E-posta bağlantın doğrulandıysa oturumun bu uygulamada açılır.',
         ),
@@ -1093,7 +1091,7 @@ class AuthCallbackScreen extends StatelessWidget {
         GradientButton(
           label: 'Devam Et',
           onPressed: () {
-            final route = CardStationAuthBackend.currentUser == null
+            final route = SourceBaseAuthBackend.currentUser == null
                 ? LoginScreen.route
                 : HomeScreen.route;
             Navigator.pushNamedAndRemoveUntil(context, route, (_) => false);
@@ -1120,14 +1118,14 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final email = CardStationAuthBackend.currentUser?.email ?? 'MedAsi hesabı';
+    final email = SourceBaseAuthBackend.currentUser?.email ?? 'MedAsi hesabı';
     return AuthShell(
       children: [
         const SizedBox(height: 34),
         const HeroArt(kind: HeroKind.login),
         const SizedBox(height: 26),
         ScreenTitle(
-          title: 'CardStation hazır',
+          title: 'SourceBase hazır',
           subtitle:
               '$email ile ortak MedAsi hesabına bağlısın.\nQlinik Auth havuzu değişmeden aynı kimlik kullanılır.',
           titleSize: 28,
@@ -1142,7 +1140,7 @@ class HomeScreen extends StatelessWidget {
         OutlineCsButton(
           label: 'Çıkış Yap',
           onPressed: () async {
-            await CardStationAuthBackend.signOut();
+            await SourceBaseAuthBackend.signOut();
             if (!context.mounted) {
               return;
             }
@@ -1999,7 +1997,7 @@ class EmailFooter extends StatelessWidget {
             children: [
               TextSpan(text: '© 2024 '),
               TextSpan(
-                text: 'CardStation.',
+                text: 'SourceBase.',
                 style: TextStyle(
                   color: AppColors.blue,
                   fontWeight: FontWeight.w800,
