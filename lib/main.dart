@@ -28,6 +28,8 @@ class SourceBaseApp extends StatelessWidget {
       ),
       initialRoute: SourceBaseAuthBackend.currentUser == null
           ? LoginScreen.route
+          : SourceBaseAuthBackend.currentUserNeedsSourceBaseProfile
+          ? ProfileSetupScreen.route
           : HomeScreen.route,
       routes: {
         LoginScreen.route: (_) => const LoginScreen(),
@@ -40,6 +42,7 @@ class SourceBaseApp extends StatelessWidget {
         EmailVerifiedScreen.route: (_) => const EmailVerifiedScreen(),
         EmailTemplateScreen.route: (_) => const EmailTemplateScreen(),
         AuthCallbackScreen.route: (_) => const AuthCallbackScreen(),
+        ProfileSetupScreen.route: (_) => const ProfileSetupScreen(),
         HomeScreen.route: (_) => const HomeScreen(),
       },
     );
@@ -69,6 +72,10 @@ class AppGradients {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+}
+
+class SourceBaseDepartments {
+  static const values = ['Tıp', 'Diş Hekimliği', 'Hemşirelik'];
 }
 
 enum HeroKind {
@@ -226,7 +233,9 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       Navigator.pushNamedAndRemoveUntil(
         context,
-        HomeScreen.route,
+        SourceBaseAuthBackend.currentUserNeedsSourceBaseProfile
+            ? ProfileSetupScreen.route
+            : HomeScreen.route,
         (_) => false,
       );
     } catch (error) {
@@ -355,8 +364,10 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final nameController = TextEditingController();
   final emailController = TextEditingController();
+  final facultyController = TextEditingController();
   final passwordController = TextEditingController();
   final repeatPasswordController = TextEditingController();
+  String department = SourceBaseDepartments.values.first;
   bool terms = true;
   bool obscureOne = true;
   bool obscureTwo = true;
@@ -367,6 +378,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     nameController.dispose();
     emailController.dispose();
+    facultyController.dispose();
     passwordController.dispose();
     repeatPasswordController.dispose();
     super.dispose();
@@ -384,6 +396,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() => errorMessage = 'Şifreler birbiriyle eşleşmiyor.');
       return;
     }
+    if (facultyController.text.trim().isEmpty) {
+      setState(() => errorMessage = 'Fakülte bilgisini doldurmalısın.');
+      return;
+    }
     setState(() {
       loading = true;
       errorMessage = null;
@@ -393,6 +409,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         fullName: nameController.text,
         email: emailController.text,
         password: passwordController.text,
+        profile: SourceBaseProfile(
+          faculty: facultyController.text,
+          department: department,
+        ),
       );
       if (!mounted) {
         return;
@@ -447,6 +467,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
               textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 13),
+            const FieldLabel('Fakülte / Üniversite'),
+            CsTextField(
+              icon: Icons.account_balance_outlined,
+              hint: 'Örn. İstanbul Üniversitesi',
+              controller: facultyController,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 13),
+            const FieldLabel('Bölüm'),
+            CsSelectField(
+              icon: Icons.school_outlined,
+              value: department,
+              options: SourceBaseDepartments.values,
+              onChanged: (value) => setState(() => department = value),
             ),
             const SizedBox(height: 13),
             const FieldLabel('Şifre'),
@@ -1093,6 +1129,8 @@ class AuthCallbackScreen extends StatelessWidget {
           onPressed: () {
             final route = SourceBaseAuthBackend.currentUser == null
                 ? LoginScreen.route
+                : SourceBaseAuthBackend.currentUserNeedsSourceBaseProfile
+                ? ProfileSetupScreen.route
                 : HomeScreen.route;
             Navigator.pushNamedAndRemoveUntil(context, route, (_) => false);
           },
@@ -1111,6 +1149,138 @@ class AuthCallbackScreen extends StatelessWidget {
   }
 }
 
+class ProfileSetupScreen extends StatefulWidget {
+  const ProfileSetupScreen({super.key});
+
+  static const route = '/profile-setup';
+
+  @override
+  State<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
+}
+
+class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
+  final facultyController = TextEditingController();
+  String department = SourceBaseDepartments.values.first;
+  bool loading = false;
+  String? errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    final metadata = SourceBaseAuthBackend.currentUser?.userMetadata ?? {};
+    facultyController.text =
+        metadata['sourcebase_faculty']?.toString().trim() ?? '';
+    final existingDepartment =
+        metadata['sourcebase_department']?.toString().trim() ?? '';
+    if (SourceBaseDepartments.values.contains(existingDepartment)) {
+      department = existingDepartment;
+    }
+  }
+
+  @override
+  void dispose() {
+    facultyController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _completeProfile() async {
+    if (facultyController.text.trim().isEmpty) {
+      setState(() => errorMessage = 'Fakülte bilgisini doldurmalısın.');
+      return;
+    }
+    setState(() {
+      loading = true;
+      errorMessage = null;
+    });
+    try {
+      await SourceBaseAuthBackend.updateSourceBaseProfile(
+        SourceBaseProfile(
+          faculty: facultyController.text,
+          department: department,
+        ),
+      );
+      if (!mounted) {
+        return;
+      }
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        HomeScreen.route,
+        (_) => false,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => errorMessage = SourceBaseAuthBackend.friendlyError(error));
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final email = SourceBaseAuthBackend.currentUser?.email ?? 'MedAsi hesabın';
+    return AuthShell(
+      children: [
+        const SizedBox(height: 28),
+        const HeroArt(kind: HeroKind.register),
+        const SizedBox(height: 20),
+        const ScreenTitle(
+          title: 'Bilgilerini tamamla',
+          subtitle:
+              'Qlinik hesabınla geldin. SourceBase deneyimini sana uygun hale getirmek için birkaç bilgiye ihtiyacımız var.',
+          titleSize: 27,
+        ),
+        const SizedBox(height: 18),
+        SentToEmailBox(icon: Icons.verified_user_outlined, email: email),
+        const SizedBox(height: 18),
+        FormPanel(
+          children: [
+            const FieldLabel('Fakülte / Üniversite'),
+            CsTextField(
+              icon: Icons.account_balance_outlined,
+              hint: 'Örn. İstanbul Üniversitesi',
+              controller: facultyController,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 14),
+            const FieldLabel('Bölüm'),
+            CsSelectField(
+              icon: Icons.school_outlined,
+              value: department,
+              options: SourceBaseDepartments.values,
+              onChanged: (value) => setState(() => department = value),
+            ),
+            const SizedBox(height: 18),
+            const InfoBox(
+              icon: Icons.auto_awesome_outlined,
+              text:
+                  'Bu bilgiler önerilecek kaynakları, kart setlerini ve çalışma akışını kişiselleştirmek için kullanılır.',
+            ),
+            const SizedBox(height: 18),
+            if (errorMessage != null) ...[
+              StatusMessageBox(
+                icon: Icons.error_outline_rounded,
+                text: errorMessage!,
+                isError: true,
+              ),
+              const SizedBox(height: 12),
+            ],
+            GradientButton(
+              label: loading ? 'Kaydediliyor...' : 'Devam Et',
+              onPressed: loading ? () {} : _completeProfile,
+            ),
+          ],
+        ),
+        const SizedBox(height: 28),
+        const EcoFooter(),
+      ],
+    );
+  }
+}
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -1119,6 +1289,9 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final email = SourceBaseAuthBackend.currentUser?.email ?? 'MedAsi hesabı';
+    final metadata = SourceBaseAuthBackend.currentUser?.userMetadata ?? {};
+    final faculty = metadata['sourcebase_faculty']?.toString() ?? '';
+    final department = metadata['sourcebase_department']?.toString() ?? '';
     return AuthShell(
       children: [
         const SizedBox(height: 34),
@@ -1136,6 +1309,14 @@ class HomeScreen extends StatelessWidget {
           title: 'İlk bağlantı tamam',
           text: 'Sıradaki adım kaynak ekleme ve deste oluşturma akışı.',
         ),
+        if (faculty.isNotEmpty || department.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          NextStepCard(
+            icon: Icons.school_outlined,
+            title: department.isEmpty ? 'Bölüm bilgisi' : department,
+            text: faculty.isEmpty ? 'Fakülte bilgisi bekleniyor.' : faculty,
+          ),
+        ],
         const SizedBox(height: 28),
         OutlineCsButton(
           label: 'Çıkış Yap',
@@ -1355,6 +1536,70 @@ class CsTextField extends StatelessWidget {
               data: const IconThemeData(color: AppColors.muted, size: 22),
               child: trailing!,
             ),
+          const SizedBox(width: 8),
+        ],
+      ),
+    );
+  }
+}
+
+class CsSelectField extends StatelessWidget {
+  const CsSelectField({
+    required this.icon,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+    super.key,
+  });
+
+  final IconData icon;
+  final String value;
+  final List<String> options;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 54,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.line, width: 1),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 15),
+          Icon(icon, size: 22, color: AppColors.muted),
+          const SizedBox(width: 14),
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: value,
+                isExpanded: true,
+                icon: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: AppColors.muted,
+                ),
+                borderRadius: BorderRadius.circular(10),
+                style: const TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                  fontFamily: 'SF Pro Display',
+                ),
+                items: [
+                  for (final option in options)
+                    DropdownMenuItem(value: option, child: Text(option)),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    onChanged(value);
+                  }
+                },
+              ),
+            ),
+          ),
           const SizedBox(width: 8),
         ],
       ),

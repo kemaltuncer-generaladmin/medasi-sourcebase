@@ -32,6 +32,22 @@ class AuthActionResult {
   bool get ok => error == null;
 }
 
+class SourceBaseProfile {
+  const SourceBaseProfile({required this.faculty, required this.department});
+
+  final String faculty;
+  final String department;
+
+  Map<String, dynamic> toMetadata() {
+    return {
+      'sourcebase_faculty': faculty.trim(),
+      'sourcebase_department': department.trim(),
+      'sourcebase_profile_completed': true,
+      'sourcebase_profile_completed_at': DateTime.now().toIso8601String(),
+    };
+  }
+}
+
 class SourceBaseAuthBackend {
   static bool _initialized = false;
 
@@ -46,6 +62,20 @@ class SourceBaseAuthBackend {
   }
 
   static User? get currentUser => client?.auth.currentUser;
+
+  static bool get currentUserNeedsSourceBaseProfile =>
+      userNeedsSourceBaseProfile(currentUser);
+
+  static bool userNeedsSourceBaseProfile(User? user) {
+    if (user == null) {
+      return false;
+    }
+    final metadata = user.userMetadata ?? {};
+    final faculty = metadata['sourcebase_faculty']?.toString().trim() ?? '';
+    final department =
+        metadata['sourcebase_department']?.toString().trim() ?? '';
+    return faculty.isEmpty || department.isEmpty;
+  }
 
   static Future<void> initialize() async {
     if (!isConfigured || _initialized) {
@@ -75,6 +105,7 @@ class SourceBaseAuthBackend {
     required String fullName,
     required String email,
     required String password,
+    required SourceBaseProfile profile,
   }) async {
     final auth = _authOrThrow();
     await auth.signUp(
@@ -86,11 +117,23 @@ class SourceBaseAuthBackend {
         'display_name': fullName.trim(),
         'signup_source': SourceBaseAuthConfig.appCode,
         'ecosystem': 'medasi',
+        ...profile.toMetadata(),
       },
     );
     return const AuthActionResult.success(
       'Doğrulama e-postası SourceBase bağlantısıyla gönderildi.',
     );
+  }
+
+  static Future<AuthActionResult> updateSourceBaseProfile(
+    SourceBaseProfile profile,
+  ) async {
+    final auth = _authOrThrow();
+    final currentMetadata = auth.currentUser?.userMetadata ?? {};
+    await auth.updateUser(
+      UserAttributes(data: {...currentMetadata, ...profile.toMetadata()}),
+    );
+    return const AuthActionResult.success('SourceBase bilgilerin tamamlandı.');
   }
 
   static Future<AuthActionResult> resendSignupEmail(String email) async {
