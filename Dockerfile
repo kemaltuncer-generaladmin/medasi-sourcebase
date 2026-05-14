@@ -6,7 +6,14 @@ COPY pubspec.yaml pubspec.lock ./
 RUN flutter pub get
 
 COPY . .
-RUN flutter build web --release
+
+ARG CARDSTATION_SUPABASE_URL=""
+ARG CARDSTATION_SUPABASE_PUBLIC_TOKEN=""
+ARG CARDSTATION_PUBLIC_URL=""
+RUN flutter build web --release \
+  --dart-define=CARDSTATION_SUPABASE_URL="${CARDSTATION_SUPABASE_URL}" \
+  --dart-define=CARDSTATION_SUPABASE_ANON_KEY="${CARDSTATION_SUPABASE_PUBLIC_TOKEN}" \
+  --dart-define=CARDSTATION_PUBLIC_URL="${CARDSTATION_PUBLIC_URL}"
 
 FROM nginx:1.27-alpine
 

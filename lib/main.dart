@@ -2,7 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-void main() {
+import 'auth_backend.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await CardStationAuthBackend.initialize();
   runApp(const CardStationApp());
 }
 
@@ -22,7 +26,9 @@ class CardStationApp extends StatelessWidget {
           cursorColor: AppColors.blue,
         ),
       ),
-      initialRoute: LoginScreen.route,
+      initialRoute: CardStationAuthBackend.currentUser == null
+          ? LoginScreen.route
+          : HomeScreen.route,
       routes: {
         LoginScreen.route: (_) => const LoginScreen(),
         RegisterScreen.route: (_) => const RegisterScreen(),
@@ -33,6 +39,8 @@ class CardStationApp extends StatelessWidget {
         VerifyEmailScreen.route: (_) => const VerifyEmailScreen(),
         EmailVerifiedScreen.route: (_) => const EmailVerifiedScreen(),
         EmailTemplateScreen.route: (_) => const EmailTemplateScreen(),
+        AuthCallbackScreen.route: (_) => const AuthCallbackScreen(),
+        HomeScreen.route: (_) => const HomeScreen(),
       },
     );
   }
@@ -181,8 +189,51 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
   bool remember = true;
   bool obscure = true;
+  bool loading = false;
+  String? errorMessage;
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _signIn() async {
+    setState(() {
+      loading = true;
+      errorMessage = null;
+    });
+    try {
+      await CardStationAuthBackend.signIn(
+        email: emailController.text,
+        password: passwordController.text,
+      );
+      if (!mounted) {
+        return;
+      }
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        HomeScreen.route,
+        (_) => false,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(
+        () => errorMessage = CardStationAuthBackend.friendlyError(error),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -200,15 +251,24 @@ class _LoginScreenState extends State<LoginScreen> {
         FormPanel(
           children: [
             const FieldLabel('E-posta'),
-            const CsTextField(
+            CsTextField(
               icon: Icons.mail_outline_rounded,
               hint: 'ornek@medasi.com',
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
+              textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 16),
             const FieldLabel('Şifre'),
             CsTextField(
               icon: Icons.lock_outline_rounded,
               hint: '••••••••••••',
+              controller: passwordController,
+              obscureText: obscure,
+              autofillHints: const [AutofillHints.password],
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _signIn(),
               trailing: IconButton(
                 onPressed: () => setState(() => obscure = !obscure),
                 icon: Icon(
@@ -250,10 +310,17 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
             const SizedBox(height: 8),
+            if (errorMessage != null) ...[
+              StatusMessageBox(
+                icon: Icons.error_outline_rounded,
+                text: errorMessage!,
+                isError: true,
+              ),
+              const SizedBox(height: 12),
+            ],
             GradientButton(
-              label: 'Giriş Yap',
-              onPressed: () =>
-                  Navigator.pushNamed(context, EmailVerifiedScreen.route),
+              label: loading ? 'Giriş yapılıyor...' : 'Giriş Yap',
+              onPressed: loading ? () {} : _signIn,
             ),
             const SizedBox(height: 12),
             OutlineCsButton(
@@ -280,9 +347,68 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  final nameController = TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  final repeatPasswordController = TextEditingController();
   bool terms = true;
   bool obscureOne = true;
   bool obscureTwo = true;
+  bool loading = false;
+  String? errorMessage;
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    repeatPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _signUp() async {
+    if (!terms) {
+      setState(
+        () => errorMessage =
+            'Devam etmek için kullanım koşullarını kabul etmelisin.',
+      );
+      return;
+    }
+    if (passwordController.text != repeatPasswordController.text) {
+      setState(() => errorMessage = 'Şifreler birbiriyle eşleşmiyor.');
+      return;
+    }
+    setState(() {
+      loading = true;
+      errorMessage = null;
+    });
+    try {
+      await CardStationAuthBackend.signUp(
+        fullName: nameController.text,
+        email: emailController.text,
+        password: passwordController.text,
+      );
+      if (!mounted) {
+        return;
+      }
+      Navigator.pushNamed(
+        context,
+        VerifyEmailScreen.route,
+        arguments: emailController.text.trim(),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(
+        () => errorMessage = CardStationAuthBackend.friendlyError(error),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -301,21 +427,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
         FormPanel(
           children: [
             const FieldLabel('Ad Soyad'),
-            const CsTextField(
+            CsTextField(
               icon: Icons.person_outline_rounded,
               hint: 'Adınızı ve soyadınızı girin',
+              controller: nameController,
+              autofillHints: const [AutofillHints.name],
+              textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 13),
             const FieldLabel('E-posta'),
-            const CsTextField(
+            CsTextField(
               icon: Icons.mail_outline_rounded,
               hint: 'ornek@medasi.com',
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
+              textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 13),
             const FieldLabel('Şifre'),
             CsTextField(
               icon: Icons.lock_outline_rounded,
               hint: '••••••••••',
+              controller: passwordController,
+              obscureText: obscureOne,
+              autofillHints: const [AutofillHints.newPassword],
+              textInputAction: TextInputAction.next,
               trailing: IconButton(
                 onPressed: () => setState(() => obscureOne = !obscureOne),
                 icon: Icon(
@@ -330,6 +467,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
             CsTextField(
               icon: Icons.lock_outline_rounded,
               hint: '••••••••••',
+              controller: repeatPasswordController,
+              obscureText: obscureTwo,
+              autofillHints: const [AutofillHints.newPassword],
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _signUp(),
               trailing: IconButton(
                 onPressed: () => setState(() => obscureTwo = !obscureTwo),
                 icon: Icon(
@@ -379,10 +521,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ],
             ),
             const SizedBox(height: 18),
+            if (errorMessage != null) ...[
+              StatusMessageBox(
+                icon: Icons.error_outline_rounded,
+                text: errorMessage!,
+                isError: true,
+              ),
+              const SizedBox(height: 12),
+            ],
             GradientButton(
-              label: 'Kayıt Ol',
-              onPressed: () =>
-                  Navigator.pushNamed(context, VerifyEmailScreen.route),
+              label: loading ? 'Hesap oluşturuluyor...' : 'Kayıt Ol',
+              onPressed: loading ? () {} : _signUp,
             ),
             const SizedBox(height: 12),
             OutlineCsButton(
@@ -399,10 +548,54 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 }
 
-class ForgotPasswordScreen extends StatelessWidget {
+class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   static const route = '/forgot';
+
+  @override
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+}
+
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  final emailController = TextEditingController();
+  bool loading = false;
+  String? errorMessage;
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendReset() async {
+    setState(() {
+      loading = true;
+      errorMessage = null;
+    });
+    try {
+      await CardStationAuthBackend.sendPasswordReset(emailController.text);
+      if (!mounted) {
+        return;
+      }
+      Navigator.pushNamed(
+        context,
+        ResetCodeScreen.route,
+        arguments: emailController.text.trim(),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(
+        () => errorMessage = CardStationAuthBackend.friendlyError(error),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -420,9 +613,14 @@ class ForgotPasswordScreen extends StatelessWidget {
         FormPanel(
           children: [
             const FieldLabel('E-posta'),
-            const CsTextField(
+            CsTextField(
               icon: Icons.mail_outline_rounded,
               hint: 'ornek@medasi.com',
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _sendReset(),
             ),
             const SizedBox(height: 20),
             const InfoBox(
@@ -430,10 +628,17 @@ class ForgotPasswordScreen extends StatelessWidget {
               text: 'Sıfırlama kodunu kayıtlı e-posta\nadresine göndereceğiz.',
             ),
             const SizedBox(height: 22),
+            if (errorMessage != null) ...[
+              StatusMessageBox(
+                icon: Icons.error_outline_rounded,
+                text: errorMessage!,
+                isError: true,
+              ),
+              const SizedBox(height: 12),
+            ],
             GradientButton(
-              label: 'Kod Gönder',
-              onPressed: () =>
-                  Navigator.pushNamed(context, ResetCodeScreen.route),
+              label: loading ? 'Gönderiliyor...' : 'Kod Gönder',
+              onPressed: loading ? () {} : _sendReset,
             ),
           ],
         ),
@@ -456,30 +661,28 @@ class ResetCodeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final email = ModalRoute.of(context)?.settings.arguments as String?;
     return AuthShell(
       children: [
         const SizedBox(height: 28),
         const HeroArt(kind: HeroKind.resetCode),
         const SizedBox(height: 20),
         const ScreenTitle(
-          title: 'Sıfırlama kodunu gir',
+          title: 'Sıfırlama e-postanı kontrol et',
           subtitle:
-              'Şifreni yenilemek için e-postana\ngönderdiğimiz 6 haneli kodu doğrula.',
+              'Şifreni yenilemek için e-postana\ngönderdiğimiz CardStation bağlantısını aç.',
         ),
         const SizedBox(height: 22),
-        const SentToEmailBox(icon: Icons.mail_outline_rounded),
+        SentToEmailBox(icon: Icons.mail_outline_rounded, email: email),
         const SizedBox(height: 20),
-        const OtpBoxes(active: 0, values: ['|', '', '', '', '', '']),
-        const SizedBox(height: 18),
-        const TimerLine(),
-        const SizedBox(height: 8),
-        ResendLine(
-          onPressed: () =>
-              Navigator.pushNamed(context, EmailTemplateScreen.route),
+        const InfoBox(
+          icon: Icons.link_rounded,
+          text:
+              'E-postadaki bağlantı bu uygulamaya döner ve yeni şifre ekranını açar.',
         ),
         const SizedBox(height: 24),
         GradientButton(
-          label: 'Doğrula',
+          label: 'Yeni şifre ekranına git',
           onPressed: () =>
               Navigator.pushNamed(context, NewPasswordScreen.route),
         ),
@@ -506,8 +709,52 @@ class NewPasswordScreen extends StatefulWidget {
 }
 
 class _NewPasswordScreenState extends State<NewPasswordScreen> {
+  final passwordController = TextEditingController();
+  final repeatPasswordController = TextEditingController();
   bool first = true;
   bool second = true;
+  bool loading = false;
+  String? errorMessage;
+
+  @override
+  void dispose() {
+    passwordController.dispose();
+    repeatPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _updatePassword() async {
+    if (passwordController.text != repeatPasswordController.text) {
+      setState(() => errorMessage = 'Şifreler birbiriyle eşleşmiyor.');
+      return;
+    }
+    setState(() {
+      loading = true;
+      errorMessage = null;
+    });
+    try {
+      await CardStationAuthBackend.updatePassword(passwordController.text);
+      if (!mounted) {
+        return;
+      }
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        PasswordUpdatedScreen.route,
+        (_) => false,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(
+        () => errorMessage = CardStationAuthBackend.friendlyError(error),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -527,6 +774,10 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
             CsTextField(
               icon: Icons.lock_outline_rounded,
               hint: '••••••••••••',
+              controller: passwordController,
+              obscureText: first,
+              autofillHints: const [AutofillHints.newPassword],
+              textInputAction: TextInputAction.next,
               trailing: IconButton(
                 onPressed: () => setState(() => first = !first),
                 icon: Icon(
@@ -541,6 +792,11 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
             CsTextField(
               icon: Icons.lock_outline_rounded,
               hint: '••••••••••••',
+              controller: repeatPasswordController,
+              obscureText: second,
+              autofillHints: const [AutofillHints.newPassword],
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _updatePassword(),
               trailing: IconButton(
                 onPressed: () => setState(() => second = !second),
                 icon: Icon(
@@ -553,10 +809,17 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
             const SizedBox(height: 20),
             const RequirementBox(),
             const SizedBox(height: 22),
+            if (errorMessage != null) ...[
+              StatusMessageBox(
+                icon: Icons.error_outline_rounded,
+                text: errorMessage!,
+                isError: true,
+              ),
+              const SizedBox(height: 12),
+            ],
             GradientButton(
-              label: 'Şifreyi Güncelle',
-              onPressed: () =>
-                  Navigator.pushNamed(context, PasswordUpdatedScreen.route),
+              label: loading ? 'Güncelleniyor...' : 'Şifreyi Güncelle',
+              onPressed: loading ? () {} : _updatePassword,
             ),
             const SizedBox(height: 14),
             TextLink(
@@ -619,13 +882,49 @@ class PasswordUpdatedScreen extends StatelessWidget {
   }
 }
 
-class VerifyEmailScreen extends StatelessWidget {
+class VerifyEmailScreen extends StatefulWidget {
   const VerifyEmailScreen({super.key});
 
   static const route = '/verify-email';
 
   @override
+  State<VerifyEmailScreen> createState() => _VerifyEmailScreenState();
+}
+
+class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
+  bool loading = false;
+  String? message;
+  String? errorMessage;
+
+  Future<void> _resend(String email) async {
+    setState(() {
+      loading = true;
+      message = null;
+      errorMessage = null;
+    });
+    try {
+      final result = await CardStationAuthBackend.resendSignupEmail(email);
+      if (!mounted) {
+        return;
+      }
+      setState(() => message = result.message);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(
+        () => errorMessage = CardStationAuthBackend.friendlyError(error),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final email = ModalRoute.of(context)?.settings.arguments as String?;
     return AuthShell(
       children: [
         const SizedBox(height: 28),
@@ -637,16 +936,28 @@ class VerifyEmailScreen extends StatelessWidget {
               'E-posta adresine gönderdiğimiz\n6 haneli doğrulama kodunu gir.',
         ),
         const SizedBox(height: 20),
-        const SentToEmailBox(icon: Icons.info_outline_rounded),
+        SentToEmailBox(icon: Icons.info_outline_rounded, email: email),
         const SizedBox(height: 22),
         const OtpBoxes(active: 0, values: ['|', '-', '-', '-', '-', '-']),
         const SizedBox(height: 20),
         const TimerLine(),
         const SizedBox(height: 8),
         ResendLine(
-          onPressed: () =>
-              Navigator.pushNamed(context, EmailTemplateScreen.route),
+          label: loading
+              ? 'Gönderiliyor...'
+              : 'Doğrulama e-postasını tekrar gönder',
+          onPressed: email == null || loading ? () {} : () => _resend(email),
         ),
+        if (message != null || errorMessage != null) ...[
+          const SizedBox(height: 12),
+          StatusMessageBox(
+            icon: errorMessage == null
+                ? Icons.check_circle_outline_rounded
+                : Icons.error_outline_rounded,
+            text: message ?? errorMessage!,
+            isError: errorMessage != null,
+          ),
+        ],
         const SizedBox(height: 24),
         GradientButton(
           label: 'Doğrula',
@@ -756,6 +1067,94 @@ class EmailTemplateScreen extends StatelessWidget {
         ),
         const SizedBox(height: 34),
         const EmailFooter(),
+      ],
+    );
+  }
+}
+
+class AuthCallbackScreen extends StatelessWidget {
+  const AuthCallbackScreen({super.key});
+
+  static const route = '/auth/callback';
+
+  @override
+  Widget build(BuildContext context) {
+    return AuthShell(
+      children: [
+        const SizedBox(height: 34),
+        const HeroArt(kind: HeroKind.emailVerified),
+        const SizedBox(height: 26),
+        const ScreenTitle(
+          title: 'CardStation bağlantısı açıldı',
+          subtitle:
+              'E-posta bağlantın doğrulandıysa oturumun bu uygulamada açılır.',
+        ),
+        const SizedBox(height: 26),
+        GradientButton(
+          label: 'Devam Et',
+          onPressed: () {
+            final route = CardStationAuthBackend.currentUser == null
+                ? LoginScreen.route
+                : HomeScreen.route;
+            Navigator.pushNamedAndRemoveUntil(context, route, (_) => false);
+          },
+        ),
+        const SizedBox(height: 12),
+        OutlineCsButton(
+          label: 'Yeni şifre oluştur',
+          onPressed: () =>
+              Navigator.pushNamed(context, NewPasswordScreen.route),
+          fontSize: 17,
+        ),
+        const SizedBox(height: 34),
+        const EcoFooter(),
+      ],
+    );
+  }
+}
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  static const route = '/home';
+
+  @override
+  Widget build(BuildContext context) {
+    final email = CardStationAuthBackend.currentUser?.email ?? 'MedAsi hesabı';
+    return AuthShell(
+      children: [
+        const SizedBox(height: 34),
+        const HeroArt(kind: HeroKind.login),
+        const SizedBox(height: 26),
+        ScreenTitle(
+          title: 'CardStation hazır',
+          subtitle:
+              '$email ile ortak MedAsi hesabına bağlısın.\nQlinik Auth havuzu değişmeden aynı kimlik kullanılır.',
+          titleSize: 28,
+        ),
+        const SizedBox(height: 28),
+        const NextStepCard(
+          icon: Icons.style_outlined,
+          title: 'İlk bağlantı tamam',
+          text: 'Sıradaki adım kaynak ekleme ve deste oluşturma akışı.',
+        ),
+        const SizedBox(height: 28),
+        OutlineCsButton(
+          label: 'Çıkış Yap',
+          onPressed: () async {
+            await CardStationAuthBackend.signOut();
+            if (!context.mounted) {
+              return;
+            }
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              LoginScreen.route,
+              (_) => false,
+            );
+          },
+        ),
+        const SizedBox(height: 36),
+        const EcoFooter(),
       ],
     );
   }
@@ -891,13 +1290,25 @@ class CsTextField extends StatelessWidget {
   const CsTextField({
     required this.icon,
     required this.hint,
+    this.controller,
     this.trailing,
+    this.obscureText = false,
+    this.keyboardType,
+    this.autofillHints,
+    this.textInputAction,
+    this.onSubmitted,
     super.key,
   });
 
   final IconData icon;
   final String hint;
+  final TextEditingController? controller;
   final Widget? trailing;
+  final bool obscureText;
+  final TextInputType? keyboardType;
+  final Iterable<String>? autofillHints;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
 
   @override
   Widget build(BuildContext context) {
@@ -914,12 +1325,29 @@ class CsTextField extends StatelessWidget {
           Icon(icon, size: 22, color: AppColors.muted),
           const SizedBox(width: 14),
           Expanded(
-            child: Text(
-              hint,
+            child: TextField(
+              controller: controller,
+              obscureText: obscureText,
+              keyboardType: keyboardType,
+              autofillHints: autofillHints,
+              textInputAction: textInputAction,
+              onSubmitted: onSubmitted,
+              cursorColor: AppColors.blue,
+              decoration: InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                hintText: hint,
+                hintStyle: const TextStyle(
+                  color: Color(0xFF7A89A8),
+                  fontSize: 17,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0,
+                ),
+              ),
               style: const TextStyle(
-                color: Color(0xFF7A89A8),
+                color: AppColors.navy,
                 fontSize: 17,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
                 letterSpacing: 0,
               ),
             ),
@@ -1116,13 +1544,61 @@ class InfoBox extends StatelessWidget {
   }
 }
 
-class SentToEmailBox extends StatelessWidget {
-  const SentToEmailBox({required this.icon, super.key});
+class StatusMessageBox extends StatelessWidget {
+  const StatusMessageBox({
+    required this.icon,
+    required this.text,
+    this.isError = false,
+    super.key,
+  });
 
   final IconData icon;
+  final String text;
+  final bool isError;
 
   @override
   Widget build(BuildContext context) {
+    final color = isError ? const Color(0xFFC33B4A) : AppColors.blue;
+    final background = isError
+        ? const Color(0xFFFFF1F3)
+        : AppColors.softBlue.withValues(alpha: .72);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: isError ? color : AppColors.muted,
+                fontSize: 14.5,
+                height: 1.25,
+                fontWeight: isError ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SentToEmailBox extends StatelessWidget {
+  const SentToEmailBox({required this.icon, this.email, super.key});
+
+  final IconData icon;
+  final String? email;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleEmail = email?.isNotEmpty == true ? email! : 'e-posta adresin';
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 12),
@@ -1148,18 +1624,18 @@ class SentToEmailBox extends StatelessWidget {
           const SizedBox(width: 13),
           Expanded(
             child: RichText(
-              text: const TextSpan(
-                style: TextStyle(
+              text: TextSpan(
+                style: const TextStyle(
                   color: AppColors.muted,
                   fontSize: 15.8,
                   height: 1.25,
                   fontFamily: 'SF Pro Display',
                 ),
                 children: [
-                  TextSpan(text: 'Kod şu adrese gönderildi: '),
+                  const TextSpan(text: 'E-posta şu adrese gönderildi: '),
                   TextSpan(
-                    text: 'ornek@medasi.com',
-                    style: TextStyle(
+                    text: visibleEmail,
+                    style: const TextStyle(
                       color: AppColors.blue,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1299,9 +1775,14 @@ class TimerLine extends StatelessWidget {
 }
 
 class ResendLine extends StatelessWidget {
-  const ResendLine({required this.onPressed, super.key});
+  const ResendLine({
+    required this.onPressed,
+    this.label = 'Kodu tekrar gönder (00:45)',
+    super.key,
+  });
 
   final VoidCallback onPressed;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -1309,9 +1790,9 @@ class ResendLine extends StatelessWidget {
       onPressed: onPressed,
       style: TextButton.styleFrom(foregroundColor: AppColors.blue),
       icon: const Icon(Icons.refresh_rounded, size: 22),
-      label: const Text(
-        'Kodu tekrar gönder (00:45)',
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       ),
     );
   }
