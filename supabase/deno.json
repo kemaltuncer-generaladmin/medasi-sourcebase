@@ -1,0 +1,5 @@
+{
+  "tasks": {
+    "functions_test": "deno test --no-check --allow-all functions/**/*.test.ts"
+  }
+}

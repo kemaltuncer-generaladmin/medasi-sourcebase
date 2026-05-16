@@ -1,0 +1,5 @@
+# KOD YAZMA KURALLARI (ÇOK KRİTİK)
+- ASLA kod bloklarında "// ...", "/* ... */", "// Mevcut kodlar buraya" veya "TODO" gibi yer tutucular (placeholders) kullanma.
+- Bir dosyayı güncellerken veya oluştururken, kodun TAMAMINI satır satır, eksiksiz bir şekilde yazacaksın. 
+- Kod atlamak, özet geçmek veya sadece değişen kısmı verip gerisini boş bırakmak KESİNLİKLE YASAKTIR.
+- Eğer dosya çok büyükse ve tek seferde yazamayacaksan, kodu parçalara bölmek için benden izin iste ama asla eksik kod üretme.
