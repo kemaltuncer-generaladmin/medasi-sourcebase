@@ -43,6 +43,21 @@ class DriveHomeScreen extends StatelessWidget {
     final hasCourses = data.courses.isNotEmpty;
     final hasRecent = data.recentFiles.isNotEmpty;
     final hasCollections = data.collections.isNotEmpty;
+    final phone = MediaQuery.sizeOf(context).width < 600;
+
+    if (phone) {
+      return _MobileDriveHome(
+        data: data,
+        onSearch: onSearch,
+        onOpenCourse: onOpenCourse,
+        onOpenFile: onOpenFile,
+        onCreateCourse: onCreateCourse,
+        onOpenUploads: onOpenUploads,
+        onOpenUploadsPage: onOpenUploadsPage,
+        onOpenCollections: onOpenCollections,
+        onRefresh: onRefresh,
+      );
+    }
 
     return WorkspaceScroll(
       onRefresh: onRefresh,
@@ -174,6 +189,550 @@ class DriveHomeScreen extends StatelessWidget {
         const SizedBox(height: 22),
         const TrustStrip(),
       ],
+    );
+  }
+}
+
+class _MobileDriveHome extends StatelessWidget {
+  const _MobileDriveHome({
+    required this.data,
+    required this.onSearch,
+    required this.onOpenCourse,
+    required this.onOpenFile,
+    required this.onCreateCourse,
+    required this.onOpenUploads,
+    required this.onOpenUploadsPage,
+    required this.onOpenCollections,
+    this.onRefresh,
+  });
+
+  final DriveWorkspaceData data;
+  final VoidCallback onSearch;
+  final ValueChanged<DriveCourse> onOpenCourse;
+  final ValueChanged<DriveFile> onOpenFile;
+  final VoidCallback onCreateCourse;
+  final VoidCallback onOpenUploads;
+  final VoidCallback onOpenUploadsPage;
+  final VoidCallback onOpenCollections;
+  final RefreshCallback? onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final recentFiles = data.recentFiles.take(4).toList();
+    final courses = data.courses.take(4).toList();
+
+    return WorkspaceScroll(
+      onRefresh: onRefresh,
+      children: [
+        DriveTopBar(title: 'Drive', onSearch: onSearch),
+        _MobileDriveHeader(onUpload: onOpenUploads, onSearch: onSearch),
+        const SizedBox(height: 10),
+        _MobileDriveToolbar(
+          onCreateCourse: onCreateCourse,
+          onCreateSection: () {
+            final course = data.primaryCourse;
+            if (course == null) {
+              onCreateCourse();
+              return;
+            }
+            onOpenCourse(course);
+          },
+          onCollections: onOpenCollections,
+        ),
+        SectionTitle(
+          title: 'Klasörler',
+          actionLabel: data.courses.length > courses.length ? 'Tümü' : null,
+          onAction: () {},
+        ),
+        if (courses.isEmpty)
+          const GlassPanel(
+            padding: EdgeInsets.all(18),
+            child: EmptyState(
+              message: 'Henüz ders yok.',
+              subMessage: 'İlk ders alanını oluşturarak başlayın.',
+            ),
+          )
+        else
+          Column(
+            children: [
+              for (var i = 0; i < courses.length; i++) ...[
+                _MobileCourseCard(
+                  course: courses[i],
+                  onTap: () => onOpenCourse(courses[i]),
+                ),
+                if (i != courses.length - 1) const SizedBox(height: 10),
+              ],
+            ],
+          ),
+        SectionTitle(
+          title: 'Dosyalar',
+          actionLabel: 'Tümü',
+          onAction: onOpenUploadsPage,
+        ),
+        if (recentFiles.isEmpty)
+          GlassPanel(
+            padding: const EdgeInsets.all(18),
+            child: _MobileEmptyPrompt(onUpload: onOpenUploads),
+          )
+        else
+          Column(
+            children: [
+              for (var i = 0; i < recentFiles.length; i++) ...[
+                _MobileFileCard(
+                  file: recentFiles[i],
+                  onTap: () => onOpenFile(recentFiles[i]),
+                ),
+                if (i != recentFiles.length - 1) const SizedBox(height: 10),
+              ],
+            ],
+          ),
+        SectionTitle(
+          title: 'Koleksiyonlar',
+          actionLabel: data.collections.isNotEmpty ? 'Aç' : null,
+          onAction: onOpenCollections,
+        ),
+        if (data.collections.isEmpty)
+          const GlassPanel(
+            padding: EdgeInsets.all(18),
+            child: EmptyState(
+              message: 'Henüz koleksiyon yok.',
+              subMessage: 'Dosyalarından flashcard veya özet üret.',
+            ),
+          )
+        else
+          SizedBox(
+            height: 142,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: data.collections.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, index) => _MobileCollectionCard(
+                bundle: data.collections[index],
+                onTap: onOpenCollections,
+              ),
+            ),
+          ),
+        const SizedBox(height: 14),
+        const _MobileTrustCard(),
+      ],
+    );
+  }
+}
+
+class _MobileDriveHeader extends StatelessWidget {
+  const _MobileDriveHeader({required this.onUpload, required this.onSearch});
+
+  final VoidCallback onUpload;
+  final VoidCallback onSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      radius: 16,
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: onSearch,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    height: 48,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.selectedBlue,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.softLine),
+                    ),
+                    child: Row(
+                      children: const [
+                        Icon(
+                          Icons.search_rounded,
+                          color: AppColors.blue,
+                          size: 24,
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Drive içinde ara',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              SizedBox(
+                width: 104,
+                child: PrimaryGradientButton(
+                  label: 'Yükle',
+                  icon: Icons.upload_file_rounded,
+                  height: 48,
+                  onTap: onUpload,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MobileDriveToolbar extends StatelessWidget {
+  const _MobileDriveToolbar({
+    required this.onCreateCourse,
+    required this.onCreateSection,
+    required this.onCollections,
+  });
+
+  final VoidCallback onCreateCourse;
+  final VoidCallback onCreateSection;
+  final VoidCallback onCollections;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _MobileToolButton(
+            icon: Icons.create_new_folder_rounded,
+            label: 'Yeni Ders',
+            onTap: onCreateCourse,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _MobileToolButton(
+            icon: Icons.folder_open_rounded,
+            label: 'Bölüm',
+            onTap: onCreateSection,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _MobileToolButton(
+            icon: Icons.layers_rounded,
+            label: 'Setler',
+            color: AppColors.purple,
+            onTap: onCollections,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MobileToolButton extends StatelessWidget {
+  const _MobileToolButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color = AppColors.blue,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          foregroundColor: color,
+          backgroundColor: Colors.white.withValues(alpha: .94),
+          side: const BorderSide(color: AppColors.softLine),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 20),
+              const SizedBox(width: 6),
+              Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileCourseCard extends StatelessWidget {
+  const _MobileCourseCard({required this.course, required this.onTap});
+
+  final DriveCourse course;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: GlassPanel(
+        radius: 16,
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: course.iconBackground,
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Icon(course.icon, color: course.iconColor, size: 28),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          course.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.navy,
+                            fontSize: 16.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _CourseStatus(status: course.status),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    '${course.sections.length} bölüm  •  ${course.fileCount} dosya',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.softText,
+              size: 24,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileFileCard extends StatelessWidget {
+  const _MobileFileCard({required this.file, required this.onTap});
+
+  final DriveFile file;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final uploading = file.status == DriveItemStatus.uploading;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: GlassPanel(
+        radius: 16,
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FileKindBadge(kind: file.kind, compact: true, plain: true),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        file.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w900,
+                          height: 1.15,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        '${file.sizeLabel}  •  ${file.updatedLabel}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                StatusPill(status: file.status, compact: true),
+              ],
+            ),
+            if (uploading) ...[
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: const LinearProgressIndicator(
+                  value: null,
+                  minHeight: 6,
+                  backgroundColor: AppColors.line,
+                  valueColor: AlwaysStoppedAnimation(AppColors.blue),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileEmptyPrompt extends StatelessWidget {
+  const _MobileEmptyPrompt({required this.onUpload});
+
+  final VoidCallback onUpload;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const EmptyState(
+          message: 'Henüz yüklenmiş dosya yok.',
+          subMessage: 'İlk kaynağını yükleyip AI ile işlemeye başla.',
+        ),
+        PrimaryGradientButton(
+          label: 'Dosya Yükle',
+          icon: Icons.upload_file_rounded,
+          height: 48,
+          onTap: onUpload,
+        ),
+      ],
+    );
+  }
+}
+
+class _MobileCollectionCard extends StatelessWidget {
+  const _MobileCollectionCard({required this.bundle, required this.onTap});
+
+  final CollectionBundle bundle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 240,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: GlassPanel(
+          radius: 16,
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  FileKindBadge(kind: bundle.file.kind, compact: true),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      bundle.file.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        height: 1.15,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final output in bundle.outputs.take(3))
+                    _OutputLabel(output: output),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileTrustCard extends StatelessWidget {
+  const _MobileTrustCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      radius: 16,
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: const [
+          Icon(Icons.verified_user_rounded, color: AppColors.blue, size: 24),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Kaynakların güvenli şekilde saklanır ve tüm cihazlarında erişilebilir.',
+              style: TextStyle(
+                color: AppColors.muted,
+                fontSize: 13,
+                height: 1.3,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
