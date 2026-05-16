@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
-import '../../../../core/design_system/design_system.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
+import '../../../../core/widgets/responsive_layout.dart';
 import '../../data/drive_models.dart';
 
 // Re-export design system buttons for backward compatibility
@@ -18,30 +18,45 @@ class WorkspacePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final maxWidth = ResponsiveLayout.getContentMaxWidth(context);
+    final padding = ResponsiveLayout.getHorizontalPadding(context);
+
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: child,
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: padding),
+          child: child,
+        ),
       ),
     );
   }
 }
 
 class WorkspaceScroll extends StatelessWidget {
-  const WorkspaceScroll({
-    required this.children,
-    this.onRefresh,
-    super.key,
-  });
+  const WorkspaceScroll({required this.children, this.onRefresh, super.key});
 
   final List<Widget> children;
   final RefreshCallback? onRefresh;
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = ResponsiveLayout.isDesktop(context);
+    final isTablet = ResponsiveLayout.isTablet(context);
+    final horizontalPadding = ResponsiveLayout.getHorizontalPadding(context);
+    final bottomPadding = isDesktop ? 48.0 : (isTablet ? 48.0 : 138.0);
+    final topPadding = isDesktop || isTablet
+        ? 18.0
+        : MediaQuery.viewPaddingOf(context).top + 8.0;
+
     final scroll = ListView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 138),
+      padding: EdgeInsets.fromLTRB(
+        horizontalPadding,
+        topPadding,
+        horizontalPadding,
+        bottomPadding,
+      ),
       children: [
         for (var i = 0; i < children.length; i++)
           Semantics(
@@ -190,7 +205,7 @@ class DriveTopBar extends StatelessWidget {
               ),
             );
 
-            if (constraints.maxWidth < 390 && showBrand && onBack == null) {
+            if (constraints.maxWidth < 430 && showBrand && onBack == null) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -803,11 +818,7 @@ class EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 42,
-            color: AppColors.blue.withValues(alpha: .4),
-          ),
+          Icon(icon, size: 42, color: AppColors.blue.withValues(alpha: .4)),
           const SizedBox(height: 12),
           Text(
             message,

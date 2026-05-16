@@ -7168,7 +7168,7 @@ class _InfographicPoster extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      SizedBox(width: 10),
                       Expanded(
                         child: _PosterBox(
                           title: 'BAŞLIK 2',

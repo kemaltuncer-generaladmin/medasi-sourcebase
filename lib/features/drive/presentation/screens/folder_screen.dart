@@ -20,7 +20,7 @@ class FolderScreen extends StatelessWidget {
   final DriveSection section;
   final VoidCallback onSearch;
   final VoidCallback onBack;
-  final VoidCallback onOpenFile;
+  final ValueChanged<DriveFile> onOpenFile;
   final VoidCallback onOpenUploads;
   final VoidCallback onOpenCollections;
 
@@ -112,7 +112,7 @@ class FolderScreen extends StatelessWidget {
           )
         else
           for (final file in section.files) ...[
-            _FileListRow(file: file, onTap: onOpenFile),
+            _FileListRow(file: file, onTap: () => onOpenFile(file)),
             const SizedBox(height: 12),
           ],
         _SelectionTray(onOpenCollections: onOpenCollections),
@@ -129,7 +129,8 @@ class FolderScreen extends StatelessWidget {
                 icon: Icons.description_outlined,
                 color: AppColors.purple,
                 title: 'Bu bölüm için sınav sabahı özeti üret',
-                subtitle: 'Önemli noktaları çıkarıp hızlı bir özet hazırlayabilirsin.',
+                subtitle:
+                    'Önemli noktaları çıkarıp hızlı bir özet hazırlayabilirsin.',
               ),
               SizedBox(height: 10),
               _SuggestionRow(
@@ -152,21 +153,25 @@ class _Toolbar extends StatelessWidget {
     return GlassPanel(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       radius: 12,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: const [
-          _ToolbarItem(
-            icon: Icons.format_list_bulleted_rounded,
-            label: 'Liste',
-            active: true,
-          ),
-          _ToolbarItem(icon: Icons.grid_view_rounded, label: 'Grid'),
-          _Divider(),
-          _ToolbarItem(icon: Icons.filter_alt_outlined, label: 'Filtrele'),
-          _Divider(),
-          _ToolbarItem(icon: Icons.swap_vert_rounded, label: 'Sırala'),
-          Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.navy),
-        ],
+      child: const SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: BouncingScrollPhysics(),
+        child: Row(
+          children: [
+            _ToolbarItem(
+              icon: Icons.format_list_bulleted_rounded,
+              label: 'Liste',
+              active: true,
+            ),
+            SizedBox(width: 16),
+            _ToolbarItem(icon: Icons.grid_view_rounded, label: 'Grid'),
+            _Divider(),
+            _ToolbarItem(icon: Icons.filter_alt_outlined, label: 'Filtrele'),
+            _Divider(),
+            _ToolbarItem(icon: Icons.swap_vert_rounded, label: 'Sırala'),
+            Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.navy),
+          ],
+        ),
       ),
     );
   }
@@ -433,53 +438,74 @@ class _SelectionTray extends StatelessWidget {
     return GlassPanel(
       padding: const EdgeInsets.fromLTRB(22, 18, 18, 18),
       borderColor: const Color(0xFFB9D5FF),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 430;
+          final summary = const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '- öğe seçildi',
+                style: TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              SizedBox(height: 6),
+              Text(
+                'Toplam - MB',
+                style: TextStyle(color: AppColors.navy, fontSize: 16),
+              ),
+            ],
+          );
+          final actions = [
+            _TrayAction(
+              icon: Icons.drive_file_move_outline,
+              label: 'Taşı',
+              color: AppColors.navy,
+              onTap: () {},
+            ),
+            _TrayAction(
+              icon: Icons.delete_outline_rounded,
+              label: 'Sil',
+              color: AppColors.red,
+              onTap: () {},
+            ),
+            _TrayAction(
+              icon: Icons.layers_outlined,
+              label: 'Koleksiyona Ekle',
+              color: AppColors.navy,
+              onTap: onOpenCollections,
+            ),
+            _TrayAction(
+              icon: Icons.more_vert_rounded,
+              label: 'Daha fazla',
+              color: AppColors.navy,
+              onTap: () {},
+            ),
+          ];
+          if (compact) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '- öğe seçildi',
-                  style: TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Toplam - MB',
-                  style: TextStyle(color: AppColors.navy, fontSize: 16),
+                summary,
+                const SizedBox(height: 14),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(children: actions),
                 ),
               ],
-            ),
-          ),
-          _TrayAction(
-            icon: Icons.drive_file_move_outline,
-            label: 'Taşı',
-            color: AppColors.navy,
-            onTap: () {},
-          ),
-          _TrayAction(
-            icon: Icons.delete_outline_rounded,
-            label: 'Sil',
-            color: AppColors.red,
-            onTap: () {},
-          ),
-          _TrayAction(
-            icon: Icons.layers_outlined,
-            label: 'Koleksiyona Ekle',
-            color: AppColors.navy,
-            onTap: onOpenCollections,
-          ),
-          _TrayAction(
-            icon: Icons.more_vert_rounded,
-            label: 'Daha fazla',
-            color: AppColors.navy,
-            onTap: () {},
-          ),
-        ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: summary),
+              ...actions,
+            ],
+          );
+        },
       ),
     );
   }

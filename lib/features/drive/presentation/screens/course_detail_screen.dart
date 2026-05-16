@@ -18,7 +18,7 @@ class CourseDetailScreen extends StatelessWidget {
   final DriveCourse course;
   final VoidCallback onSearch;
   final VoidCallback onBack;
-  final VoidCallback onOpenSection;
+  final ValueChanged<DriveSection> onOpenSection;
   final VoidCallback onCreateSection;
   final VoidCallback onOpenUploads;
 
@@ -121,7 +121,7 @@ class CourseDetailScreen extends StatelessWidget {
         _SegmentedTabs(),
         const SizedBox(height: 18),
         for (final section in course.sections) ...[
-          _SectionCard(section: section, onTap: onOpenSection),
+          _SectionCard(section: section, onTap: () => onOpenSection(section)),
           const SizedBox(height: 14),
         ],
       ],

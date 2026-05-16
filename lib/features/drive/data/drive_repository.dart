@@ -11,19 +11,15 @@ class DriveRepository {
 
   Future<DriveWorkspaceData> loadWorkspace() async {
     if (!api.isConfigured) {
-      return DriveWorkspaceData.empty;
+      throw StateError('SourceBase Supabase client is not configured.');
     }
 
-    try {
-      final response = await api.invoke('drive_bootstrap');
-      final data = response['data'];
-      if (data is Map<String, dynamic>) {
-        return _workspaceFromJson(data);
-      }
-      return DriveWorkspaceData.empty;
-    } catch (_) {
-      return DriveWorkspaceData.empty;
+    final response = await api.invoke('drive_bootstrap');
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return _workspaceFromJson(data);
     }
+    throw StateError('Drive workspace response is empty.');
   }
 
   Future<GcsUploadSession> createUploadSession(DriveUploadDraft draft) {
@@ -31,11 +27,8 @@ class DriveRepository {
   }
 
   Future<DriveCourse> createCourse(String title) async {
-    if (!api.isConfigured) {
-      return _fallbackCourse(title);
-    }
     final response = await api.createCourse(title);
-    final row = _dataRow(response);
+    final row = _requiredDataRow(response, 'Ders oluşturulamadı.');
     return _courseFromRow(row, const [], const []);
   }
 
@@ -43,16 +36,12 @@ class DriveRepository {
     required String courseId,
     required String title,
   }) async {
-    if (!api.isConfigured) {
-      return DriveSection(
-        id: 'local-section-${DateTime.now().millisecondsSinceEpoch}',
-        title: title,
-        status: DriveItemStatus.completed,
-        files: const [],
-      );
-    }
     final response = await api.createSection(courseId: courseId, title: title);
-    return _sectionFromRow(_dataRow(response), const [], null);
+    return _sectionFromRow(
+      _requiredDataRow(response, 'Bölüm oluşturulamadı.'),
+      const [],
+      null,
+    );
   }
 
   Future<DriveFile> completeUpload({
@@ -63,65 +52,44 @@ class DriveRepository {
     required String courseTitle,
     required String sectionTitle,
   }) async {
-    if (api.isConfigured) {
-      final response = await api.completeUpload(
-        objectName: objectName,
-        courseId: courseId,
-        sectionId: sectionId,
-        fileName: file.name,
-        contentType: file.contentType,
-        sizeBytes: file.sizeBytes,
-      );
-      final row = _dataRow(response);
-      if (row.isNotEmpty) {
-        return _fileFromRow(row, courseTitle, sectionTitle, const []);
-      }
-    }
-    return DriveFile(
-      id: 'file-${DateTime.now().millisecondsSinceEpoch}',
-      title: file.name,
-      kind: _kindFromFileName(file.name),
-      sizeLabel: _sizeLabel(file.sizeBytes),
-      pageLabel: 'İşleniyor',
-      updatedLabel: 'Bugün',
-      courseTitle: courseTitle,
-      sectionTitle: sectionTitle,
-      status: DriveItemStatus.processing,
-      generated: const [],
+    final response = await api.completeUpload(
+      objectName: objectName,
+      courseId: courseId,
+      sectionId: sectionId,
+      fileName: file.name,
+      contentType: file.contentType,
+      sizeBytes: file.sizeBytes,
     );
+    final row = _requiredDataRow(response, 'Yüklenen dosya kaydı alınamadı.');
+    return _fileFromRow(row, courseTitle, sectionTitle, const []);
   }
 
   Future<GeneratedOutput> createGeneratedOutput({
     required DriveFile file,
     required GeneratedKind kind,
   }) async {
-    if (api.isConfigured) {
-      final jobType = _jobTypeForGeneratedKind(kind);
-      int? itemCount;
-      if (jobType != null) {
-        final jobResponse = await api.createGenerationJob(
-          fileId: file.id,
-          jobType: jobType,
-          count: _defaultGenerationCount(kind),
-        );
-        final jobId = _text((jobResponse['data'] as Map?)?['jobId']);
-        if (jobId.isEmpty) {
-          throw StateError('AI üretim işi başlatılamadı.');
-        }
-        final content = await _waitForGeneratedContent(api, jobId);
-        itemCount = _contentItemCount(content);
-      }
-      await api.createGeneratedOutput(
+    final jobType = _jobTypeForGeneratedKind(kind);
+    int? itemCount;
+    if (jobType != null) {
+      final jobResponse = await api.createGenerationJob(
         fileId: file.id,
-        kind: kind,
-        itemCount: itemCount,
+        jobType: jobType,
+        count: _defaultGenerationCount(kind),
       );
+      final jobId = _text((jobResponse['data'] as Map?)?['jobId']);
+      if (jobId.isEmpty) {
+        throw StateError('AI üretim işi başlatılamadı.');
+      }
+      final content = await _waitForGeneratedContent(api, jobId);
+      itemCount = _contentItemCount(content);
     }
-    return GeneratedOutput(
+    final response = await api.createGeneratedOutput(
+      fileId: file.id,
       kind: kind,
-      title: _generatedTitle(kind),
-      detail: _generatedDetail(kind),
-      updatedLabel: 'Şimdi',
+      itemCount: itemCount,
+    );
+    return _outputFromRow(
+      _requiredDataRow(response, 'Üretilen içerik kaydı alınamadı.'),
     );
   }
 }
@@ -291,6 +259,17 @@ Map<String, dynamic> _dataRow(Map<String, dynamic> response) {
   return const {};
 }
 
+Map<String, dynamic> _requiredDataRow(
+  Map<String, dynamic> response,
+  String message,
+) {
+  final row = _dataRow(response);
+  if (row.isEmpty) {
+    throw StateError(message);
+  }
+  return row;
+}
+
 List<Map<String, dynamic>> _list(Object? value) {
   if (value is List) {
     return value
@@ -318,20 +297,6 @@ String _metadataText(Object? raw, String key, {required String fallback}) {
   return fallback;
 }
 
-DriveCourse _fallbackCourse(String title) {
-  return DriveCourse(
-    id: 'local-course-${DateTime.now().millisecondsSinceEpoch}',
-    title: title,
-    icon: Icons.menu_book_outlined,
-    iconColor: const Color(0xFF1459F5),
-    iconBackground: const Color(0xFFEAF2FF),
-    status: DriveItemStatus.completed,
-    sections: const [],
-    updatedLabel: 'Son güncelleme bugün',
-    description: '$title dersine ait içerikler için yeni alan hazır.',
-  );
-}
-
 DriveItemStatus _statusFromText(String status) {
   return switch (status) {
     'completed' ||
@@ -354,17 +319,6 @@ DriveFileKind _kindFromText(String kind) {
     'zip' => DriveFileKind.zip,
     _ => DriveFileKind.docx,
   };
-}
-
-DriveFileKind _kindFromFileName(String fileName) {
-  final lower = fileName.toLowerCase();
-  if (lower.endsWith('.pdf')) return DriveFileKind.pdf;
-  if (lower.endsWith('.ppt') || lower.endsWith('.pptx')) {
-    return DriveFileKind.pptx;
-  }
-  if (lower.endsWith('.doc')) return DriveFileKind.doc;
-  if (lower.endsWith('.zip')) return DriveFileKind.zip;
-  return DriveFileKind.docx;
 }
 
 GeneratedKind _generatedKindFromText(String kind) {
@@ -426,18 +380,5 @@ String _generatedTitle(GeneratedKind kind) {
     GeneratedKind.podcast => 'Podcast',
     GeneratedKind.table => 'Tablo',
     GeneratedKind.mindMap => 'Zihin Haritası',
-  };
-}
-
-String _generatedDetail(GeneratedKind kind) {
-  return switch (kind) {
-    GeneratedKind.flashcard => '- kart',
-    GeneratedKind.question => '- soru',
-    GeneratedKind.summary => '- sayfa',
-    GeneratedKind.algorithm => 'Karar akışı',
-    GeneratedKind.comparison => 'Konu karşılaştırması',
-    GeneratedKind.podcast => 'Sesli anlatım',
-    GeneratedKind.table => '1 tablo',
-    GeneratedKind.mindMap => '1 zihin haritası',
   };
 }
