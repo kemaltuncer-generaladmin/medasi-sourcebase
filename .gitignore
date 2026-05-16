@@ -9,6 +9,9 @@
 .env.*
 !.env.example
 .gitdir/
+
+# Sensitive files
+AGENTS.md
 .atom/
 .build/
 .buildlog/
