@@ -114,7 +114,6 @@ async function authenticate(
 }
 
 async function driveBootstrap(userId: string) {
-  await ensureDefaultWorkspace(userId);
   const [courses, sections, files, generatedOutputs] = await Promise.all([
     dbSelect(
       `courses?owner_user_id=eq.${userId}&select=*&order=created_at.asc`,
@@ -139,51 +138,6 @@ async function driveBootstrap(userId: string) {
     files,
     generatedOutputs,
   };
-}
-
-async function ensureDefaultWorkspace(userId: string) {
-  const existing = await dbSelect(
-    `courses?owner_user_id=eq.${userId}&select=id&limit=1`,
-  );
-  if (existing.length > 0) {
-    return;
-  }
-  const [course] = await dbInsert("courses", [{
-    owner_user_id: userId,
-    title: "Kardiyoloji",
-    icon_name: "heart",
-    subject: "Kardiyoloji",
-    status: "active",
-    metadata: {
-      description:
-        "Kardiyoloji dersine ait tüm içerikler, bölümler halinde düzenlenmiştir.",
-    },
-  }]);
-  const courseId = String(course.id ?? "");
-  if (!courseId) return;
-  await dbInsert("sections", [
-    {
-      owner_user_id: userId,
-      course_id: courseId,
-      title: "Aritmiler",
-      status: "active",
-      sort_order: 1,
-    },
-    {
-      owner_user_id: userId,
-      course_id: courseId,
-      title: "Kalp Yetmezliği",
-      status: "active",
-      sort_order: 2,
-    },
-    {
-      owner_user_id: userId,
-      course_id: courseId,
-      title: "Kapak Hastalıkları",
-      status: "draft",
-      sort_order: 3,
-    },
-  ]);
 }
 
 async function createCourse(userId: string, payload: JsonMap) {
@@ -278,6 +232,7 @@ async function completeUpload(userId: string, payload: JsonMap) {
   }
   await assertOwned(userId, "courses", courseId);
   await assertOwned(userId, "sections", sectionId);
+  await assertSectionInCourse(userId, sectionId, courseId);
   const bucket = Deno.env.get("SOURCEBASE_GCS_BUCKET") ?? "";
   const [row] = await dbInsert("drive_files", [{
     owner_user_id: userId,
@@ -301,11 +256,34 @@ async function completeUpload(userId: string, payload: JsonMap) {
     objectName,
   });
 
+  try {
+    await processFileExtraction(userId, { fileId: row.id });
+  } catch (error) {
+    await dbPatch(
+      "drive_files",
+      `id=eq.${row.id}&owner_user_id=eq.${userId}`,
+      {
+        ai_status: "failed",
+        metadata: {
+          extractionError: error instanceof SafeError
+            ? error.message
+            : "Dosya metni çıkarılamadı.",
+          extractionFailedAt: new Date().toISOString(),
+        },
+      },
+    );
+    throw error;
+  }
+
+  const [readyRow] = await dbSelect(
+    `drive_files?id=eq.${row.id}&owner_user_id=eq.${userId}&select=*&limit=1`,
+  );
+
   return {
-    row,
+    row: readyRow ?? row,
     objectName,
-    status: "uploaded",
-    nextAction: "extract_and_analyze",
+    status: "ready",
+    nextAction: "generate",
   };
 }
 
@@ -339,6 +317,23 @@ async function assertOwned(userId: string, table: string, id: string) {
   }
 }
 
+async function assertSectionInCourse(
+  userId: string,
+  sectionId: string,
+  courseId: string,
+) {
+  const rows = await dbSelect(
+    `sections?id=eq.${sectionId}&course_id=eq.${courseId}&owner_user_id=eq.${userId}&select=id&limit=1`,
+  );
+  if (rows.length === 0) {
+    throw new SafeError(
+      "SECTION_COURSE_MISMATCH",
+      "Bölüm bu derse ait değil.",
+      400,
+    );
+  }
+}
+
 async function dbSelect(path: string): Promise<JsonMap[]> {
   const response = await supabaseRest(path, { method: "GET" });
   const data = await response.json();
@@ -356,6 +351,17 @@ async function dbInsert(table: string, rows: JsonMap[]): Promise<JsonMap[]> {
     return data.filter(isRecord);
   }
   return [];
+}
+
+async function dbPatch(
+  table: string,
+  query: string,
+  body: JsonMap,
+): Promise<void> {
+  await supabaseRest(`${table}?${query}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
 }
 
 async function audit(

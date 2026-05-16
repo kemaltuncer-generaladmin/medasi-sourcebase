@@ -19,6 +19,7 @@ class DriveHomeScreen extends StatelessWidget {
     required this.data,
     required this.onSearch,
     required this.onOpenCourse,
+    required this.onOpenFile,
     required this.onCreateCourse,
     required this.onOpenUploads,
     required this.onOpenUploadsPage,
@@ -29,7 +30,8 @@ class DriveHomeScreen extends StatelessWidget {
 
   final DriveWorkspaceData data;
   final VoidCallback onSearch;
-  final VoidCallback onOpenCourse;
+  final ValueChanged<DriveCourse> onOpenCourse;
+  final ValueChanged<DriveFile> onOpenFile;
   final VoidCallback onCreateCourse;
   final VoidCallback onOpenUploads;
   final VoidCallback onOpenUploadsPage;
@@ -48,33 +50,58 @@ class DriveHomeScreen extends StatelessWidget {
         DriveTopBar(title: 'Drive', onSearch: onSearch),
         _HeroPanel(onUpload: onOpenUploads),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            _QuickAction(
-              icon: Icons.note_add_rounded,
-              label: 'Ders Oluştur',
-              onTap: onCreateCourse,
-            ),
-            const SizedBox(width: 10),
-            _QuickAction(
-              icon: Icons.create_new_folder_rounded,
-              label: 'Bölüm Ekle',
-              onTap: onOpenCourse,
-            ),
-            const SizedBox(width: 10),
-            _QuickAction(
-              icon: Icons.picture_as_pdf_rounded,
-              label: 'PDF/PPT',
-              onTap: onOpenUploads,
-            ),
-            const SizedBox(width: 10),
-            _QuickAction(
-              icon: Icons.layers_rounded,
-              label: 'Koleksiyonlar',
-              onTap: onOpenCollections,
-              color: AppColors.purple,
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 430;
+            final actions = [
+              _QuickAction(
+                icon: Icons.note_add_rounded,
+                label: 'Ders Oluştur',
+                onTap: onCreateCourse,
+              ),
+              _QuickAction(
+                icon: Icons.create_new_folder_rounded,
+                label: 'Bölüm Ekle',
+                onTap: () {
+                  if (data.primaryCourse != null) {
+                    onOpenCourse(data.primaryCourse!);
+                  } else {
+                    onCreateCourse();
+                  }
+                },
+              ),
+              _QuickAction(
+                icon: Icons.picture_as_pdf_rounded,
+                label: 'PDF/PPT',
+                onTap: onOpenUploads,
+              ),
+              _QuickAction(
+                icon: Icons.layers_rounded,
+                label: 'Koleksiyonlar',
+                onTap: onOpenCollections,
+                color: AppColors.purple,
+              ),
+            ];
+            if (!compact) {
+              return Row(
+                children: [
+                  for (var i = 0; i < actions.length; i++) ...[
+                    Expanded(child: actions[i]),
+                    if (i != actions.length - 1) const SizedBox(width: 10),
+                  ],
+                ],
+              );
+            }
+            return GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1.95,
+              children: actions,
+            );
+          },
         ),
         SectionTitle(
           title: 'Derslerim',
@@ -87,7 +114,10 @@ class DriveHomeScreen extends StatelessWidget {
               ? Column(
                   children: [
                     for (final course in data.courses)
-                      _CourseRow(course: course, onTap: onOpenCourse),
+                      _CourseRow(
+                        course: course,
+                        onTap: () => onOpenCourse(course),
+                      ),
                   ],
                 )
               : const EmptyState(
@@ -110,9 +140,8 @@ class DriveHomeScreen extends StatelessWidget {
                 physics: const BouncingScrollPhysics(),
                 itemCount: data.collections.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 12),
-                itemBuilder: (context, index) => _CollectionCard(
-                  bundle: data.collections[index],
-                ),
+                itemBuilder: (context, index) =>
+                    _CollectionCard(bundle: data.collections[index]),
               ),
             ),
           )
@@ -121,7 +150,8 @@ class DriveHomeScreen extends StatelessWidget {
             padding: EdgeInsets.all(22),
             child: EmptyState(
               message: 'Henüz bir koleksiyonunuz yok.',
-              subMessage: 'Dosyalarınızdan flashcard veya özet üreterek başlayın.',
+              subMessage:
+                  'Dosyalarınızdan flashcard veya özet üreterek başlayın.',
             ),
           ),
         GlassPanel(
@@ -132,7 +162,7 @@ class DriveHomeScreen extends StatelessWidget {
                     for (final file in data.recentFiles)
                       _RecentUploadRow(
                         file: file,
-                        onTap: () {},
+                        onTap: () => onOpenFile(file),
                       ),
                   ],
                 )
@@ -285,34 +315,34 @@ class _QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Semantics(
-        button: true,
-        label: label,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: ExcludeSemantics(
-            child: GlassPanel(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 18),
-              radius: 14,
-              child: Column(
-                children: [
-                  Icon(icon, color: color, size: 34),
-                  const SizedBox(height: 12),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      label,
-                      style: const TextStyle(
-                        color: AppColors.navy,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: ExcludeSemantics(
+          child: GlassPanel(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 14),
+            radius: 14,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: color, size: 31),
+                const SizedBox(height: 9),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: const TextStyle(
+                      color: AppColors.navy,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -743,9 +773,7 @@ class _CollectionPreview extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.line),
       ),
-      child: CustomPaint(
-        painter: _PreviewMiniPainter(kind: kind),
-      ),
+      child: CustomPaint(painter: _PreviewMiniPainter(kind: kind)),
     );
   }
 }

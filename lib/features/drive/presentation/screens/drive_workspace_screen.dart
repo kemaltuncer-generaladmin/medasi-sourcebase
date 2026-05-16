@@ -50,6 +50,9 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
   DriveWorkspaceData data = DriveWorkspaceData.empty;
   WorkspaceRouteKey route = WorkspaceRouteKey.home;
   WorkspaceRouteKey searchReturnRoute = WorkspaceRouteKey.home;
+  String? selectedCourseId;
+  String? selectedSectionId;
+  String? selectedFileId;
   bool loading = true;
   bool busy = false;
   String? errorMessage;
@@ -70,6 +73,7 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
       if (!mounted) return;
       setState(() {
         data = loaded;
+        _syncSelection(loaded);
         loading = false;
       });
     } catch (e) {
@@ -83,6 +87,56 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
 
   void _go(WorkspaceRouteKey next) {
     setState(() => route = next);
+  }
+
+  void _syncSelection(DriveWorkspaceData workspace) {
+    if (selectedCourseId != null &&
+        !workspace.courses.any((course) => course.id == selectedCourseId)) {
+      selectedCourseId = null;
+      selectedSectionId = null;
+      selectedFileId = null;
+    }
+    selectedCourseId ??= workspace.primaryCourse?.id;
+
+    final course = _courseById(selectedCourseId, workspace);
+    if (selectedSectionId != null &&
+        !(course?.sections.any((section) => section.id == selectedSectionId) ??
+            false)) {
+      selectedSectionId = null;
+      selectedFileId = null;
+    }
+    selectedSectionId ??= course?.sections.firstOrNull?.id;
+
+    final section = _sectionById(selectedSectionId, workspace);
+    if (selectedFileId != null &&
+        !(section?.files.any((file) => file.id == selectedFileId) ?? false)) {
+      selectedFileId = null;
+    }
+    selectedFileId ??= section?.files.firstOrNull?.id;
+  }
+
+  void _openCourse(DriveCourse course) {
+    setState(() {
+      selectedCourseId = course.id;
+      selectedSectionId = course.sections.firstOrNull?.id;
+      selectedFileId = course.sections.firstOrNull?.files.firstOrNull?.id;
+      route = WorkspaceRouteKey.course;
+    });
+  }
+
+  void _openSection(DriveSection section) {
+    setState(() {
+      selectedSectionId = section.id;
+      selectedFileId = section.files.firstOrNull?.id;
+      route = WorkspaceRouteKey.folder;
+    });
+  }
+
+  void _openFile(DriveFile file) {
+    setState(() {
+      selectedFileId = file.id;
+      route = WorkspaceRouteKey.fileDetail;
+    });
   }
 
   void _openGlobalFileSearch() {
@@ -104,6 +158,9 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
     await _runAction('Ders oluşturuluyor...', () async {
       final course = await repository.createCourse(title.trim());
       setState(() {
+        selectedCourseId = course.id;
+        selectedSectionId = null;
+        selectedFileId = null;
         data = data.copyWith(courses: [course, ...data.courses]);
         route = WorkspaceRouteKey.course;
       });
@@ -113,6 +170,10 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
 
   Future<void> _createSection() async {
     final course = _primaryCourse;
+    if (course == null) {
+      _showSnack('Bölüm eklemek için önce bir ders oluşturun.');
+      return;
+    }
     final title = await _textDialog(
       title: 'Bölüm Ekle',
       label: 'Bölüm adı',
@@ -124,14 +185,19 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
         courseId: course.id,
         title: title.trim(),
       );
+      selectedCourseId = course.id;
+      selectedSectionId = section.id;
+      selectedFileId = null;
       _replaceCourse(course.copyWith(sections: [section, ...course.sections]));
+      setState(() => route = WorkspaceRouteKey.folder);
       _showSnack('${section.title} bölümü eklendi.');
     });
   }
 
   Future<void> _uploadFile() async {
-    final course = _primaryCourse;
-    final section = _primarySection;
+    final target = await _ensureUploadTarget();
+    if (target == null) return;
+    final (:course, :section) = target;
     final picked = await uploadService.pickFile();
     if (picked == null) return;
     await _runAction('Dosya yükleniyor...', () async {
@@ -156,6 +222,9 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
         courseTitle: course.title,
         sectionTitle: section.title,
       );
+      selectedCourseId = course.id;
+      selectedSectionId = section.id;
+      selectedFileId = uploaded.id;
       _addFileToSection(uploaded);
       setState(() => route = WorkspaceRouteKey.uploads);
       _showSnack('${picked.name} Drive alanına yüklendi.');
@@ -164,6 +233,10 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
 
   Future<void> _generateFromFile(GeneratedKind kind) async {
     final file = _primaryFile;
+    if (file == null) {
+      _showSnack('Üretim için önce Drive’dan bir dosya seçin.');
+      return;
+    }
     await _runAction('Üretim başlatılıyor...', () async {
       final output = await repository.createGeneratedOutput(
         file: file,
@@ -172,6 +245,69 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
       _replaceFile(file.copyWith(generated: [output, ...file.generated]));
       _showSnack('${output.title} oluşturuldu.');
     });
+  }
+
+  Future<({DriveCourse course, DriveSection section})?>
+  _ensureUploadTarget() async {
+    var course = _primaryCourse;
+    if (course == null) {
+      final title = await _textDialog(
+        title: 'Ders Oluştur',
+        label: 'Ders adı',
+        initialValue: 'Yeni Ders',
+      );
+      if (title == null || title.trim().isEmpty) return null;
+      try {
+        course = await repository.createCourse(title.trim());
+      } catch (error) {
+        _showSnack(error.toString().replaceFirst('Exception: ', ''));
+        return null;
+      }
+      setState(() {
+        selectedCourseId = course!.id;
+        data = data.copyWith(courses: [course, ...data.courses]);
+      });
+    }
+
+    var section = _primarySection;
+    if (section == null || selectedCourseId != course.id) {
+      section = course.sections.firstOrNull;
+    }
+    if (section == null) {
+      final title = await _textDialog(
+        title: 'Bölüm Ekle',
+        label: 'Bölüm adı',
+        initialValue: 'Yeni Bölüm',
+      );
+      if (title == null || title.trim().isEmpty) return null;
+      try {
+        section = await repository.createSection(
+          courseId: course.id,
+          title: title.trim(),
+        );
+      } catch (error) {
+        _showSnack(error.toString().replaceFirst('Exception: ', ''));
+        return null;
+      }
+      final updatedCourse = course.copyWith(
+        sections: [section, ...course.sections],
+      );
+      setState(() {
+        selectedCourseId = course!.id;
+        selectedSectionId = section!.id;
+        data = data.copyWith(
+          courses: [
+            for (final item in data.courses)
+              if (item.id == updatedCourse.id) updatedCourse else item,
+          ],
+        );
+      });
+      course = updatedCourse;
+    }
+
+    selectedCourseId = course.id;
+    selectedSectionId = section.id;
+    return (course: course, section: section);
   }
 
   Future<void> _runAction(String label, Future<void> Function() action) async {
@@ -201,6 +337,7 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
   void _addFileToSection(DriveFile file) {
     final course = _primaryCourse;
     final section = _primarySection;
+    if (course == null || section == null) return;
     final updatedSection = section.copyWith(files: [file, ...section.files]);
     final updatedCourse = course.copyWith(
       sections: [
@@ -297,11 +434,47 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
     return data;
   }
 
-  DriveCourse get _primaryCourse => _workspaceData.primaryCourse!;
+  DriveCourse? get _primaryCourse =>
+      _courseById(selectedCourseId, _workspaceData) ??
+      _workspaceData.primaryCourse;
 
-  DriveSection get _primarySection => _workspaceData.primarySection!;
+  DriveSection? get _primarySection =>
+      _sectionById(selectedSectionId, _workspaceData) ??
+      _primaryCourse?.sections.firstOrNull;
 
-  DriveFile get _primaryFile => _workspaceData.primaryFile!;
+  DriveFile? get _primaryFile =>
+      _fileById(selectedFileId, _workspaceData) ??
+      _primarySection?.files.firstOrNull;
+
+  DriveCourse? _courseById(String? id, [DriveWorkspaceData? workspace]) {
+    if (id == null) return null;
+    for (final course in (workspace ?? _workspaceData).courses) {
+      if (course.id == id) return course;
+    }
+    return null;
+  }
+
+  DriveSection? _sectionById(String? id, [DriveWorkspaceData? workspace]) {
+    if (id == null) return null;
+    for (final course in (workspace ?? _workspaceData).courses) {
+      for (final section in course.sections) {
+        if (section.id == id) return section;
+      }
+    }
+    return null;
+  }
+
+  DriveFile? _fileById(String? id, [DriveWorkspaceData? workspace]) {
+    if (id == null) return null;
+    for (final course in (workspace ?? _workspaceData).courses) {
+      for (final section in course.sections) {
+        for (final file in section.files) {
+          if (file.id == id) return file;
+        }
+      }
+    }
+    return null;
+  }
 
   List<DriveFile> get _allFiles {
     final workspace = _workspaceData;
@@ -327,7 +500,7 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
   Widget build(BuildContext context) {
     return ScreenTypeLayout.builder(
       mobile: (context) => _MobileLayout(screen: _buildScreen(), state: this),
-      tablet: (context) => _DesktopLayout(screen: _buildScreen(), state: this),
+      tablet: (context) => _TabletLayout(screen: _buildScreen(), state: this),
       desktop: (context) => _DesktopLayout(screen: _buildScreen(), state: this),
     );
   }
@@ -339,94 +512,101 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
     final file = workspace.primaryFile;
 
     return AnimatedSwitcher(
-        duration: const Duration(milliseconds: 180),
-        child: loading
-            ? const Center(child: CircularProgressIndicator())
-            : errorMessage != null
-                ? _ErrorState(
-                    message: 'Bir Sorun Oluştu',
-                    subtitle: errorMessage!,
-                    onRetry: _load,
-                  )
-                : KeyedSubtree(key: ValueKey(route), child: switch (route) {
-      WorkspaceRouteKey.home => DriveHomeScreen(
-          data: workspace,
-          onSearch: _openGlobalFileSearch,
-          onOpenCourse: () => _go(WorkspaceRouteKey.course),
-          onCreateCourse: _createCourse,
-          onOpenUploads: _uploadFile,
-          onOpenUploadsPage: () => _go(WorkspaceRouteKey.uploads),
-          onOpenCollections: () => _go(WorkspaceRouteKey.collections),
-          onRefresh: _load,
-        ),
-      WorkspaceRouteKey.course =>
-        course == null
-            ? const _ErrorPlaceholder()
-            : CourseDetailScreen(
-                course: course,
-                onSearch: _openGlobalFileSearch,
-                onBack: () => _go(WorkspaceRouteKey.home),
-                onOpenSection: () => _go(WorkspaceRouteKey.folder),
-                onCreateSection: _createSection,
-                onOpenUploads: _uploadFile,
-              ),
-      WorkspaceRouteKey.folder =>
-        (course == null || section == null)
-            ? const _ErrorPlaceholder()
-            : FolderScreen(
-                course: course,
-                section: section,
-                onSearch: _openGlobalFileSearch,
-                onBack: () => _go(WorkspaceRouteKey.course),
-                onOpenFile: () => _go(WorkspaceRouteKey.fileDetail),
-                onOpenUploads: _uploadFile,
-                onOpenCollections: () => _go(WorkspaceRouteKey.collections),
-              ),
-      WorkspaceRouteKey.fileDetail =>
-        file == null
-            ? const _ErrorPlaceholder()
-            : FileDetailScreen(
-                file: file,
-                onSearch: _openGlobalFileSearch,
-                onBack: () => _go(WorkspaceRouteKey.folder),
-                onGenerate: _generateFromFile,
-              ),
-      WorkspaceRouteKey.search => DriveSearchScreen(
-          files: _allFiles,
-          onBack: () => _go(searchReturnRoute),
-          onOpenFile: () => _go(WorkspaceRouteKey.fileDetail),
-        ),
-      WorkspaceRouteKey.uploads => UploadsScreen(
-          uploads: workspace.uploads,
-          onSearch: _openGlobalFileSearch,
-          onBack: () => _go(WorkspaceRouteKey.home),
-          onNewFile: _uploadFile,
-        ),
-      WorkspaceRouteKey.collections => CollectionsScreen(
-          data: workspace,
-          onSearch: _openGlobalFileSearch,
-          onBackToDrive: () => _go(WorkspaceRouteKey.home),
-        ),
-      WorkspaceRouteKey.baseForce => BaseForceScreen(
-          data: workspace,
-          onSearch: _openGlobalFileSearch,
-        ),
-      WorkspaceRouteKey.centralAi => CentralAiScreen(
-          onSearch: _openGlobalFileSearch,
-        ),
-      WorkspaceRouteKey.sourceLab => SourceLabScreen(
-          data: workspace,
-          onSearch: _openGlobalFileSearch,
-        ),
-      WorkspaceRouteKey.profile => ProfileScreen(
-          onSearch: _openGlobalFileSearch,
-          onOpenStore: () => _go(WorkspaceRouteKey.store),
-        ),
-      WorkspaceRouteKey.store => MedasiCoinStoreScreen(
-          onSearch: _openGlobalFileSearch,
-          onBack: () => _go(WorkspaceRouteKey.profile),
-        ),
-    }));
+      duration: const Duration(milliseconds: 180),
+      child: loading
+          ? const Center(child: CircularProgressIndicator())
+          : errorMessage != null
+          ? _ErrorState(
+              message: 'Bir Sorun Oluştu',
+              subtitle: errorMessage!,
+              onRetry: _load,
+            )
+          : KeyedSubtree(
+              key: ValueKey(route),
+              child: switch (route) {
+                WorkspaceRouteKey.home => DriveHomeScreen(
+                  data: workspace,
+                  onSearch: _openGlobalFileSearch,
+                  onOpenCourse: _openCourse,
+                  onOpenFile: _openFile,
+                  onCreateCourse: _createCourse,
+                  onOpenUploads: _uploadFile,
+                  onOpenUploadsPage: () => _go(WorkspaceRouteKey.uploads),
+                  onOpenCollections: () => _go(WorkspaceRouteKey.collections),
+                  onRefresh: _load,
+                ),
+                WorkspaceRouteKey.course =>
+                  course == null
+                      ? const _ErrorPlaceholder()
+                      : CourseDetailScreen(
+                          course: course,
+                          onSearch: _openGlobalFileSearch,
+                          onBack: () => _go(WorkspaceRouteKey.home),
+                          onOpenSection: _openSection,
+                          onCreateSection: _createSection,
+                          onOpenUploads: _uploadFile,
+                        ),
+                WorkspaceRouteKey.folder =>
+                  (course == null || section == null)
+                      ? const _ErrorPlaceholder()
+                      : FolderScreen(
+                          course: course,
+                          section: section,
+                          onSearch: _openGlobalFileSearch,
+                          onBack: () => _go(WorkspaceRouteKey.course),
+                          onOpenFile: _openFile,
+                          onOpenUploads: _uploadFile,
+                          onOpenCollections: () =>
+                              _go(WorkspaceRouteKey.collections),
+                        ),
+                WorkspaceRouteKey.fileDetail =>
+                  file == null
+                      ? const _ErrorPlaceholder()
+                      : FileDetailScreen(
+                          file: file,
+                          onSearch: _openGlobalFileSearch,
+                          onBack: () => _go(WorkspaceRouteKey.folder),
+                          onGenerate: _generateFromFile,
+                        ),
+                WorkspaceRouteKey.search => DriveSearchScreen(
+                  files: _allFiles,
+                  onBack: () => _go(searchReturnRoute),
+                  onOpenFile: _openFile,
+                ),
+                WorkspaceRouteKey.uploads => UploadsScreen(
+                  uploads: workspace.uploads,
+                  onSearch: _openGlobalFileSearch,
+                  onBack: () => _go(WorkspaceRouteKey.home),
+                  onNewFile: _uploadFile,
+                ),
+                WorkspaceRouteKey.collections => CollectionsScreen(
+                  data: workspace,
+                  onSearch: _openGlobalFileSearch,
+                  onBackToDrive: () => _go(WorkspaceRouteKey.home),
+                ),
+                WorkspaceRouteKey.baseForce => BaseForceScreen(
+                  data: workspace,
+                  onSearch: _openGlobalFileSearch,
+                ),
+                WorkspaceRouteKey.centralAi => CentralAiScreen(
+                  data: workspace,
+                  onSearch: _openGlobalFileSearch,
+                ),
+                WorkspaceRouteKey.sourceLab => SourceLabScreen(
+                  data: workspace,
+                  onSearch: _openGlobalFileSearch,
+                ),
+                WorkspaceRouteKey.profile => ProfileScreen(
+                  onSearch: _openGlobalFileSearch,
+                  onOpenStore: () => _go(WorkspaceRouteKey.store),
+                ),
+                WorkspaceRouteKey.store => MedasiCoinStoreScreen(
+                  onSearch: _openGlobalFileSearch,
+                  onBack: () => _go(WorkspaceRouteKey.profile),
+                ),
+              },
+            ),
+    );
   }
 }
 
@@ -459,6 +639,42 @@ class _MobileLayout extends StatelessWidget {
   }
 }
 
+class _TabletLayout extends StatelessWidget {
+  const _TabletLayout({required this.screen, required this.state});
+
+  final Widget screen;
+  final _DriveWorkspaceScreenState state;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Row(
+        children: [
+          SourceBaseNavRail(
+            selectedIndex: state._selectedNavIndex,
+            onChanged: state._onNavChanged,
+            extended: false,
+          ),
+          Expanded(
+            child: Stack(
+              children: [
+                screen,
+                if (state.busy)
+                  const Positioned(
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    child: LinearProgressIndicator(minHeight: 3),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DesktopLayout extends StatelessWidget {
   const _DesktopLayout({required this.screen, required this.state});
 
@@ -473,6 +689,7 @@ class _DesktopLayout extends StatelessWidget {
           SourceBaseNavRail(
             selectedIndex: state._selectedNavIndex,
             onChanged: state._onNavChanged,
+            extended: true,
           ),
           Expanded(
             child: Stack(

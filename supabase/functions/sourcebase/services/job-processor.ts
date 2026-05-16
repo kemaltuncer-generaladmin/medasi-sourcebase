@@ -1,11 +1,17 @@
 /**
  * SourceBase Job Processing Service
- * 
+ *
  * AI generation job'larını yönetir ve işler.
  * AGENTS.md Kural 9.4: Job status tracking
  */
 
-import { GenerationJob, JobStatus, SafeError } from "../types.ts";
+import {
+  GenerationJob,
+  GenerationType,
+  JobStatus,
+  SafeError,
+} from "../types.ts";
+import { VertexAIClient } from "./vertex-ai.ts";
 
 export interface JobUpdate {
   status?: JobStatus;
@@ -186,4 +192,189 @@ export async function cancelJob(
   });
 
   return true;
+}
+
+export interface JobProcessorConfig {
+  supabaseUrl: string;
+  serviceRoleKey: string;
+  vertexProjectId: string;
+  vertexLocation: string;
+  vertexModel: string;
+  vertexServiceAccountJson: string;
+}
+
+export class JobProcessor {
+  private vertex: VertexAIClient;
+
+  constructor(private config: JobProcessorConfig) {
+    this.vertex = new VertexAIClient({
+      projectId: config.vertexProjectId,
+      location: config.vertexLocation,
+      model: config.vertexModel,
+      serviceAccountJson: config.vertexServiceAccountJson,
+    });
+  }
+
+  async createJob(input: {
+    userId: string;
+    sourceFileId?: string;
+    jobType: GenerationType;
+    sourceText: string;
+    options?: {
+      count?: number;
+      temperature?: number;
+      maxTokens?: number;
+    };
+  }): Promise<GenerationJob> {
+    const job = await createJob(
+      this.config.supabaseUrl,
+      this.config.serviceRoleKey,
+      input.userId,
+      {
+        source_file_id: input.sourceFileId,
+        job_type: input.jobType,
+        model: this.config.vertexModel,
+        metadata: { sourceTextLength: input.sourceText.length },
+      },
+    );
+
+    await updateJob(
+      this.config.supabaseUrl,
+      this.config.serviceRoleKey,
+      job.id,
+      {
+        status: "processing",
+      },
+    );
+
+    try {
+      const result = await this.generate(
+        input.jobType,
+        input.sourceText,
+        input.options ?? {},
+      );
+      await updateJob(
+        this.config.supabaseUrl,
+        this.config.serviceRoleKey,
+        job.id,
+        {
+          status: "completed",
+          input_tokens: result.inputTokens,
+          output_tokens: result.outputTokens,
+          cost_estimate: result.costEstimate,
+          metadata: {
+            ...job.metadata,
+            content: result.content,
+            completedAt: new Date().toISOString(),
+          },
+        },
+      );
+      return {
+        ...job,
+        status: "completed",
+        input_tokens: result.inputTokens,
+        output_tokens: result.outputTokens,
+        cost_estimate: result.costEstimate,
+        metadata: {
+          ...job.metadata,
+          content: result.content,
+        },
+      };
+    } catch (error) {
+      await updateJob(
+        this.config.supabaseUrl,
+        this.config.serviceRoleKey,
+        job.id,
+        {
+          status: "failed",
+          error_message: error instanceof Error ? error.message : "Job failed.",
+        },
+      );
+      throw error;
+    }
+  }
+
+  async getJobStatus(userId: string, jobId: string): Promise<GenerationJob> {
+    const job = await getJob(
+      this.config.supabaseUrl,
+      this.config.serviceRoleKey,
+      jobId,
+      userId,
+    );
+    if (!job) {
+      throw new SafeError("JOB_NOT_FOUND", "İş bulunamadı.", 404);
+    }
+    return job;
+  }
+
+  listUserJobs(userId: string, limit = 50): Promise<GenerationJob[]> {
+    return listJobs(
+      this.config.supabaseUrl,
+      this.config.serviceRoleKey,
+      userId,
+      limit,
+    );
+  }
+
+  async cancelJob(userId: string, jobId: string): Promise<void> {
+    const ok = await cancelJob(
+      this.config.supabaseUrl,
+      this.config.serviceRoleKey,
+      jobId,
+      userId,
+    );
+    if (!ok) {
+      throw new SafeError("JOB_NOT_CANCELLED", "İş iptal edilemedi.", 400);
+    }
+  }
+
+  async retryJob(userId: string, jobId: string): Promise<GenerationJob> {
+    const oldJob = await this.getJobStatus(userId, jobId);
+    const metadata = oldJob.metadata ?? {};
+    const sourceText = metadata.sourceText?.toString() ??
+      metadata.sourceTextPreview?.toString() ??
+      "";
+    if (!sourceText.trim()) {
+      throw new SafeError(
+        "SOURCE_TEXT_REQUIRED",
+        "Yeniden deneme için kaynak metin bulunamadı.",
+        400,
+      );
+    }
+    return this.createJob({
+      userId,
+      sourceFileId: oldJob.source_file_id,
+      jobType: oldJob.job_type,
+      sourceText,
+    });
+  }
+
+  private generate(
+    jobType: GenerationType,
+    sourceText: string,
+    options: { count?: number; temperature?: number; maxTokens?: number },
+  ) {
+    switch (jobType) {
+      case "flashcard":
+        return this.vertex.generateFlashcards(
+          sourceText,
+          options.count ?? 20,
+          options,
+        );
+      case "quiz":
+        return this.vertex.generateQuiz(
+          sourceText,
+          options.count ?? 10,
+          options,
+        );
+      case "summary":
+        return this.vertex.generateSummary(sourceText, options);
+      case "algorithm":
+        return this.vertex.generateAlgorithm(sourceText, options);
+      case "comparison":
+        return this.vertex.generateComparison(sourceText, options);
+      case "podcast":
+        return this.vertex.generatePodcast(sourceText, options);
+    }
+  }
 }

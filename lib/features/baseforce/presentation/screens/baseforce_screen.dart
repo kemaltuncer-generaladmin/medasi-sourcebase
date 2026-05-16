@@ -19,6 +19,7 @@ enum BaseForceView {
   allGenerations,
   flashcardResults,
 }
+
 class BaseForceScreen extends StatefulWidget {
   const BaseForceScreen({
     required this.data,
@@ -42,6 +43,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
     super.initState();
     selectedSources = widget.data.recentFiles.take(2).map((f) => f.id).toSet();
   }
+
   String selectedFactory = 'flashcard';
   String selectedFilter = 'Tümü';
   String selectedQuestionDifficulty = 'Orta';
@@ -835,6 +837,7 @@ class _BaseForceHome extends StatelessWidget {
                     pages: file.pageLabel,
                     subject: file.courseTitle,
                     time: 'Az önce',
+                    warning: false,
                   ),
                   onTap: onOpenSources,
                 ),
@@ -971,6 +974,7 @@ class _SourcePickerScreen extends StatelessWidget {
                     pages: file.pageLabel,
                     subject: file.courseTitle,
                     time: 'Az önce',
+                    warning: false,
                   ),
                   selected: selectedSources.contains(file.id),
                   onTap: () => onToggleSource(file.id),
@@ -1322,7 +1326,10 @@ class _SummaryFactoryScreen extends StatelessWidget {
       art: _BaseForceArtKind.notebook,
       children: [
         _SelectedSourceChips(
-            data: data, onPickSources: onPickSources, includeThird: true),
+          data: data,
+          onPickSources: onPickSources,
+          includeThird: true,
+        ),
         const SizedBox(height: 18),
         const _ResponsiveGrid(
           minItemWidth: 240,
@@ -1533,6 +1540,7 @@ class _ComparisonFactoryScreen extends StatelessWidget {
                     pages: file.pageLabel,
                     subject: file.courseTitle,
                     time: 'Az önce',
+                    warning: false,
                   ),
                 ),
             ],
@@ -1678,6 +1686,8 @@ class _QueueScreen extends StatelessWidget {
                 ),
                 title: gen.title,
                 complete: true,
+                failed: false,
+                progress: 1,
                 time: gen.updatedLabel,
                 onAction: onOpenResult,
               ),
@@ -1870,13 +1880,17 @@ class _AllGenerationsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final allGenerations = data.recentFiles
-        .expand((file) => file.generated.map((gen) => _GenerationRowData(
+        .expand(
+          (file) => file.generated.map(
+            (gen) => _GenerationRowData(
               title: gen.title,
               source: file.title,
               kind: gen.kind.name,
               count: gen.detail,
               time: gen.updatedLabel,
-            )))
+            ),
+          ),
+        )
         .toList();
 
     final visible = selectedFilter == 'Tümü'
@@ -2733,15 +2747,18 @@ class _SelectedSourcesTray extends StatelessWidget {
   Widget build(BuildContext context) {
     final selected = data.recentFiles
         .where((file) => selectedSources.contains(file.id))
-        .map((file) => _BFSource(
-              id: file.id,
-              name: file.title,
-              kind: file.kind,
-              size: file.sizeLabel,
-              pages: file.pageLabel,
-              subject: file.courseTitle,
-              time: 'Az önce',
-            ))
+        .map(
+          (file) => _BFSource(
+            id: file.id,
+            name: file.title,
+            kind: file.kind,
+            size: file.sizeLabel,
+            pages: file.pageLabel,
+            subject: file.courseTitle,
+            time: 'Az önce',
+            warning: false,
+          ),
+        )
         .toList();
     return _BasePanel(
       padding: const EdgeInsets.all(18),
@@ -2889,6 +2906,7 @@ class _SourcesPanel extends StatelessWidget {
                   pages: file.pageLabel,
                   subject: file.courseTitle,
                   time: 'Az önce',
+                  warning: false,
                 ),
                 selected: true,
               ),
@@ -2985,6 +3003,7 @@ class _SelectedSourceChips extends StatelessWidget {
                   pages: file.pageLabel,
                   subject: file.courseTitle,
                   time: 'Az önce',
+                  warning: false,
                 ),
                 onTap: onPickSources,
               ),
@@ -6068,7 +6087,6 @@ GeneratedKind _kindForTurkishLabel(String label) {
     _ => GeneratedKind.flashcard,
   };
 }
-
 
 class _BFSource {
   const _BFSource({

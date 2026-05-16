@@ -18,11 +18,30 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+export function requireString(value: unknown, name: string): string {
+  const text = value?.toString().trim() ?? "";
+  if (!text) {
+    throw new SafeError("INVALID_PAYLOAD", `${name} alanı zorunlu.`, 400);
+  }
+  return text;
+}
+
 // Job Status Types
-export type JobStatus = "queued" | "processing" | "completed" | "failed" | "cancelled";
+export type JobStatus =
+  | "queued"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 // Generation Types
-export type GenerationType = "flashcard" | "quiz" | "summary" | "algorithm" | "comparison" | "podcast";
+export type GenerationType =
+  | "flashcard"
+  | "quiz"
+  | "summary"
+  | "algorithm"
+  | "comparison"
+  | "podcast";
 
 // AI Provider Types
 export type AIProvider = "vertex" | "openai";
