@@ -1,6 +1,6 @@
 /**
  * SourceBase Vertex AI Integration Service
- * 
+ *
  * Google Vertex AI ile içerik üretimi.
  * AGENTS.md Kural 11: API key sadece server-side kullanılır.
  * AGENTS.md Kural 12.4: Prompt injection'a karşı kaynak metni data olarak işlenir.
@@ -162,7 +162,8 @@ export class VertexAIClient {
     options: GenerationOptions = {},
   ): Promise<{ text: string; inputTokens: number; outputTokens: number }> {
     const token = await this.getAccessToken();
-    const endpoint = `https://${this.config.location}-aiplatform.googleapis.com/v1/projects/${this.config.projectId}/locations/${this.config.location}/publishers/google/models/${this.config.model}:generateContent`;
+    const endpoint =
+      `https://${this.config.location}-aiplatform.googleapis.com/v1/projects/${this.config.projectId}/locations/${this.config.location}/publishers/google/models/${this.config.model}:generateContent`;
 
     const requestBody = {
       contents: [{
@@ -216,7 +217,8 @@ export class VertexAIClient {
     count: number,
     options: GenerationOptions = {},
   ): Promise<GenerationResult<Flashcard[]>> {
-    const systemInstruction = `Sen tıp eğitimi için flashcard üreten bir uzmansın.
+    const systemInstruction =
+      `Sen tıp eğitimi için flashcard üreten bir uzmansın.
 Kurallar:
 - Her kartın ön yüzü tek, net bir soru veya ipucu içermeli
 - Arka yüz doğrudan, kısa ve öz cevap vermeli
@@ -252,7 +254,8 @@ Lütfen sadece JSON array döndür, başka açıklama ekleme.`;
     count: number,
     options: GenerationOptions = {},
   ): Promise<GenerationResult<QuizQuestion[]>> {
-    const systemInstruction = `Sen tıp eğitimi için çoktan seçmeli sınav soruları üreten bir uzmansın.
+    const systemInstruction =
+      `Sen tıp eğitimi için çoktan seçmeli sınav soruları üreten bir uzmansın.
 Kurallar:
 - Her soru net ve anlaşılır olmalı
 - 4 seçenek olmalı
@@ -261,7 +264,8 @@ Kurallar:
 - Her soru için açıklama ekle
 - Kaynakta olmayan bilgi uydurmayın`;
 
-    const prompt = `Aşağıdaki kaynak metinden ${count} adet çoktan seçmeli soru üret.
+    const prompt =
+      `Aşağıdaki kaynak metinden ${count} adet çoktan seçmeli soru üret.
 Her soru JSON formatında: {"question": "soru", "options": ["A", "B", "C", "D"], "correctIndex": 0, "explanation": "açıklama", "difficulty": "easy|medium|hard"}
 
 Kaynak metin:
@@ -321,7 +325,8 @@ Lütfen sadece JSON döndür.`;
     sourceText: string,
     options: GenerationOptions = {},
   ): Promise<GenerationResult<Algorithm>> {
-    const systemInstruction = `Sen tıbbi algoritma ve protokol oluşturan bir uzmansın.
+    const systemInstruction =
+      `Sen tıbbi algoritma ve protokol oluşturan bir uzmansın.
 Kurallar:
 - Adım adım net talimatlar ver
 - Her adımı numaralandır
@@ -354,7 +359,8 @@ Lütfen sadece JSON döndür.`;
     sourceText: string,
     options: GenerationOptions = {},
   ): Promise<GenerationResult<ComparisonTable>> {
-    const systemInstruction = `Sen tıbbi kavramları karşılaştıran tablo oluşturan bir uzmansın.
+    const systemInstruction =
+      `Sen tıbbi kavramları karşılaştıran tablo oluşturan bir uzmansın.
 Kurallar:
 - Net başlıklar kullan
 - Karşılaştırılabilir özellikler seç
@@ -386,7 +392,8 @@ Lütfen sadece JSON döndür.`;
     sourceText: string,
     options: GenerationOptions = {},
   ): Promise<GenerationResult<PodcastScript>> {
-    const systemInstruction = `Sen tıbbi konuları podcast formatına dönüştüren bir uzmansın.
+    const systemInstruction =
+      `Sen tıbbi konuları podcast formatına dönüştüren bir uzmansın.
 Kurallar:
 - Konuşma dilinde yaz
 - Host ve expert arasında diyalog oluştur
@@ -406,6 +413,43 @@ Lütfen sadece JSON döndür.`;
 
     return {
       content: podcast,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      costEstimate: this.calculateCost(result.inputTokens, result.outputTokens),
+    };
+  }
+
+  /**
+   * Merkezi AI sohbet cevabı
+   */
+  async generateCentralAiReply(
+    message: string,
+    context = "",
+    options: GenerationOptions = {},
+  ): Promise<GenerationResult<string>> {
+    const systemInstruction = `Sen SourceBase Merkezi AI asistanısın.
+Kullanıcı tıp öğrencisi veya hekim olabilir.
+Kurallar:
+- Türkçe, net ve uygulanabilir cevap ver
+- Emin olmadığın yerde belirsizliği belirt
+- Tıbbi karar gerektiren konularda klinik bağlam ve uzman değerlendirmesi gerektiğini söyle
+- Kaynak/context verilirse onu önceliklendir, kaynakta olmayan bilgiyi kaynak gibi sunma`;
+
+    const prompt = `Kullanıcı mesajı:
+${message}
+
+${context ? `Drive bağlamı:\n${context}\n` : ""}
+Cevabı kısa paragraflar ve gerektiğinde maddelerle ver.`;
+
+    const result = await this.callVertexAI(prompt, systemInstruction, {
+      temperature: options.temperature ?? 0.4,
+      maxTokens: options.maxTokens ?? 1200,
+      topP: options.topP,
+      topK: options.topK,
+    });
+
+    return {
+      content: result.text.trim(),
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
       costEstimate: this.calculateCost(result.inputTokens, result.outputTokens),

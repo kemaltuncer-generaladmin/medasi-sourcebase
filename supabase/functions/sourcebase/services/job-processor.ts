@@ -1,6 +1,6 @@
 /**
  * SourceBase Job Processing System
- * 
+ *
  * Async AI generation job yönetimi.
  * AGENTS.md Kural 9.4: Job status tracking (queued -> processing -> completed/failed)
  */
@@ -69,6 +69,7 @@ export class JobProcessor {
       model: this.config.vertexModel,
       metadata: {
         options: params.options ?? {},
+        sourceText: params.sourceText,
         sourceTextLength: params.sourceText.length,
       },
     };
@@ -76,9 +77,13 @@ export class JobProcessor {
     const [job] = await this.dbInsert("generated_jobs", [jobData]);
 
     // Async processing başlat (background)
-    this.processJobAsync(jobId, params).catch((error) => {
+    const processing = this.processJobAsync(jobId, params).catch((error) => {
       console.error(`Job ${jobId} processing error:`, error);
     });
+    const edgeRuntime = (globalThis as {
+      EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void };
+    }).EdgeRuntime;
+    edgeRuntime?.waitUntil?.(processing);
 
     return job as unknown as GenerationJob;
   }

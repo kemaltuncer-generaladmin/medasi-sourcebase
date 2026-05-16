@@ -1,14 +1,14 @@
 /**
  * SourceBase AI Generation Actions
- * 
+ *
  * Edge Function actions for AI content generation.
  * AGENTS.md Kural 11: OpenAI API key sadece server-side kullanılır.
  */
 
 import { isRecord, requireString, SafeError } from "../types.ts";
 import { JobProcessor } from "../services/job-processor.ts";
+import { VertexAIClient } from "../services/vertex-ai.ts";
 import {
-  chunkText,
   downloadFromGcs,
   estimateTokens,
   extractDocx,
@@ -26,7 +26,18 @@ export async function processFileExtraction(
 ): Promise<unknown> {
   const fileId = requireString(payload.fileId, "fileId");
 
-  // Dosya bilgilerini al
+  const extractionResult = await extractTextFromDriveFile(userId, fileId);
+
+  return {
+    fileId,
+    textLength: extractionResult.text.length,
+    pageCount: extractionResult.pageCount,
+    chunkCount: extractionResult.chunks.length,
+    tokenEstimate: estimateTokens(extractionResult.text),
+  };
+}
+
+async function extractTextFromDriveFile(userId: string, fileId: string) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -63,7 +74,6 @@ export async function processFileExtraction(
   const objectName = String(file.gcs_object_name ?? "");
   const fileType = String(file.file_type ?? "");
 
-  // GCS'den dosyayı indir
   const serviceAccountJson = Deno.env.get(
     "SOURCEBASE_GCS_SERVICE_ACCOUNT_JSON",
   );
@@ -77,7 +87,6 @@ export async function processFileExtraction(
     serviceAccountJson,
   );
 
-  // Dosya tipine göre extraction
   let extractionResult;
   switch (fileType) {
     case "pdf":
@@ -97,7 +106,6 @@ export async function processFileExtraction(
       );
   }
 
-  // Dosya kaydını güncelle
   await fetch(
     `${supabaseUrl}/rest/v1/drive_files?id=eq.${fileId}`,
     {
@@ -124,13 +132,7 @@ export async function processFileExtraction(
     },
   );
 
-  return {
-    fileId,
-    textLength: extractionResult.text.length,
-    pageCount: extractionResult.pageCount,
-    chunkCount: extractionResult.chunks.length,
-    tokenEstimate: estimateTokens(extractionResult.text),
-  };
+  return extractionResult;
 }
 
 /**
@@ -143,7 +145,16 @@ export async function createGenerationJob(
 ): Promise<unknown> {
   const fileId = payload.fileId ? String(payload.fileId) : undefined;
   const jobType = requireString(payload.jobType, "jobType");
-  const sourceText = requireString(payload.sourceText, "sourceText");
+  const explicitSourceText = payload.sourceText?.toString().trim() ?? "";
+  const sourceText = explicitSourceText ||
+    (fileId ? (await extractTextFromDriveFile(userId, fileId)).text : "");
+  if (!sourceText.trim()) {
+    throw new SafeError(
+      "SOURCE_TEXT_REQUIRED",
+      "Kaynak metin veya dosya seçimi gerekli.",
+      400,
+    );
+  }
 
   const count = payload.count ? Number(payload.count) : undefined;
   const temperature = payload.temperature
@@ -303,9 +314,40 @@ export async function retryJob(
 }
 
 /**
+ * Central AI chat
+ * Merkezi AI ekranı için doğrudan yanıt üretir.
+ */
+export async function centralAiChat(
+  _userId: string,
+  payload: Record<string, unknown>,
+): Promise<unknown> {
+  const message = requireString(payload.message, "message");
+  const context = payload.context?.toString().trim() ?? "";
+  const config = createVertexConfig();
+  const vertex = new VertexAIClient({
+    projectId: config.vertexProjectId,
+    location: config.vertexLocation,
+    model: config.vertexModel,
+    serviceAccountJson: config.vertexServiceAccountJson,
+  });
+  const reply = await vertex.generateCentralAiReply(message, context);
+
+  return {
+    message: reply.content,
+    inputTokens: reply.inputTokens,
+    outputTokens: reply.outputTokens,
+    costEstimate: reply.costEstimate,
+  };
+}
+
+/**
  * Job processor factory
  */
 function createJobProcessor(): JobProcessor {
+  return new JobProcessor(createVertexConfig());
+}
+
+function createVertexConfig() {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const vertexProjectId = Deno.env.get("VERTEX_PROJECT_ID");
@@ -326,12 +368,12 @@ function createJobProcessor(): JobProcessor {
     );
   }
 
-  return new JobProcessor({
+  return {
     supabaseUrl,
     serviceRoleKey,
     vertexProjectId,
     vertexLocation,
     vertexModel,
     vertexServiceAccountJson,
-  });
+  };
 }

@@ -1,11 +1,12 @@
-import { SafeError, isRecord } from "./types.ts";
+import { isRecord, SafeError } from "./types.ts";
 import {
-  processFileExtraction,
-  createGenerationJob,
-  getJobStatus,
-  getGeneratedContent,
-  listUserJobs,
   cancelJob,
+  centralAiChat,
+  createGenerationJob,
+  getGeneratedContent,
+  getJobStatus,
+  listUserJobs,
+  processFileExtraction,
   retryJob,
 } from "./actions/ai-generation.ts";
 
@@ -48,7 +49,7 @@ Deno.serve(async (request) => {
         return success(await completeUpload(user.id, payload));
       case "create_generated_output":
         return success(await createGeneratedOutput(user.id, payload));
-      
+
       // AI Generation actions
       case "process_file_extraction":
         return success(await processFileExtraction(user.id, payload));
@@ -64,7 +65,9 @@ Deno.serve(async (request) => {
         return success(await cancelJob(user.id, payload));
       case "retry_job":
         return success(await retryJob(user.id, payload));
-      
+      case "central_ai_chat":
+        return success(await centralAiChat(user.id, payload));
+
       default:
         return failure("UNKNOWN_ACTION", "SourceBase işlemi bulunamadı.", 400);
     }
@@ -309,13 +312,14 @@ async function completeUpload(userId: string, payload: JsonMap) {
 async function createGeneratedOutput(userId: string, payload: JsonMap) {
   const fileId = requireString(payload.fileId, "fileId");
   const kind = requireString(payload.kind, "kind");
+  const itemCount = Number(payload.itemCount ?? generatedCount(kind));
   await assertOwned(userId, "drive_files", fileId);
   const [row] = await dbInsert("generated_outputs", [{
     owner_user_id: userId,
     source_file_id: fileId,
     output_type: kind,
     title: generatedTitle(kind),
-    item_count: generatedCount(kind),
+    item_count: Number.isFinite(itemCount) ? itemCount : generatedCount(kind),
     status: "ready",
     metadata: { mode: "manual_request" },
   }]);
@@ -469,10 +473,6 @@ function json(body: unknown, status = 200) {
   });
 }
 
-function isRecord(value: unknown): value is JsonMap {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function requireString(value: unknown, name: string) {
   const text = value?.toString().trim() ?? "";
   if (!text) {
@@ -595,14 +595,4 @@ function formatDate(date: Date) {
 
 function formatTime(date: Date) {
   return date.toISOString().slice(11, 19).replaceAll(":", "");
-}
-
-class SafeError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-    public status = 400,
-  ) {
-    super(message);
-  }
 }

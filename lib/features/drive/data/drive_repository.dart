@@ -64,7 +64,7 @@ class DriveRepository {
     required String sectionTitle,
   }) async {
     if (api.isConfigured) {
-      await api.completeUpload(
+      final response = await api.completeUpload(
         objectName: objectName,
         courseId: courseId,
         sectionId: sectionId,
@@ -72,6 +72,10 @@ class DriveRepository {
         contentType: file.contentType,
         sizeBytes: file.sizeBytes,
       );
+      final row = _dataRow(response);
+      if (row.isNotEmpty) {
+        return _fileFromRow(row, courseTitle, sectionTitle, const []);
+      }
     }
     return DriveFile(
       id: 'file-${DateTime.now().millisecondsSinceEpoch}',
@@ -92,7 +96,26 @@ class DriveRepository {
     required GeneratedKind kind,
   }) async {
     if (api.isConfigured) {
-      await api.createGeneratedOutput(fileId: file.id, kind: kind);
+      final jobType = _jobTypeForGeneratedKind(kind);
+      int? itemCount;
+      if (jobType != null) {
+        final jobResponse = await api.createGenerationJob(
+          fileId: file.id,
+          jobType: jobType,
+          count: _defaultGenerationCount(kind),
+        );
+        final jobId = _text((jobResponse['data'] as Map?)?['jobId']);
+        if (jobId.isEmpty) {
+          throw StateError('AI üretim işi başlatılamadı.');
+        }
+        final content = await _waitForGeneratedContent(api, jobId);
+        itemCount = _contentItemCount(content);
+      }
+      await api.createGeneratedOutput(
+        fileId: file.id,
+        kind: kind,
+        itemCount: itemCount,
+      );
     }
     return GeneratedOutput(
       kind: kind,
@@ -144,6 +167,31 @@ DriveWorkspaceData _workspaceFromJson(Map<String, dynamic> json) {
         .toList(),
     collections: collections,
   );
+}
+
+Future<Object?> _waitForGeneratedContent(
+  SourceBaseDriveApi api,
+  String jobId,
+) async {
+  const maxAttempts = 24;
+  for (var attempt = 0; attempt < maxAttempts; attempt++) {
+    final statusResponse = await api.getJobStatus(jobId);
+    final statusData = statusResponse['data'];
+    final status = statusData is Map ? _text(statusData['status']) : '';
+    if (status == 'completed') {
+      final contentResponse = await api.getGeneratedContent(jobId);
+      final contentData = contentResponse['data'];
+      return contentData is Map ? contentData['content'] : null;
+    }
+    if (status == 'failed') {
+      final message = statusData is Map
+          ? _text(statusData['errorMessage'], fallback: 'AI üretimi başarısız.')
+          : 'AI üretimi başarısız.';
+      throw StateError(message);
+    }
+    await Future<void>.delayed(const Duration(seconds: 2));
+  }
+  throw StateError('AI üretimi zaman aşımına uğradı.');
 }
 
 DriveCourse _courseFromRow(
@@ -331,6 +379,41 @@ String _sizeLabel(int bytes) {
   final mb = bytes / (1024 * 1024);
   if (mb >= 1) return '${mb.toStringAsFixed(mb >= 10 ? 1 : 1)} MB';
   return '${(bytes / 1024).toStringAsFixed(0)} KB';
+}
+
+String? _jobTypeForGeneratedKind(GeneratedKind kind) {
+  return switch (kind) {
+    GeneratedKind.flashcard => 'flashcard',
+    GeneratedKind.question => 'quiz',
+    GeneratedKind.summary => 'summary',
+    GeneratedKind.algorithm => 'algorithm',
+    GeneratedKind.comparison => 'comparison',
+    GeneratedKind.podcast => 'podcast',
+    GeneratedKind.table || GeneratedKind.mindMap => null,
+  };
+}
+
+int? _defaultGenerationCount(GeneratedKind kind) {
+  return switch (kind) {
+    GeneratedKind.flashcard => 20,
+    GeneratedKind.question => 10,
+    _ => null,
+  };
+}
+
+int _contentItemCount(Object? content) {
+  if (content is List) return content.length;
+  if (content is Map) {
+    final bulletPoints = content['bulletPoints'];
+    final steps = content['steps'];
+    final rows = content['rows'];
+    final segments = content['segments'];
+    if (bulletPoints is List) return bulletPoints.length;
+    if (steps is List) return steps.length;
+    if (rows is List) return rows.length;
+    if (segments is List) return segments.length;
+  }
+  return 1;
 }
 
 String _generatedTitle(GeneratedKind kind) {

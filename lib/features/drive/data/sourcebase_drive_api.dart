@@ -46,7 +46,7 @@ class SourceBaseDriveApi {
     throw StateError('Upload session response is empty.');
   }
 
-  Future<void> completeUpload({
+  Future<Map<String, dynamic>> completeUpload({
     required String objectName,
     required String courseId,
     required String sectionId,
@@ -54,7 +54,7 @@ class SourceBaseDriveApi {
     required String contentType,
     required int sizeBytes,
   }) async {
-    await invoke(
+    return invoke(
       'complete_upload',
       payload: {
         'objectName': objectName,
@@ -84,10 +84,32 @@ class SourceBaseDriveApi {
   Future<Map<String, dynamic>> createGeneratedOutput({
     required String fileId,
     required GeneratedKind kind,
+    int? itemCount,
   }) {
-    return invoke(
-      'create_generated_output',
-      payload: {'fileId': fileId, 'kind': kind.name},
-    );
+    final payload = <String, dynamic>{'fileId': fileId, 'kind': kind.name};
+    if (itemCount != null) payload['itemCount'] = itemCount;
+    return invoke('create_generated_output', payload: payload);
+  }
+
+  Future<Map<String, dynamic>> createGenerationJob({
+    required String fileId,
+    required String jobType,
+    int? count,
+  }) {
+    final payload = <String, dynamic>{'fileId': fileId, 'jobType': jobType};
+    if (count != null) payload['count'] = count;
+    return invoke('create_generation_job', payload: payload);
+  }
+
+  Future<Map<String, dynamic>> getJobStatus(String jobId) {
+    return invoke('get_job_status', payload: {'jobId': jobId});
+  }
+
+  Future<Map<String, dynamic>> getGeneratedContent(String jobId) {
+    return invoke('get_generated_content', payload: {'jobId': jobId});
+  }
+
+  Future<Map<String, dynamic>> centralAiChat(String message) {
+    return invoke('central_ai_chat', payload: {'message': message});
   }
 }

@@ -66,9 +66,10 @@ create table if not exists sourcebase.cards (
 create table if not exists sourcebase.generated_jobs (
   id uuid primary key default gen_random_uuid(),
   owner_user_id uuid not null references auth.users(id) on delete cascade,
+  source_file_id uuid references sourcebase.drive_files(id) on delete set null,
   source_id uuid references sourcebase.sources(id) on delete set null,
   deck_id uuid references sourcebase.decks(id) on delete set null,
-  job_type text not null check (job_type in ('flashcards', 'summary', 'quiz', 'notes', 'outline', 'questions')),
+  job_type text not null check (job_type in ('flashcard', 'quiz', 'summary', 'algorithm', 'comparison', 'podcast')),
   status text not null default 'queued' check (status in ('queued', 'processing', 'completed', 'failed', 'cancelled')),
   model text,
   input_tokens integer,
@@ -200,6 +201,7 @@ create index if not exists sourcebase_cards_tags_idx on sourcebase.cards using g
 -- Generated jobs indexes
 create index if not exists sourcebase_generated_jobs_owner_idx on sourcebase.generated_jobs(owner_user_id);
 create index if not exists sourcebase_generated_jobs_status_idx on sourcebase.generated_jobs(status);
+create index if not exists sourcebase_generated_jobs_source_file_idx on sourcebase.generated_jobs(source_file_id);
 create index if not exists sourcebase_generated_jobs_source_idx on sourcebase.generated_jobs(source_id);
 create index if not exists sourcebase_generated_jobs_deck_idx on sourcebase.generated_jobs(deck_id);
 

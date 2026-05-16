@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
+import '../../../drive/data/sourcebase_drive_api.dart';
 import '../../../drive/presentation/widgets/drive_ui.dart';
 
 class CentralAiScreen extends StatefulWidget {
@@ -13,6 +14,7 @@ class CentralAiScreen extends StatefulWidget {
 }
 
 class _CentralAiScreenState extends State<CentralAiScreen> {
+  final SourceBaseDriveApi _api = const SourceBaseDriveApi();
   final TextEditingController _controller = TextEditingController();
   final List<_ChatMessage> _messages = [
     const _ChatMessage(
@@ -20,25 +22,55 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
       isAi: true,
     ),
   ];
+  bool _isSending = false;
 
-  void _sendMessage() {
-    if (_controller.text.trim().isEmpty) return;
+  Future<void> _sendMessage() async {
+    final prompt = _controller.text.trim();
+    if (prompt.isEmpty || _isSending) return;
     setState(() {
-      _messages.add(_ChatMessage(text: _controller.text.trim(), isAi: false));
+      _isSending = true;
+      _messages.add(_ChatMessage(text: prompt, isAi: false));
       _controller.clear();
-      // Simulate AI response
-      Future.delayed(const Duration(milliseconds: 600), () {
-        if (!mounted) return;
-        setState(() {
-          _messages.add(
-            const _ChatMessage(
-              text: 'Harika bir soru! Bu konuda Drive alanındaki kaynaklarınızı analiz edip size en uygun cevabı hazırlıyorum.',
-              isAi: true,
-            ),
-          );
-        });
-      });
     });
+
+    try {
+      final response = await _api.centralAiChat(prompt);
+      final data = response['data'];
+      final answer = data is Map
+          ? data['message']?.toString().trim() ?? ''
+          : '';
+      if (!mounted) return;
+      setState(() {
+        _messages.add(
+          _ChatMessage(
+            text: answer.isEmpty
+                ? 'Cevap üretildi ama içerik boş döndü. Lütfen tekrar dene.'
+                : answer,
+            isAi: true,
+          ),
+        );
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _messages.add(
+          _ChatMessage(
+            text: error.toString().replaceFirst('Bad state: ', ''),
+            isAi: true,
+          ),
+        );
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
@@ -73,7 +105,10 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
             ),
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 20,
+                ),
                 reverse: true,
                 itemCount: _messages.length,
                 itemBuilder: (context, index) {
@@ -85,6 +120,7 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
             _AiInputArea(
               controller: _controller,
               onSend: _sendMessage,
+              sending: _isSending,
             ),
           ],
         ),
@@ -110,64 +146,72 @@ class _ChatBubble extends StatelessWidget {
       child: Align(
         alignment: message.isAi ? Alignment.centerLeft : Alignment.centerRight,
         child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (message.isAi) ...[
-            Container(
-              width: 38,
-              height: 38,
-              decoration: const BoxDecoration(
-                color: AppColors.selectedBlue,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.psychology_rounded, color: AppColors.blue, size: 22),
-            ),
-            const SizedBox(width: 12),
-          ],
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: message.isAi ? Colors.white : AppColors.blue,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(20),
-                  topRight: const Radius.circular(20),
-                  bottomLeft: Radius.circular(message.isAi ? 4 : 20),
-                  bottomRight: Radius.circular(message.isAi ? 20 : 4),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (message.isAi) ...[
+              Container(
+                width: 38,
+                height: 38,
+                decoration: const BoxDecoration(
+                  color: AppColors.selectedBlue,
+                  shape: BoxShape.circle,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.navy.withValues(alpha: .06),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
+                child: const Icon(
+                  Icons.psychology_rounded,
+                  color: AppColors.blue,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: message.isAi ? Colors.white : AppColors.blue,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(20),
+                    topRight: const Radius.circular(20),
+                    bottomLeft: Radius.circular(message.isAi ? 4 : 20),
+                    bottomRight: Radius.circular(message.isAi ? 20 : 4),
                   ),
-                ],
-              ),
-              child: Text(
-                message.text,
-                style: TextStyle(
-                  color: message.isAi ? AppColors.navy : Colors.white,
-                  fontSize: 16,
-                  height: 1.4,
-                  fontWeight: FontWeight.w500,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.navy.withValues(alpha: .06),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  message.text,
+                  style: TextStyle(
+                    color: message.isAi ? AppColors.navy : Colors.white,
+                    fontSize: 16,
+                    height: 1.4,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
-          ),
-          if (!message.isAi) ...[
-            const SizedBox(width: 12),
-            Container(
-              width: 38,
-              height: 38,
-              decoration: const BoxDecoration(
-                color: Color(0xFFE2E8F0),
-                shape: BoxShape.circle,
+            if (!message.isAi) ...[
+              const SizedBox(width: 12),
+              Container(
+                width: 38,
+                height: 38,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE2E8F0),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.person_rounded,
+                  color: Color(0xFF64748B),
+                  size: 22,
+                ),
               ),
-              child: const Icon(Icons.person_rounded, color: Color(0xFF64748B), size: 22),
-            ),
+            ],
           ],
-        ],
         ),
       ),
     );
@@ -175,9 +219,14 @@ class _ChatBubble extends StatelessWidget {
 }
 
 class _AiInputArea extends StatelessWidget {
-  const _AiInputArea({required this.controller, required this.onSend});
+  const _AiInputArea({
+    required this.controller,
+    required this.onSend,
+    required this.sending,
+  });
   final TextEditingController controller;
-  final VoidCallback onSend;
+  final Future<void> Function() onSend;
+  final bool sending;
 
   @override
   Widget build(BuildContext context) {
@@ -201,7 +250,10 @@ class _AiInputArea extends StatelessWidget {
           children: [
             IconButton(
               onPressed: () {},
-              icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.blue),
+              icon: const Icon(
+                Icons.add_circle_outline_rounded,
+                color: AppColors.blue,
+              ),
             ),
             Expanded(
               child: TextField(
@@ -214,7 +266,7 @@ class _AiInputArea extends StatelessWidget {
                 onSubmitted: (_) => onSend(),
               ),
             ),
-            _SendButton(onTap: onSend),
+            _SendButton(onTap: onSend, sending: sending),
           ],
         ),
       ),
@@ -223,13 +275,14 @@ class _AiInputArea extends StatelessWidget {
 }
 
 class _SendButton extends StatelessWidget {
-  const _SendButton({required this.onTap});
-  final VoidCallback onTap;
+  const _SendButton({required this.onTap, required this.sending});
+  final Future<void> Function() onTap;
+  final bool sending;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: onTap,
+      onTap: sending ? null : onTap,
       child: Container(
         width: 42,
         height: 42,
@@ -237,7 +290,20 @@ class _SendButton extends StatelessWidget {
           gradient: AppColors.primaryGradient,
           shape: BoxShape.circle,
         ),
-        child: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 24),
+        child: sending
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(
+                Icons.arrow_upward_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
       ),
     );
   }

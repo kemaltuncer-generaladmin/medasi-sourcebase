@@ -26,7 +26,7 @@ Required public build arguments:
 - `SOURCEBASE_SUPABASE_PUBLIC_TOKEN`
 - `SOURCEBASE_PUBLIC_URL`
 
-`SOURCEBASE_SUPABASE_PUBLIC_TOKEN` is passed into Flutter as `SOURCEBASE_SUPABASE_ANON_KEY` during the Docker build. These values connect SourceBase to the same Supabase Auth user pool as Qlinik. Do not use `service_role` keys in Flutter, Docker build args, or browser code.
+`SOURCEBASE_SUPABASE_PUBLIC_TOKEN` is passed into Flutter as `SOURCEBASE_SUPABASE_ANON_KEY` during the Docker build. These values connect SourceBase to the same shared MedAsi Supabase backend/Auth user pool as Qlinik. In production this backend can be exposed through the shared Supabase custom API domain `https://medasi.com.tr`; `https://sourcebase.medasi.com.tr` is the SourceBase web app/origin, not a separate database. Do not use `service_role` keys in Flutter, Docker build args, or browser code.
 
 ## Auth Boundary
 
