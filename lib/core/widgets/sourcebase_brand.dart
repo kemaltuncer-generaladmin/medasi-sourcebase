@@ -13,36 +13,42 @@ class SourceBaseBrand extends StatelessWidget {
   Widget build(BuildContext context) {
     final markSize = compact ? 38.0 : 54.0;
     final textSize = compact ? 22.0 : 34.0;
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      alignment: Alignment.centerLeft,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SourceBaseMark(size: markSize),
-          SizedBox(width: compact ? 8 : 12),
-          RichText(
-            text: TextSpan(
-              style: TextStyle(
-                fontFamily: 'SF Pro Display',
-                fontSize: textSize,
-                height: 1,
-                letterSpacing: 0,
-                fontWeight: FontWeight.w500,
+    return Semantics(
+      container: true,
+      label: 'SourceBase',
+      child: ExcludeSemantics(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SourceBaseMark(size: markSize),
+              SizedBox(width: compact ? 8 : 12),
+              RichText(
+                text: TextSpan(
+                  style: TextStyle(
+                    fontFamily: 'SF Pro Display',
+                    fontSize: textSize,
+                    height: 1,
+                    letterSpacing: 0,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  children: const [
+                    TextSpan(
+                      text: 'Source',
+                      style: TextStyle(color: Color(0xFF0C18B8)),
+                    ),
+                    TextSpan(
+                      text: 'Base',
+                      style: TextStyle(color: AppColors.cyan),
+                    ),
+                  ],
+                ),
               ),
-              children: const [
-                TextSpan(
-                  text: 'Source',
-                  style: TextStyle(color: Color(0xFF0C18B8)),
-                ),
-                TextSpan(
-                  text: 'Base',
-                  style: TextStyle(color: AppColors.cyan),
-                ),
-              ],
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

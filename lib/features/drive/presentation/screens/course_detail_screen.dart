@@ -93,20 +93,20 @@ class CourseDetailScreen extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: OutlineIconButton(
+                          child: SBSecondaryButton(
                             label: 'Bölüm Ekle',
                             icon: Icons.create_new_folder_outlined,
-                            onTap: onCreateSection,
-                            height: 48,
+                            onPressed: onCreateSection,
+                            size: SBButtonSize.small,
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: PrimaryGradientButton(
+                          child: SBPrimaryButton(
                             label: 'Dosya Yükle',
                             icon: Icons.cloud_upload_outlined,
-                            onTap: onOpenUploads,
-                            height: 48,
+                            onPressed: onOpenUploads,
+                            size: SBButtonSize.small,
                           ),
                         ),
                       ],

@@ -98,7 +98,9 @@ void main() {
     },
   );
 
-  testWidgets('BaseForce search stays inside BaseForce', (tester) async {
+  testWidgets('BaseForce search opens global Drive file search', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       const AppShellForTest(child: DriveWorkspaceScreen()),
     );
@@ -109,8 +111,26 @@ void main() {
     await tester.tap(find.byIcon(Icons.search_rounded).first);
     await tester.pumpAndSettle();
 
-    expect(find.text('Tüm Üretimler'), findsOneWidget);
-    expect(find.text('Üretimlerde ara...'), findsOneWidget);
+    expect(find.text('Dosya Arama'), findsOneWidget);
+    expect(find.text('13 sonuç bulundu'), findsOneWidget);
+    expect(find.text('Filtreler'), findsOneWidget);
+  });
+
+  testWidgets('SourceLab search opens global Drive file search', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const AppShellForTest(child: DriveWorkspaceScreen()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('SourceLab'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.search_rounded).first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dosya Arama'), findsOneWidget);
+    expect(find.text('Filtreler'), findsOneWidget);
   });
 
   testWidgets('BaseForce remains usable on a phone viewport', (tester) async {
@@ -130,7 +150,7 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.search_rounded).first);
     await tester.pumpAndSettle();
-    expect(find.text('Tüm Üretimler'), findsOneWidget);
+    expect(find.text('Dosya Arama'), findsOneWidget);
   });
 }
 

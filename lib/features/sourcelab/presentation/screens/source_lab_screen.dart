@@ -42,29 +42,35 @@ class SourceLabScreen extends StatefulWidget {
 
 class _SourceLabScreenState extends State<SourceLabScreen> {
   SourceLabView view = SourceLabView.home;
-  late List<_LabSource> selectedSources = List.of(_defaultSources);
+  late List<_LabSource> selectedSources;
 
-  String clinicalType = 'Acil';
-  String clinicalDifficulty = 'Orta';
-  String clinicalLevel = 'Dönem 3';
-  String clinicalBranch = 'Kardiyoloji';
-  double patientAge = 58;
+  @override
+  void initState() {
+    super.initState();
+    selectedSources = _sourcePool(widget.data);
+  }
+
+  String clinicalType = '';
+  String clinicalDifficulty = '';
+  String clinicalLevel = '';
+  String clinicalBranch = '';
+  double patientAge = 0;
   bool clinicalFeedback = true;
 
-  String planGoal = 'Komite';
-  String planPriority = 'Karma';
-  String planIntensity = 'Orta';
-  int planDays = 7;
-  String dailyDuration = '2 saat';
+  String planGoal = '';
+  String planPriority = '';
+  String planIntensity = '';
+  int planDays = 1;
+  String dailyDuration = '';
   bool includeReviews = true;
 
-  String podcastVoice = 'Akademik';
-  String podcastDuration = '10 dk';
-  String podcastFocus = 'Kritik Noktalar';
-  double podcastPace = .55;
+  String podcastVoice = '';
+  String podcastDuration = '';
+  String podcastFocus = '';
+  double podcastPace = .5;
   bool includeMiniQuiz = true;
-  bool podcastPlaying = true;
-  double podcastPosition = .36;
+  bool podcastPlaying = false;
+  double podcastPosition = 0;
 
   String infographicStyle = 'Akademik';
   String infographicSize = 'Dikey';
@@ -283,6 +289,7 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onGenerate: () => _open(SourceLabView.planResult),
           ),
           SourceLabView.planResult => _LearningPlanResult(
+            selectedSources: selectedSources,
             planDays: planDays,
             planGoal: planGoal,
             onBack: _back,
@@ -418,33 +425,6 @@ class _LabSource {
   final String tag;
 }
 
-const _defaultSources = [
-  _LabSource(
-    id: 'pharma-pdf',
-    title: 'Farmakoloji Ders\nNotları.pdf',
-    kind: DriveFileKind.pdf,
-    size: '8.4 MB',
-    detail: '156 sayfa',
-    tag: 'Farmakoloji',
-  ),
-  _LabSource(
-    id: 'cardio-pptx',
-    title: 'Kardiyovasküler\nSistem.pptx',
-    kind: DriveFileKind.pptx,
-    size: '12.7 MB',
-    detail: '89 slayt',
-    tag: 'Kardiyoloji',
-  ),
-  _LabSource(
-    id: 'bio-docx',
-    title: 'Biyokimya\nEnzimler.docx',
-    kind: DriveFileKind.docx,
-    size: '2.6 MB',
-    detail: '73 sayfa',
-    tag: 'Biyokimya',
-  ),
-];
-
 List<_LabSource> _sourcePool(DriveWorkspaceData data) {
   final converted = <_LabSource>[];
   for (final file in data.recentFiles) {
@@ -459,12 +439,7 @@ List<_LabSource> _sourcePool(DriveWorkspaceData data) {
       ),
     );
   }
-  return [
-    ..._defaultSources,
-    ...converted.where(
-      (source) => !_defaultSources.any((item) => item.title == source.title),
-    ),
-  ];
+  return converted;
 }
 
 void _showLabSnack(BuildContext context, String message) {
@@ -535,12 +510,7 @@ class _SourceLabHome extends StatelessWidget {
               for (var i = 0; i < selectedSources.length; i++)
                 _RecentSourceRow(
                   source: selectedSources[i],
-                  trailing:
-                      '${i == 0
-                          ? '2 saat'
-                          : i == 1
-                          ? '5 saat'
-                          : '1 gün'} önce',
+                  trailing: 'Şimdi',
                   onTap: onPickSources,
                 ),
             ],
@@ -585,11 +555,11 @@ class _HomeContinuePanel extends StatelessWidget {
                     color: AppColors.blue,
                   ),
                   const SizedBox(width: 14),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           'Drive’dan Devam Et',
                           style: TextStyle(
                             color: AppColors.navy,
@@ -597,9 +567,9 @@ class _HomeContinuePanel extends StatelessWidget {
                             fontWeight: FontWeight.w900,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
-                          'Drive’ınızdan seçtiğiniz 3 kaynak',
+                          'Drive’ınızdan seçtiğiniz ${sources.length} kaynak',
                           style: TextStyle(
                             color: AppColors.muted,
                             fontSize: 15,
@@ -801,7 +771,7 @@ class _SmartSuggestionsPanel extends StatelessWidget {
             icon: Icons.psychology_outlined,
             color: AppColors.cyan,
             text:
-                'Biyokimya Enzimler.docx kaynağından “Enzim Kinetiği” konusunda özet çıkarabilirsiniz.',
+                'Yüklediğin kaynaklardan istediğin konuda özetler çıkarabilirsin.',
             onTap: () => onOpenTool(_ToolKind.infographic),
           ),
           _SuggestionRow(
@@ -815,7 +785,7 @@ class _SmartSuggestionsPanel extends StatelessWidget {
             icon: Icons.keyboard_voice_outlined,
             color: AppColors.blue,
             text:
-                'Farmakoloji Ders Notları.pdf kaynağını podcast formatında dinleyin.',
+                'Ders notlarını podcast formatında dinleyebilirsin.',
             onTap: () => onOpenTool(_ToolKind.podcast),
           ),
         ],
@@ -845,7 +815,7 @@ class _RecentActivitiesPanel extends StatelessWidget {
             icon: Icons.check_circle_outline_rounded,
             color: AppColors.green,
             title: 'Öğrenme planınız güncellendi',
-            subtitle: 'Farmakoloji modülü eklendi',
+            subtitle: 'Yeni özellikler eklendi',
             time: '2 saat önce',
             onTap: () => onOpenTool(_ToolKind.plan),
           ),
@@ -861,7 +831,7 @@ class _RecentActivitiesPanel extends StatelessWidget {
             icon: Icons.insert_chart_outlined_rounded,
             color: AppColors.blue,
             title: 'İnfografik oluşturuldu',
-            subtitle: 'Biyokimya Enzimler.docx',
+            subtitle: 'Yeni kaynak yüklendi',
             time: '1 gün önce',
             onTap: () => onOpenTool(_ToolKind.infographic),
           ),
@@ -1005,7 +975,7 @@ class _ClinicalScenarioBuilder extends StatelessWidget {
                       icon: Icons.favorite_border_rounded,
                       label: branch,
                       onTap: () => onBranch(
-                        branch == 'Kardiyoloji' ? 'Biyokimya' : 'Kardiyoloji',
+                        branch == 'Kategori 1' ? 'Kategori 2' : 'Kategori 1',
                       ),
                     ),
                   ),
@@ -1111,7 +1081,7 @@ class _ClinicalScenarioResult extends StatelessWidget {
                     'Vaka üzerinden ilerle, karar ver ve geri bildirim al.',
               );
               final pill = _InfoPill(
-                label: 'AKS - STEMI Senaryosu',
+                label: 'Klinik Senaryo',
                 icon: Icons.monitor_heart_outlined,
                 tint: AppColors.purple,
               );
@@ -1136,13 +1106,13 @@ class _ClinicalScenarioResult extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _QuestionTitle('İlk yaklaşımda hangi tetkik önceliklidir?'),
+              const _QuestionTitle('Soru yükleniyor...'),
               const SizedBox(height: 18),
               for (final answer in const [
-                ('A.', 'Akciğer grafisi', false),
-                ('B.', 'Tam kan sayımı', false),
-                ('C.', '12 derivasyonlu EKG', true),
-                ('D.', 'Kardiyak troponin', false),
+                ('A.', '...', false),
+                ('B.', '...', false),
+                ('C.', '...', false),
+                ('D.', '...', false),
               ])
                 _AnswerRow(
                   prefix: answer.$1,
@@ -1368,20 +1338,8 @@ class _LearningPlanBuilder extends StatelessWidget {
           number: 3,
           title: 'Odak Konular',
           child: _FocusChips(
-            labels: const [
-              'Kardiyoloji',
-              'Farmakoloji',
-              'Biyokimya',
-              'Enzimler',
-              'Akut Koroner Sendrom',
-            ],
-            selectedLabels: const {
-              'Kardiyoloji',
-              'Farmakoloji',
-              'Biyokimya',
-              'Enzimler',
-              'Akut Koroner Sendrom',
-            },
+            labels: const [],
+            selectedLabels: const {},
             onTap: (_) {},
           ),
         ),
@@ -1408,6 +1366,7 @@ class _LearningPlanBuilder extends StatelessWidget {
 
 class _LearningPlanResult extends StatelessWidget {
   const _LearningPlanResult({
+    required this.selectedSources,
     required this.planDays,
     required this.planGoal,
     required this.onBack,
@@ -1417,6 +1376,7 @@ class _LearningPlanResult extends StatelessWidget {
     required this.onRegenerate,
   });
 
+  final List<_LabSource> selectedSources;
   final int planDays;
   final String planGoal;
   final VoidCallback onBack;
@@ -1464,19 +1424,19 @@ class _LearningPlanResult extends StatelessWidget {
                   const _MetricCard(
                     icon: Icons.schedule_rounded,
                     title: 'Toplam Çalışma Süresi',
-                    value: '21 sa 15 dk',
+                    value: '-',
                     color: AppColors.blue,
                   ),
                   const _MetricCard(
                     icon: Icons.view_agenda_outlined,
                     title: 'Toplam Oturum',
-                    value: '28 oturum',
+                    value: '-',
                     color: AppColors.green,
                   ),
-                  const _MetricCard(
+                  _MetricCard(
                     icon: Icons.folder_outlined,
                     title: 'Seçilen Kaynak',
-                    value: '3 kaynak',
+                    value: '${selectedSources.length} kaynak',
                     color: AppColors.orange,
                   ),
                 ],
@@ -1755,12 +1715,12 @@ class _PodcastResult extends StatelessWidget {
               Row(
                 children: [
                   const Text(
-                    '03:42',
+                    '00:00',
                     style: TextStyle(color: AppColors.muted, fontSize: 18),
                   ),
                   const Spacer(),
                   const Text(
-                    '-06:42',
+                    '00:00',
                     style: TextStyle(color: AppColors.muted, fontSize: 18),
                   ),
                 ],
@@ -2032,12 +1992,12 @@ class _InfographicResult extends StatelessWidget {
             _InfoStatPanel(
               icon: Icons.bookmark_border_rounded,
               title: 'BÖLÜM SAYISI',
-              value: '6 bölüm',
+              value: '-',
             ),
             _InfoStatPanel(
               icon: Icons.palette_outlined,
               title: 'GÖRSEL STİL',
-              value: 'Modern  •  Akademik  •  Renkli',
+              value: '-',
             ),
           ],
         ),
@@ -2184,7 +2144,7 @@ class _MindMapBuilder extends StatelessWidget {
               _SettingRow(
                 label: 'Merkez Konu',
                 helper: true,
-                child: const _InputLike(text: 'Akut Koroner Sendrom'),
+                child: const _InputLike(text: ''),
               ),
               _SwitchSetting(
                 title: 'Alt Düğümleri Açık Başlat',
@@ -2198,14 +2158,7 @@ class _MindMapBuilder extends StatelessWidget {
           number: 3,
           title: 'Dahil Edilecek Başlıklar',
           child: _TopicWrap(
-            labels: const [
-              'Patofizyoloji',
-              'Klinik',
-              'Tanı',
-              'Tedavi',
-              'Komplikasyonlar',
-              'İlaçlar',
-            ],
+            labels: const [],
             selected: topics,
             onTap: onToggleTopic,
           ),
@@ -2355,7 +2308,11 @@ class _LabTopBar extends StatelessWidget {
           final actions = Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _RoundButton(icon: Icons.search_rounded, onTap: onSearch),
+              _RoundButton(
+                icon: Icons.search_rounded,
+                label: 'Ara',
+                onTap: onSearch,
+              ),
               const SizedBox(width: 10),
               _NotificationButton(
                 onTap: () => _showLabSnack(context, 'Bildirim merkezi açıldı.'),
@@ -2364,6 +2321,7 @@ class _LabTopBar extends StatelessWidget {
                 const SizedBox(width: 10),
                 _RoundButton(
                   icon: Icons.more_horiz_rounded,
+                  label: 'Diğer işlemler',
                   onTap: () =>
                       _showLabSnack(context, 'Sayfa seçenekleri açıldı.'),
                 ),
@@ -2380,6 +2338,7 @@ class _LabTopBar extends StatelessWidget {
                     if (onBack != null)
                       _RoundButton(
                         icon: Icons.arrow_back_rounded,
+                        label: 'Geri dön',
                         onTap: onBack!,
                       ),
                     if (onBack != null) const SizedBox(width: 12),
@@ -2395,7 +2354,11 @@ class _LabTopBar extends StatelessWidget {
           return Row(
             children: [
               if (onBack case final onBack?) ...[
-                _RoundButton(icon: Icons.arrow_back_rounded, onTap: onBack),
+                _RoundButton(
+                  icon: Icons.arrow_back_rounded,
+                  label: 'Geri dön',
+                  onTap: onBack,
+                ),
                 const SizedBox(width: 18),
               ],
               Expanded(child: brand),
@@ -2506,10 +2469,15 @@ class _MinimalTopBar extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  _RoundButton(icon: Icons.arrow_back_rounded, onTap: onBack),
+                  _RoundButton(
+                    icon: Icons.arrow_back_rounded,
+                    label: 'Geri dön',
+                    onTap: onBack,
+                  ),
                   const Spacer(),
                   _RoundButton(
                     icon: Icons.more_horiz_rounded,
+                    label: 'Diğer işlemler',
                     onTap: () =>
                         _showLabSnack(context, 'Sayfa seçenekleri açıldı.'),
                   ),
@@ -2524,13 +2492,18 @@ class _MinimalTopBar extends StatelessWidget {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _RoundButton(icon: Icons.arrow_back_rounded, onTap: onBack),
+            _RoundButton(
+              icon: Icons.arrow_back_rounded,
+              label: 'Geri dön',
+              onTap: onBack,
+            ),
             const SizedBox(width: 34),
             Expanded(
               child: _TitleBlock(title: title, subtitle: subtitle),
             ),
             _RoundButton(
               icon: Icons.more_horiz_rounded,
+              label: 'Diğer işlemler',
               onTap: () => _showLabSnack(context, 'Sayfa seçenekleri açıldı.'),
             ),
           ],
@@ -3224,42 +3197,55 @@ class _HeaderDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 30,
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      color: const Color(0xFFC9D5EA),
+    return ExcludeSemantics(
+      child: Container(
+        width: 1,
+        height: 30,
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        color: const Color(0xFFC9D5EA),
+      ),
     );
   }
 }
 
 class _RoundButton extends StatelessWidget {
-  const _RoundButton({required this.icon, required this.onTap});
+  const _RoundButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   final IconData icon;
+  final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: Container(
-        width: 52,
-        height: 52,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          border: Border.all(color: AppColors.line),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.navy.withValues(alpha: .06),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: ExcludeSemantics(
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.line),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.navy.withValues(alpha: .06),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-          ],
+            child: Icon(icon, color: AppColors.navy, size: 28),
+          ),
         ),
-        child: Icon(icon, color: AppColors.navy, size: 28),
       ),
     );
   }
@@ -3275,28 +3261,10 @@ class _NotificationButton extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        _RoundButton(icon: Icons.notifications_none_rounded, onTap: onTap),
-        Positioned(
-          top: 1,
-          right: 0,
-          child: Container(
-            width: 22,
-            height: 22,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.blue,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-            child: const Text(
-              '3',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
+        _RoundButton(
+          icon: Icons.notifications_none_rounded,
+          label: 'Bildirimler',
+          onTap: onTap,
         ),
       ],
     );
@@ -4986,7 +4954,7 @@ class _LearningGoalsPreview extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           for (final goal in const [
-            'AKS tanı yaklaşımını uygulama',
+            'Tanı yaklaşımını uygulama',
             'Uygun tetkik ve tedavi planlama',
             'Ayırıcı tanıda klinik karar verme',
           ])
@@ -5216,7 +5184,7 @@ class _PatientVitalsPanel extends StatelessWidget {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Ani başlayan göğüs ağrısı,\nsoğuk terleme, HT öyküsü.',
+                  'Klinik tablo ve\nbaşvuru şikayetleri.',
                   style: TextStyle(
                     color: AppColors.muted,
                     fontSize: 16,
@@ -5227,11 +5195,11 @@ class _PatientVitalsPanel extends StatelessWidget {
             ),
           ),
           for (final vital in const [
-            (Icons.favorite_border_rounded, '128', 'nabız/dk', AppColors.red),
-            (Icons.water_drop_outlined, '156/92', 'mmHg', AppColors.red),
-            (Icons.air_outlined, '20', 'sol/dk', AppColors.cyan),
-            (Icons.opacity_rounded, '95%', 'SpO₂', AppColors.green),
-            (Icons.thermostat_outlined, '36.6°C', 'Ateş', AppColors.blue),
+            (Icons.favorite_border_rounded, '-', 'nabız/dk', AppColors.muted),
+            (Icons.water_drop_outlined, '-', 'mmHg', AppColors.muted),
+            (Icons.air_outlined, '-', 'sol/dk', AppColors.muted),
+            (Icons.opacity_rounded, '-', 'SpO₂', AppColors.muted),
+            (Icons.thermostat_outlined, '-', 'Ateş', AppColors.muted),
           ])
             Expanded(
               child: Container(
@@ -5370,7 +5338,7 @@ class _ClinicalFeedbackPanel extends StatelessWidget {
                   ),
                   TextSpan(
                     text:
-                        'AKS şüphesi olan hastada en önemli ve zaman kritik tetkik 12 derivasyonlu EKG’dir. ST elevasyonu tanıyı hızla doğrular.',
+                        'Tanı kriterlerini inceleyerek en uygun yaklaşımı belirleyin.',
                   ),
                 ],
               ),
@@ -5438,24 +5406,19 @@ class _LearningPointsStrip extends StatelessWidget {
           runSpacing: 10,
           children: const [
             _InfoPill(
-              label: 'STEMI',
-              icon: Icons.monitor_heart_outlined,
+              label: 'Kavram 1',
+              icon: Icons.lightbulb_outline_rounded,
               tint: AppColors.purple,
             ),
             _InfoPill(
-              label: 'Troponin',
-              icon: Icons.water_drop_outlined,
+              label: 'Kavram 2',
+              icon: Icons.lightbulb_outline_rounded,
               tint: AppColors.blue,
             ),
             _InfoPill(
-              label: 'EKG',
-              icon: Icons.show_chart_rounded,
+              label: 'Kavram 3',
+              icon: Icons.lightbulb_outline_rounded,
               tint: AppColors.green,
-            ),
-            _InfoPill(
-              label: 'Acil Reperfüzyon',
-              icon: Icons.timer_outlined,
-              tint: AppColors.orange,
             ),
           ],
         ),
@@ -5475,8 +5438,8 @@ class _ClinicalScorePanel extends StatelessWidget {
           child: _ScoreBox(
             icon: Icons.emoji_events_outlined,
             title: 'Başarı',
-            value: '%86',
-            subtitle: 'Doğru karar oranı',
+            value: '-%',
+            subtitle: 'Karar oranı',
             color: AppColors.green,
           ),
         ),
@@ -5605,19 +5568,19 @@ class _PlanPreviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final lines = switch (day) {
       1 => [
-        'Farmakoloji - Genel İlkeler',
-        'Kardiyoloji - Temel Kavramlar',
-        'Biyokimya - Enzimler Yapısı',
+        'Konu 1',
+        'Konu 2',
+        'Konu 3',
       ],
       2 => [
-        'Farmakoloji - Reseptörler',
-        'Kardiyoloji - İskemik Kalp Hast.',
-        'Biyokimya - Enzim Kinetiği',
+        'Konu 1',
+        'Konu 2',
+        'Konu 3',
       ],
       _ => [
-        'Farmakoloji - Otonom İlaçlar',
-        'Kardiyoloji - Akut Koroner Send.',
-        'Biyokimya - Enzim Regülasyonu',
+        'Konu 1',
+        'Konu 2',
+        'Konu 3',
       ],
     };
     return Container(
@@ -5824,12 +5787,20 @@ class _ResultHeader extends StatelessWidget {
           Positioned(
             left: 0,
             top: 36,
-            child: _RoundButton(icon: Icons.arrow_back_rounded, onTap: onBack),
+            child: _RoundButton(
+              icon: Icons.arrow_back_rounded,
+              label: 'Geri dön',
+              onTap: onBack,
+            ),
           ),
           Positioned(
             right: 0,
             top: 36,
-            child: _RoundButton(icon: trailing, onTap: onTrailing),
+            child: _RoundButton(
+              icon: trailing,
+              label: 'Sayfa işlemi',
+              onTap: onTrailing,
+            ),
           ),
           Positioned(
             left: 140,
@@ -5959,28 +5930,21 @@ class _PlanTimelinePanel extends StatelessWidget {
     final items = [
       (
         '1',
-        'Kardiyoloji - Temel Kavramlar',
-        'Kalp Anatomisi, Fizyoloji, EKG’ye Giriş',
-        '3 sa 15 dk',
+        'Bölüm 1',
+        'İçerik açıklaması...',
+        '-',
       ),
       (
         '2',
-        'Biyokimya - Enzimler',
-        'Enzim Kinetiği, Regülasyon Mekanizmaları',
-        '3 sa 20 dk',
+        'Bölüm 2',
+        'İçerik açıklaması...',
+        '-',
       ),
       (
         '3',
-        'Farmakoloji - Otonomik İlaçlar',
-        'Kolinomimetikler, Kolinolitikler',
-        '3 sa 10 dk',
-      ),
-      ('4', 'Biyokimya - Vitaminler', 'Suda Çözünen Vitaminler', '2 sa 50 dk'),
-      (
-        '5',
-        'Kardiyoloji - İskemik Kalp Hastalığı',
-        'Patofizyoloji, Klinik, Tanı, Tedavi',
-        '3 sa 40 dk',
+        'Bölüm 3',
+        'İçerik açıklaması...',
+        '-',
       ),
     ];
     return _LabPanel(
@@ -6116,7 +6080,7 @@ class _TodayGoalCard extends StatelessWidget {
                     ),
                   ),
                   TextSpan(
-                    text: '3 oturum  •  3 sa 15 dk\n',
+                    text: '-  •  -\n',
                     style: TextStyle(
                       color: AppColors.navy,
                       fontWeight: FontWeight.w900,
@@ -6124,7 +6088,7 @@ class _TodayGoalCard extends StatelessWidget {
                   ),
                   TextSpan(
                     text:
-                        'Kardiyoloji - Temel Kavramlar\nPlanına sadık kal, hedefine yaklaş!',
+                        'Konu Başlığı\n...',
                   ),
                 ],
               ),
@@ -6177,7 +6141,7 @@ class _WeaknessAlertCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Son performansına göre Kardiyoloji ve Biyokimya konularında daha fazla zaman ayırmanı öneriyoruz.',
+                  'Daha fazla kaynak yükleyerek planını zenginleştirebilirsin.',
                   style: TextStyle(
                     color: AppColors.navy,
                     fontSize: 15,
@@ -6229,17 +6193,17 @@ class _PlanAnalysisPanel extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
                     _ProgressLine(
-                      label: 'Kardiyoloji',
+                      label: 'Konu 1',
                       value: .34,
                       color: AppColors.blue,
                     ),
                     _ProgressLine(
-                      label: 'Biyokimya',
+                      label: 'Konu 2',
                       value: .33,
                       color: AppColors.green,
                     ),
                     _ProgressLine(
-                      label: 'Farmakoloji',
+                      label: 'Konu 3',
                       value: .33,
                       color: AppColors.purple,
                     ),
@@ -6303,9 +6267,9 @@ class _LegendList extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: const [
-        _LegendRow(label: 'Video', value: '%43', color: AppColors.blue),
-        _LegendRow(label: 'Okuma/Özet', value: '%29', color: AppColors.green),
-        _LegendRow(label: 'Soru Çözümü', value: '%28', color: AppColors.purple),
+        _LegendRow(label: 'Kategori 1', value: '%-', color: AppColors.blue),
+        _LegendRow(label: 'Kategori 2', value: '%-', color: AppColors.green),
+        _LegendRow(label: 'Kategori 3', value: '%-', color: AppColors.purple),
       ],
     );
   }
@@ -6640,7 +6604,7 @@ class _PodcastResultMeta extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: const [
         Text(
-          'Kardiyoloji - Hızlı Podcast Özeti',
+          'İçerik Başlığı - Podcast Özeti',
           style: TextStyle(
             color: AppColors.navy,
             fontSize: 26,
@@ -6819,10 +6783,8 @@ class _PodcastChaptersPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final chapters = [
       ('1', 'Giriş', '00:00'),
-      ('2', 'Kalp Yetmezliği', '02:10'),
-      ('3', 'AKS', '04:32'),
-      ('4', 'Aritmiler', '07:18'),
-      ('5', 'Mini Quiz', '09:18'),
+      ('2', 'Bölüm 1', '00:00'),
+      ('3', 'Bölüm 2', '00:00'),
     ];
     return _LabPanel(
       padding: EdgeInsets.zero,
@@ -6910,16 +6872,8 @@ class _PodcastNotesPanel extends StatelessWidget {
           ),
           for (final note in const [
             (
-              'Kalp yetmezliğinde erken tanı kritik öneme sahiptir.',
-              'Semptomlar hafifken müdahale, prognozu belirgin şekilde iyileştirir.',
-            ),
-            (
-              'AKS yönetiminde zaman hayat kurtarır.',
-              'İlk tıbbi temas - balon süresi 90 dakikanın altında olmalıdır.',
-            ),
-            (
-              'Aritmilerde risk stratifikasyonu şarttır.',
-              'CHA₂DS₂-VASc skoru inme riskini belirlemede yol göstericidir.',
+              'Not başlığı yükleniyor...',
+              'İçerik açıklaması hazırlanıyor.',
             ),
           ])
             Padding(
@@ -7107,9 +7061,9 @@ class _HeartCoverCard extends StatelessWidget {
           Icon(Icons.favorite_rounded, color: AppColors.red, size: 80),
           SizedBox(height: 8),
           Text(
-            'AKUT KORONER\nSENDROM',
+            'KONU\nBAŞLIĞI',
             textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.red, fontWeight: FontWeight.w900),
+            style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900),
           ),
         ],
       ),
@@ -7127,7 +7081,7 @@ class _InfographicMetaBlock extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: const [
         Text(
-          'Akut Koroner Sendrom - İnfografik',
+          'İçerik Başlığı - İnfografik',
           style: TextStyle(
             color: AppColors.navy,
             fontSize: 24,
@@ -7146,7 +7100,7 @@ class _InfographicMetaBlock extends StatelessWidget {
         ),
         SizedBox(height: 14),
         Text(
-          'Kaynak: Kardiyovasküler Sistem.pptx',
+          'Kaynak: Yüklenen Dosyalar',
           style: TextStyle(color: AppColors.muted, fontSize: 15),
         ),
         SizedBox(height: 6),
@@ -7179,7 +7133,7 @@ class _InfographicPoster extends StatelessWidget {
       child: Column(
         children: [
           const Text(
-            'AKUT KORONER SENDROM',
+            'KONU BAŞLIĞI',
             style: TextStyle(
               color: Colors.white,
               fontSize: 34,
@@ -7189,7 +7143,7 @@ class _InfographicPoster extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Hızlı Tanı, Doğru Tedavi, Daha İyi Sonuç',
+            'Alt Başlık veya Açıklama',
             style: TextStyle(
               color: Colors.white,
               fontSize: 18,
@@ -7206,31 +7160,29 @@ class _InfographicPoster extends StatelessWidget {
                     children: const [
                       Expanded(
                         child: _PosterBox(
-                          title: 'TANIM',
+                          title: 'BAŞLIK 1',
                           lines: [
-                            'AKS, koroner arterlerde ani azalma veya tıkanma sonucu oluşur.',
-                            'STEMI',
-                            'NSTEMI',
-                            'Unstable Angina',
+                            'İçerik maddesi 1',
+                            'İçerik maddesi 2',
+                            'İçerik maddesi 3',
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _PosterBox(
+                          title: 'BAŞLIK 2',
+                          lines: [
+                            'İçerik maddesi 1',
+                            'İçerik maddesi 2',
+                            'İçerik maddesi 3',
                           ],
                         ),
                       ),
                       SizedBox(width: 10),
                       Expanded(
                         child: _PosterBox(
-                          title: 'KRİTİK BULGULAR',
-                          lines: [
-                            'Göğüs ağrısı / sıkışma',
-                            'Eforla artan ağrı',
-                            'Dispne, terleme, bulantı',
-                            'Sol kola yayılım',
-                          ],
-                        ),
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: _PosterBox(
-                          title: 'EKG BULGULARI',
+                          title: 'BULGULAR',
                           lines: [
                             'ST elevasyonu',
                             'ST depresyonu',
@@ -7496,40 +7448,28 @@ class _MindMapPreviewPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final branches = [
       (
-        'Patofizyoloji',
+        'Bölüm 1',
         Offset(size.width * .24, size.height * .24),
         AppColors.green,
-        ['Risk Faktörleri', 'Ateroskleroz'],
+        ['Madde 1', 'Madde 2'],
       ),
       (
-        'Tanı',
+        'Bölüm 2',
         Offset(size.width * .22, size.height * .52),
         AppColors.blue,
-        ['EKG Bulguları', 'Biyobelirteçler', 'Görüntüleme'],
+        ['Madde 1', 'Madde 2'],
       ),
       (
-        'Komplikasyonlar',
+        'Bölüm 3',
         Offset(size.width * .30, size.height * .76),
         AppColors.purple,
-        ['Aritmiler', 'Kalp Yetmezliği', 'Şok'],
+        ['Madde 1', 'Madde 2'],
       ),
       (
-        'Klinik',
+        'Bölüm 4',
         Offset(size.width * .72, size.height * .30),
         AppColors.orange,
-        ['Semptomlar', 'Fizik Muayene'],
-      ),
-      (
-        'Tedavi',
-        Offset(size.width * .74, size.height * .55),
-        const Color(0xFFFF3F7D),
-        ['Medikal Tedavi', 'Revaskülarizasyon', 'Yaşam Tarzı'],
-      ),
-      (
-        'İlaçlar',
-        Offset(size.width * .70, size.height * .78),
-        AppColors.cyan,
-        ['Antitrombotikler', 'Beta Blokerler', 'Statinler'],
+        ['Madde 1', 'Madde 2'],
       ),
     ];
     final line = Paint()

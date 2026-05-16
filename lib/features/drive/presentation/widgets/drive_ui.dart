@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
+import '../../../../core/design_system/design_system.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
 import '../../data/drive_models.dart';
+
+// Re-export design system buttons for backward compatibility
+export '../../../../core/design_system/buttons/sb_primary_button.dart';
+export '../../../../core/design_system/buttons/sb_secondary_button.dart';
+export '../../../../core/design_system/buttons/sb_icon_button.dart';
 
 class WorkspacePage extends StatelessWidget {
   const WorkspacePage({required this.child, super.key});
@@ -21,17 +28,43 @@ class WorkspacePage extends StatelessWidget {
 }
 
 class WorkspaceScroll extends StatelessWidget {
-  const WorkspaceScroll({required this.children, super.key});
+  const WorkspaceScroll({
+    required this.children,
+    this.onRefresh,
+    super.key,
+  });
 
   final List<Widget> children;
+  final RefreshCallback? onRefresh;
 
   @override
   Widget build(BuildContext context) {
+    final scroll = ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 138),
+      children: [
+        for (var i = 0; i < children.length; i++)
+          Semantics(
+            container: true,
+            explicitChildNodes: true,
+            sortKey: OrdinalSortKey(i.toDouble()),
+            child: children[i],
+          ),
+      ],
+    );
+
     return WorkspacePage(
-      child: ListView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 138),
-        children: children,
+      child: Semantics(
+        container: true,
+        explicitChildNodes: true,
+        child: onRefresh != null
+            ? RefreshIndicator(
+                onRefresh: onRefresh!,
+                displacement: 20,
+                color: AppColors.blue,
+                child: scroll,
+              )
+            : scroll,
       ),
     );
   }
@@ -58,6 +91,7 @@ class DriveTopBar extends StatelessWidget {
     final leading = onBack != null
         ? IconButton(
             onPressed: onBack,
+            tooltip: 'Geri dön',
             icon: const Icon(Icons.arrow_back_rounded, size: 31),
             color: AppColors.navy,
           )
@@ -77,6 +111,7 @@ class DriveTopBar extends StatelessWidget {
                   ),
                 );
             },
+            tooltip: 'Diğer işlemler',
             icon: const Icon(Icons.more_horiz_rounded, size: 30),
             color: AppColors.navy,
           )
@@ -85,6 +120,7 @@ class DriveTopBar extends StatelessWidget {
             children: [
               IconButton(
                 onPressed: onSearch,
+                tooltip: 'Ara',
                 icon: const Icon(Icons.search_rounded, size: 34),
                 color: AppColors.navy,
               ),
@@ -102,6 +138,7 @@ class DriveTopBar extends StatelessWidget {
                           ),
                         );
                     },
+                    tooltip: 'Bildirimler',
                     icon: const Icon(
                       Icons.notifications_none_rounded,
                       size: 32,
@@ -126,55 +163,69 @@ class DriveTopBar extends StatelessWidget {
             ],
           );
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 6, bottom: 24),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final titleText = Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.navy,
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0,
-            ),
-          );
-
-          if (constraints.maxWidth < 390 && showBrand && onBack == null) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(child: leading),
-                    const Spacer(),
-                    actions,
-                  ],
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: 'Üst çubuk',
+      child: Padding(
+        padding: const EdgeInsets.only(top: 6, bottom: 24),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final titleText = Semantics(
+              container: true,
+              header: true,
+              label: title,
+              child: ExcludeSemantics(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0,
+                  ),
                 ),
-                const SizedBox(height: 12),
-                titleText,
+              ),
+            );
+
+            if (constraints.maxWidth < 390 && showBrand && onBack == null) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(child: leading),
+                      const Spacer(),
+                      actions,
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  titleText,
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                leading,
+                if (showBrand && onBack == null) ...[
+                  ExcludeSemantics(
+                    child: Container(
+                      width: 1,
+                      height: 24,
+                      margin: const EdgeInsets.symmetric(horizontal: 18),
+                      color: AppColors.line,
+                    ),
+                  ),
+                ],
+                Expanded(child: titleText),
+                actions,
               ],
             );
-          }
-
-          return Row(
-            children: [
-              leading,
-              if (showBrand && onBack == null) ...[
-                Container(
-                  width: 1,
-                  height: 24,
-                  margin: const EdgeInsets.symmetric(horizontal: 18),
-                  color: AppColors.line,
-                ),
-              ],
-              Expanded(child: titleText),
-              actions,
-            ],
-          );
-        },
+          },
+        ),
       ),
     );
   }
@@ -196,22 +247,26 @@ class GlassPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: padding,
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: .92),
-        borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: borderColor ?? AppColors.line),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1A4288).withValues(alpha: .055),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
-          ),
-        ],
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      child: Container(
+        width: double.infinity,
+        padding: padding,
+        decoration: BoxDecoration(
+          color: AppColors.white.withValues(alpha: .92),
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(color: borderColor ?? AppColors.line),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1A4288).withValues(alpha: .055),
+              blurRadius: 22,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: child,
       ),
-      child: child,
     );
   }
 }
@@ -230,39 +285,47 @@ class SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 22, 2, 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                color: AppColors.navy,
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          if (actionLabel != null)
-            TextButton(
-              onPressed: onAction,
-              style: TextButton.styleFrom(foregroundColor: AppColors.blue),
-              child: Row(
-                children: [
-                  Text(
-                    actionLabel!,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      header: true,
+      label: title,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(2, 22, 2, 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: ExcludeSemantics(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
                   ),
-                  const SizedBox(width: 6),
-                  const Icon(Icons.chevron_right_rounded, size: 24),
-                ],
+                ),
               ),
             ),
-        ],
+            if (actionLabel != null)
+              TextButton(
+                onPressed: onAction,
+                style: TextButton.styleFrom(foregroundColor: AppColors.blue),
+                child: Row(
+                  children: [
+                    Text(
+                      actionLabel!,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.chevron_right_rounded, size: 24),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -403,51 +466,57 @@ class StatusPill extends StatelessWidget {
       DriveItemStatus.failed => AppColors.redBg,
       _ => AppColors.selectedBlue,
     };
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 10 : 12,
-        vertical: compact ? 5 : 8,
-      ),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: .14)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (status == DriveItemStatus.completed)
-            Icon(
-              Icons.check_circle_rounded,
-              color: color,
-              size: compact ? 15 : 18,
-            )
-          else if (status == DriveItemStatus.failed)
-            Icon(
-              Icons.warning_amber_rounded,
-              color: color,
-              size: compact ? 15 : 18,
-            )
-          else if (status == DriveItemStatus.processing ||
-              status == DriveItemStatus.uploading)
-            SizedBox(
-              width: compact ? 14 : 18,
-              height: compact ? 14 : 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(color),
-              ),
-            ),
-          if (status != DriveItemStatus.draft) SizedBox(width: compact ? 5 : 8),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: compact ? 12 : 15,
-              fontWeight: FontWeight.w700,
-            ),
+    return Semantics(
+      label: 'Durum: $label',
+      child: ExcludeSemantics(
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 10 : 12,
+            vertical: compact ? 5 : 8,
           ),
-        ],
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withValues(alpha: .14)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (status == DriveItemStatus.completed)
+                Icon(
+                  Icons.check_circle_rounded,
+                  color: color,
+                  size: compact ? 15 : 18,
+                )
+              else if (status == DriveItemStatus.failed)
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: color,
+                  size: compact ? 15 : 18,
+                )
+              else if (status == DriveItemStatus.processing ||
+                  status == DriveItemStatus.uploading)
+                SizedBox(
+                  width: compact ? 14 : 18,
+                  height: compact ? 14 : 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  ),
+                ),
+              if (status != DriveItemStatus.draft)
+                SizedBox(width: compact ? 5 : 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: compact ? 12 : 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -472,46 +541,52 @@ class FileKindBadge extends StatelessWidget {
     final color = kindColor(kind);
     final label = kindLabel(kind);
     final size = large ? 64.0 : (compact ? 40.0 : 46.0);
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: plain ? color.withValues(alpha: .08) : color,
-        borderRadius: BorderRadius.circular(large ? 9 : 7),
-        boxShadow: large
-            ? [
-                BoxShadow(
-                  color: color.withValues(alpha: .18),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
+    return Semantics(
+      image: true,
+      label: '$label dosya türü',
+      child: ExcludeSemantics(
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: plain ? color.withValues(alpha: .08) : color,
+            borderRadius: BorderRadius.circular(large ? 9 : 7),
+            boxShadow: large
+                ? [
+                    BoxShadow(
+                      color: color.withValues(alpha: .18),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                right: 0,
+                top: 0,
+                child: CustomPaint(
+                  size: Size(
+                    large ? 18 : (compact ? 12 : 14),
+                    large ? 18 : (compact ? 12 : 14),
+                  ),
+                  painter: FoldPainter(color: plain ? color : Colors.white),
                 ),
-              ]
-            : null,
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: 0,
-            top: 0,
-            child: CustomPaint(
-              size: Size(
-                large ? 18 : (compact ? 12 : 14),
-                large ? 18 : (compact ? 12 : 14),
               ),
-              painter: FoldPainter(color: plain ? color : Colors.white),
-            ),
-          ),
-          Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: plain ? color : Colors.white,
-                fontSize: large ? 20 : (compact ? 10.5 : 12),
-                fontWeight: FontWeight.w800,
+              Center(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: plain ? color : Colors.white,
+                    fontSize: large ? 20 : (compact ? 10.5 : 12),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -563,9 +638,14 @@ class MetaDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 7),
-      child: Text('•', style: TextStyle(color: AppColors.muted, fontSize: 16)),
+    return const ExcludeSemantics(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 7),
+        child: Text(
+          '•',
+          style: TextStyle(color: AppColors.muted, fontSize: 16),
+        ),
+      ),
     );
   }
 }
@@ -621,35 +701,43 @@ class _TrustItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: AppColors.blue, size: 28),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
-                ),
+    return Semantics(
+      label: '$title. $subtitle.',
+      child: ExcludeSemantics(
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.blue, size: 28),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.navy,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 3),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppColors.muted, fontSize: 11.5),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -659,11 +747,13 @@ class _VerticalRule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 42,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      color: AppColors.line,
+    return ExcludeSemantics(
+      child: Container(
+        width: 1,
+        height: 42,
+        margin: const EdgeInsets.symmetric(horizontal: 8),
+        color: AppColors.line,
+      ),
     );
   }
 }
@@ -692,4 +782,50 @@ Color generatedColor(GeneratedKind kind) {
     GeneratedKind.table => const Color(0xFF13B857),
     GeneratedKind.mindMap => AppColors.purple,
   };
+}
+
+class EmptyState extends StatelessWidget {
+  const EmptyState({
+    required this.message,
+    required this.subMessage,
+    this.icon = Icons.inbox_outlined,
+    super.key,
+  });
+
+  final String message;
+  final String subMessage;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 42,
+            color: AppColors.blue.withValues(alpha: .4),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subMessage,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.muted, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
 }

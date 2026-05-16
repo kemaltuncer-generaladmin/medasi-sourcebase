@@ -55,13 +55,13 @@ class UploadsScreen extends StatelessWidget {
           padding: const EdgeInsets.all(22),
           child: Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '4 dosya yükleniyor',
-                      style: TextStyle(
+                      '${uploads.length} dosya',
+                      style: const TextStyle(
                         color: AppColors.navy,
                         fontSize: 26,
                         fontWeight: FontWeight.w800,
@@ -81,11 +81,12 @@ class UploadsScreen extends StatelessWidget {
               ),
               Column(
                 children: [
-                  OutlineIconButton(
+                  SBSecondaryButton(
                     label: 'Yeni Dosya',
                     icon: Icons.add_rounded,
-                    onTap: onNewFile,
-                    height: 48,
+                    onPressed: onNewFile,
+                    size: SBButtonSize.small,
+                    fullWidth: false,
                   ),
                   const SizedBox(height: 18),
                   const SizedBox(
@@ -122,10 +123,19 @@ class UploadsScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        for (final upload in uploads) ...[
-          _UploadRow(upload: upload),
-          const SizedBox(height: 12),
-        ],
+        if (uploads.isEmpty)
+          const GlassPanel(
+            child: EmptyState(
+              message: 'Aktif yükleme bulunmuyor.',
+              subMessage: 'Yeni dosyalar yükleyerek başlayabilirsiniz.',
+              icon: Icons.cloud_done_outlined,
+            ),
+          )
+        else
+          for (final upload in uploads) ...[
+            _UploadRow(upload: upload),
+            const SizedBox(height: 12),
+          ],
       ],
     );
   }
@@ -351,7 +361,7 @@ class _UploadState extends StatelessWidget {
         return _ProgressStatus(
           icon: Icons.sync_rounded,
           title: 'Yükleniyor',
-          subtitle: 'Tahmini 8 saniye kaldı',
+          subtitle: 'Bekleniyor...',
           progress: upload.progress,
           color: AppColors.blue,
           bigPercent: true,

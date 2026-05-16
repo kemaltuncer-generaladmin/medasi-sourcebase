@@ -19,9 +19,15 @@ enum BaseForceView {
   allGenerations,
   flashcardResults,
 }
-
 class BaseForceScreen extends StatefulWidget {
-  const BaseForceScreen({super.key});
+  const BaseForceScreen({
+    required this.data,
+    required this.onSearch,
+    super.key,
+  });
+
+  final DriveWorkspaceData data;
+  final VoidCallback onSearch;
 
   @override
   State<BaseForceScreen> createState() => _BaseForceScreenState();
@@ -29,20 +35,19 @@ class BaseForceScreen extends StatefulWidget {
 
 class _BaseForceScreenState extends State<BaseForceScreen> {
   BaseForceView view = BaseForceView.home;
-  final Set<String> selectedSources = {'pharma-pdf', 'bio-docx'};
+  late final Set<String> selectedSources;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedSources = widget.data.recentFiles.take(2).map((f) => f.id).toSet();
+  }
   String selectedFactory = 'flashcard';
   String selectedFilter = 'Tümü';
   String selectedQuestionDifficulty = 'Orta';
 
   void _open(BaseForceView next) {
     setState(() => view = next);
-  }
-
-  void _handleSearch() {
-    if (view != BaseForceView.allGenerations) {
-      setState(() => view = BaseForceView.allGenerations);
-    }
-    _toast('BaseForce üretimlerinde arama açıldı.');
   }
 
   void _toast(String message) {
@@ -65,10 +70,11 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
         key: ValueKey(view),
         child: switch (view) {
           BaseForceView.home => _BaseForceHome(
-            onSearch: _handleSearch,
+            onSearch: widget.onSearch,
             onOpenSources: () => _open(BaseForceView.sourcePicker),
             onOpenAll: () => _open(BaseForceView.allGenerations),
             onOpenQueue: () => _open(BaseForceView.queue),
+            data: widget.data,
             onOpenFactory: (factory) {
               selectedFactory = factory;
               _open(switch (factory) {
@@ -82,8 +88,9 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             onOpenResult: () => _open(BaseForceView.flashcardResults),
           ),
           BaseForceView.sourcePicker => _SourcePickerScreen(
+            data: widget.data,
             selectedSources: selectedSources,
-            onSearch: _handleSearch,
+            onSearch: widget.onSearch,
             onToggleSource: (id) {
               setState(() {
                 if (selectedSources.contains(id)) {
@@ -103,50 +110,58 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             onUpload: () => _toast('Yeni yükleme akışı hazır.'),
           ),
           BaseForceView.flashcardFactory => _FlashcardFactoryScreen(
-            onSearch: _handleSearch,
+            data: widget.data,
+            onSearch: widget.onSearch,
             onPickSources: () => _open(BaseForceView.sourcePicker),
             onGenerate: () => _open(BaseForceView.queue),
             onSavePreview: () => _toast('Önizleme koleksiyona hazırlandı.'),
           ),
           BaseForceView.questionFactory => _QuestionFactoryScreen(
+            data: widget.data,
             selectedDifficulty: selectedQuestionDifficulty,
-            onSearch: _handleSearch,
+            onSearch: widget.onSearch,
             onPickSources: () => _open(BaseForceView.sourcePicker),
             onDifficulty: (value) =>
                 setState(() => selectedQuestionDifficulty = value),
             onGenerate: () => _open(BaseForceView.queue),
           ),
           BaseForceView.summaryFactory => _SummaryFactoryScreen(
-            onSearch: _handleSearch,
+            data: widget.data,
+            onSearch: widget.onSearch,
             onPickSources: () => _open(BaseForceView.sourcePicker),
             onGenerate: () => _open(BaseForceView.queue),
           ),
           BaseForceView.algorithmFactory => _AlgorithmFactoryScreen(
-            onSearch: _handleSearch,
+            data: widget.data,
+            onSearch: widget.onSearch,
             onPickSources: () => _open(BaseForceView.sourcePicker),
             onGenerate: () => _open(BaseForceView.queue),
           ),
           BaseForceView.comparisonFactory => _ComparisonFactoryScreen(
-            onSearch: _handleSearch,
+            data: widget.data,
+            onSearch: widget.onSearch,
             onPickSources: () => _open(BaseForceView.sourcePicker),
             onGenerate: () => _open(BaseForceView.queue),
+            onOpenResult: () => _open(BaseForceView.flashcardResults),
           ),
           BaseForceView.queue => _QueueScreen(
-            onSearch: _handleSearch,
+            data: widget.data,
+            onSearch: widget.onSearch,
             onOpenResult: () => _open(BaseForceView.flashcardResults),
             onRetry: () => _open(BaseForceView.algorithmFactory),
             onStop: () => _toast('Üretim duraklatıldı.'),
           ),
           BaseForceView.flashcardResults => _FlashcardResultsScreen(
-            onSearch: _handleSearch,
+            onSearch: widget.onSearch,
             onSave: () => _toast('Koleksiyona kaydedildi.'),
             onExport: () => _toast('Dışa aktarma hazırlanıyor.'),
             onRegenerate: () => _open(BaseForceView.flashcardFactory),
             onEdit: () => _toast('Düzenleme modu açıldı.'),
           ),
           BaseForceView.allGenerations => _AllGenerationsScreen(
+            data: widget.data,
             selectedFilter: selectedFilter,
-            onSearch: _handleSearch,
+            onSearch: widget.onSearch,
             onFilter: (filter) => setState(() => selectedFilter = filter),
             onOpenResult: () => _open(BaseForceView.flashcardResults),
             onRegenerate: () => _open(BaseForceView.flashcardFactory),
@@ -213,13 +228,18 @@ class _BaseForceTopBar extends StatelessWidget {
     final actions = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _RoundIconButton(icon: Icons.search_rounded, onTap: onSearch),
+        _RoundIconButton(
+          icon: Icons.search_rounded,
+          label: 'Ara',
+          onTap: onSearch,
+        ),
         const SizedBox(width: 8),
         Stack(
           clipBehavior: Clip.none,
           children: [
             _RoundIconButton(
               icon: Icons.notifications_none_rounded,
+              label: 'Bildirimler',
               onTap: () {
                 ScaffoldMessenger.of(context)
                   ..clearSnackBars()
@@ -249,13 +269,20 @@ class _BaseForceTopBar extends StatelessWidget {
       ],
     );
 
-    const baseForceLabel = Text(
-      'BaseForce',
-      style: TextStyle(
-        color: AppColors.blue,
-        fontSize: 23,
-        fontWeight: FontWeight.w900,
-        height: 1,
+    final baseForceLabel = Semantics(
+      container: true,
+      header: true,
+      label: 'BaseForce',
+      child: ExcludeSemantics(
+        child: Text(
+          'BaseForce',
+          style: TextStyle(
+            color: AppColors.blue,
+            fontSize: 23,
+            fontWeight: FontWeight.w900,
+            height: 1,
+          ),
+        ),
       ),
     );
 
@@ -281,11 +308,11 @@ class _BaseForceTopBar extends StatelessWidget {
           }
           return Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Row(
                   children: [
-                    Flexible(child: SourceBaseBrand(compact: true)),
-                    _TopDivider(),
+                    const Flexible(child: SourceBaseBrand(compact: true)),
+                    const _TopDivider(),
                     baseForceLabel,
                   ],
                 ),
@@ -304,42 +331,55 @@ class _TopDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 30,
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      color: const Color(0xFFC8D4E8),
+    return ExcludeSemantics(
+      child: Container(
+        width: 1,
+        height: 30,
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        color: const Color(0xFFC8D4E8),
+      ),
     );
   }
 }
 
 class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton({required this.icon, required this.onTap});
+  const _RoundIconButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   final IconData icon;
+  final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white,
-          border: Border.all(color: AppColors.line),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.navy.withValues(alpha: .04),
-              blurRadius: 14,
-              offset: const Offset(0, 8),
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: ExcludeSemantics(
+          child: Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              border: Border.all(color: AppColors.line),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.navy.withValues(alpha: .04),
+                  blurRadius: 14,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-          ],
+            child: Icon(icon, color: AppColors.navy, size: 28),
+          ),
         ),
-        child: Icon(icon, color: AppColors.navy, size: 28),
       ),
     );
   }
@@ -681,6 +721,7 @@ class _NetworkGridPainter extends CustomPainter {
 
 class _BaseForceHome extends StatelessWidget {
   const _BaseForceHome({
+    required this.data,
     required this.onSearch,
     required this.onOpenSources,
     required this.onOpenAll,
@@ -689,6 +730,7 @@ class _BaseForceHome extends StatelessWidget {
     required this.onOpenResult,
   });
 
+  final DriveWorkspaceData data;
   final VoidCallback onSearch;
   final VoidCallback onOpenSources;
   final VoidCallback onOpenAll;
@@ -783,8 +825,19 @@ class _BaseForceHome extends StatelessWidget {
           padding: EdgeInsets.zero,
           child: Column(
             children: [
-              for (final source in _demoSources.take(3))
-                _RecentSourceRow(source: source, onTap: onOpenSources),
+              for (final file in data.recentFiles.take(3))
+                _RecentSourceRow(
+                  source: _BFSource(
+                    id: file.id,
+                    name: file.title,
+                    kind: file.kind,
+                    size: file.sizeLabel,
+                    pages: file.pageLabel,
+                    subject: file.courseTitle,
+                    time: 'Az önce',
+                  ),
+                  onTap: onOpenSources,
+                ),
             ],
           ),
         ),
@@ -796,33 +849,17 @@ class _BaseForceHome extends StatelessWidget {
         _ResponsiveGrid(
           minItemWidth: 220,
           children: [
-            _RecentGenerationCard(
-              kind: GeneratedKind.flashcard,
-              title: 'Flashcard Fabrikası',
-              value: '128',
-              label: 'Flashcard',
-              source: 'Farmakoloji Ders Notları.pdf',
-              time: 'Az önce',
-              onTap: onOpenResult,
-            ),
-            _RecentGenerationCard(
-              kind: GeneratedKind.question,
-              title: 'Soru Fabrikası',
-              value: '45',
-              label: 'Soru',
-              source: 'Kardiyovasküler Sistem.pptx',
-              time: '2 saat önce',
-              onTap: () => onOpenFactory('question'),
-            ),
-            _RecentGenerationCard(
-              kind: GeneratedKind.summary,
-              title: 'Sınav Sabahı Özeti',
-              value: '24',
-              label: 'Özet Madde',
-              source: 'Biyokimya Enzimler.docx',
-              time: 'Dün',
-              onTap: () => onOpenFactory('summary'),
-            ),
+            for (final file in data.recentFiles)
+              for (final gen in file.generated)
+                _RecentGenerationCard(
+                  kind: gen.kind,
+                  title: gen.title,
+                  value: gen.detail,
+                  label: gen.kind.name,
+                  source: file.title,
+                  time: gen.updatedLabel,
+                  onTap: onOpenResult,
+                ),
           ],
         ),
       ],
@@ -832,6 +869,7 @@ class _BaseForceHome extends StatelessWidget {
 
 class _SourcePickerScreen extends StatelessWidget {
   const _SourcePickerScreen({
+    required this.data,
     required this.selectedSources,
     required this.onSearch,
     required this.onToggleSource,
@@ -839,6 +877,7 @@ class _SourcePickerScreen extends StatelessWidget {
     required this.onUpload,
   });
 
+  final DriveWorkspaceData data;
   final Set<String> selectedSources;
   final VoidCallback onSearch;
   final ValueChanged<String> onToggleSource;
@@ -916,17 +955,25 @@ class _SourcePickerScreen extends StatelessWidget {
         ),
         _SectionHeader(
           title: 'Drive’daki Dosyalar',
-          trailing: '${_demoSources.length} dosya',
+          trailing: '${data.recentFiles.length} dosya',
         ),
         _BasePanel(
           padding: EdgeInsets.zero,
           child: Column(
             children: [
-              for (final source in _demoSources)
+              for (final file in data.recentFiles)
                 _SourceSelectRow(
-                  source: source,
-                  selected: selectedSources.contains(source.id),
-                  onTap: () => onToggleSource(source.id),
+                  source: _BFSource(
+                    id: file.id,
+                    name: file.title,
+                    kind: file.kind,
+                    size: file.sizeLabel,
+                    pages: file.pageLabel,
+                    subject: file.courseTitle,
+                    time: 'Az önce',
+                  ),
+                  selected: selectedSources.contains(file.id),
+                  onTap: () => onToggleSource(file.id),
                 ),
             ],
           ),
@@ -935,6 +982,7 @@ class _SourcePickerScreen extends StatelessWidget {
         _UploadDropZone(onTap: onUpload),
         const SizedBox(height: 18),
         _SelectedSourcesTray(
+          data: data,
           selectedSources: selectedSources,
           onRemove: onToggleSource,
           onContinue: onContinue,
@@ -946,12 +994,14 @@ class _SourcePickerScreen extends StatelessWidget {
 
 class _FlashcardFactoryScreen extends StatelessWidget {
   const _FlashcardFactoryScreen({
+    required this.data,
     required this.onSearch,
     required this.onPickSources,
     required this.onGenerate,
     required this.onSavePreview,
   });
 
+  final DriveWorkspaceData data;
   final VoidCallback onSearch;
   final VoidCallback onPickSources;
   final VoidCallback onGenerate;
@@ -968,7 +1018,7 @@ class _FlashcardFactoryScreen extends StatelessWidget {
         _TwoPane(
           left: Column(
             children: [
-              _SourcesPanel(onPickSources: onPickSources),
+              _SourcesPanel(data: data, onPickSources: onPickSources),
               const SizedBox(height: 12),
               _BasePanel(
                 child: Column(
@@ -1127,6 +1177,7 @@ class _FlashcardFactoryScreen extends StatelessWidget {
 
 class _QuestionFactoryScreen extends StatelessWidget {
   const _QuestionFactoryScreen({
+    required this.data,
     required this.selectedDifficulty,
     required this.onSearch,
     required this.onPickSources,
@@ -1134,6 +1185,7 @@ class _QuestionFactoryScreen extends StatelessWidget {
     required this.onGenerate,
   });
 
+  final DriveWorkspaceData data;
   final String selectedDifficulty;
   final VoidCallback onSearch;
   final VoidCallback onPickSources;
@@ -1148,7 +1200,7 @@ class _QuestionFactoryScreen extends StatelessWidget {
           'Seçtiğiniz kaynaklardan, yapay zeka ile\nözelleştirilmiş sorular üretin.',
       onSearch: onSearch,
       children: [
-        _SelectedSourceChips(onPickSources: onPickSources),
+        _SelectedSourceChips(data: data, onPickSources: onPickSources),
         const SizedBox(height: 20),
         _BasePanel(
           child: Column(
@@ -1248,10 +1300,13 @@ class _QuestionFactoryScreen extends StatelessWidget {
 
 class _SummaryFactoryScreen extends StatelessWidget {
   const _SummaryFactoryScreen({
+    required this.data,
     required this.onSearch,
     required this.onPickSources,
     required this.onGenerate,
   });
+
+  final DriveWorkspaceData data;
 
   final VoidCallback onSearch;
   final VoidCallback onPickSources;
@@ -1266,7 +1321,8 @@ class _SummaryFactoryScreen extends StatelessWidget {
       onSearch: onSearch,
       art: _BaseForceArtKind.notebook,
       children: [
-        _SelectedSourceChips(onPickSources: onPickSources, includeThird: true),
+        _SelectedSourceChips(
+            data: data, onPickSources: onPickSources, includeThird: true),
         const SizedBox(height: 18),
         const _ResponsiveGrid(
           minItemWidth: 240,
@@ -1321,11 +1377,13 @@ class _SummaryFactoryScreen extends StatelessWidget {
 
 class _AlgorithmFactoryScreen extends StatelessWidget {
   const _AlgorithmFactoryScreen({
+    required this.data,
     required this.onSearch,
     required this.onPickSources,
     required this.onGenerate,
   });
 
+  final DriveWorkspaceData data;
   final VoidCallback onSearch;
   final VoidCallback onPickSources;
   final VoidCallback onGenerate;
@@ -1338,7 +1396,7 @@ class _AlgorithmFactoryScreen extends StatelessWidget {
           'Klinik süreçlerinizi görsel akış şemaları ve\nalgoritmalar ile yapılandırın.',
       onSearch: onSearch,
       children: [
-        _SelectedSourceChips(onPickSources: onPickSources),
+        _SelectedSourceChips(data: data, onPickSources: onPickSources),
         const SizedBox(height: 14),
         _BasePanel(
           child: Column(
@@ -1437,14 +1495,18 @@ class _AlgorithmFactoryScreen extends StatelessWidget {
 
 class _ComparisonFactoryScreen extends StatelessWidget {
   const _ComparisonFactoryScreen({
+    required this.data,
     required this.onSearch,
     required this.onPickSources,
     required this.onGenerate,
+    required this.onOpenResult,
   });
 
+  final DriveWorkspaceData data;
   final VoidCallback onSearch;
   final VoidCallback onPickSources;
   final VoidCallback onGenerate;
+  final VoidCallback onOpenResult;
 
   @override
   Widget build(BuildContext context) {
@@ -1461,8 +1523,18 @@ class _ComparisonFactoryScreen extends StatelessWidget {
             children: [
               const Text('Seçilen Kaynaklar (2)', style: _titleStyle),
               const SizedBox(height: 12),
-              _ComparisonSourceLine(source: _demoSources[0]),
-              _ComparisonSourceLine(source: _demoSources[1]),
+              for (final file in data.recentFiles.take(2))
+                _ComparisonSourceLine(
+                  source: _BFSource(
+                    id: file.id,
+                    name: file.title,
+                    kind: file.kind,
+                    size: file.sizeLabel,
+                    pages: file.pageLabel,
+                    subject: file.courseTitle,
+                    time: 'Az önce',
+                  ),
+                ),
             ],
           ),
         ),
@@ -1532,12 +1604,14 @@ class _ComparisonFactoryScreen extends StatelessWidget {
 
 class _QueueScreen extends StatelessWidget {
   const _QueueScreen({
+    required this.data,
     required this.onSearch,
     required this.onOpenResult,
     required this.onRetry,
     required this.onStop,
   });
 
+  final DriveWorkspaceData data;
   final VoidCallback onSearch;
   final VoidCallback onOpenResult;
   final VoidCallback onRetry;
@@ -1589,41 +1663,24 @@ class _QueueScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 22),
-        _QueueRow(
-          source: _demoQueueSources[0],
-          title: 'Flashcard\nFabrikası',
-          progress: .62,
-          time: '~ 1 dk 20 sn',
-          onAction: onStop,
-        ),
-        _QueueRow(
-          source: _demoQueueSources[1],
-          title: 'Soru\nFabrikası',
-          progress: .28,
-          time: '~ 2 dk 10 sn',
-          onAction: onStop,
-        ),
-        _QueueRow(
-          source: _demoQueueSources[2],
-          title: 'Sınav Sabahı\nÖzeti',
-          complete: true,
-          time: 'Dün 15:42',
-          onAction: onOpenResult,
-        ),
-        _QueueRow(
-          source: _demoQueueSources[3],
-          title: 'Karşılaştırma\nTablosu',
-          complete: true,
-          time: 'Dün 11:08',
-          onAction: onOpenResult,
-        ),
-        _QueueRow(
-          source: _demoQueueSources[4],
-          title: 'Akış Şeması &\nAlgoritma',
-          failed: true,
-          time: 'Dün 09:31',
-          onAction: onRetry,
-        ),
+        for (final file in data.recentFiles)
+          if (file.generated.isNotEmpty)
+            for (final gen in file.generated)
+              _QueueRow(
+                source: _BFSource(
+                  id: file.id,
+                  name: file.title,
+                  kind: file.kind,
+                  size: file.sizeLabel,
+                  pages: file.pageLabel,
+                  subject: file.courseTitle,
+                  time: 'Az önce',
+                ),
+                title: gen.title,
+                complete: true,
+                time: gen.updatedLabel,
+                onAction: onOpenResult,
+              ),
       ],
     );
   }
@@ -1791,6 +1848,7 @@ class _FlashcardResultsScreen extends StatelessWidget {
 
 class _AllGenerationsScreen extends StatelessWidget {
   const _AllGenerationsScreen({
+    required this.data,
     required this.selectedFilter,
     required this.onSearch,
     required this.onFilter,
@@ -1800,6 +1858,7 @@ class _AllGenerationsScreen extends StatelessWidget {
     required this.onClear,
   });
 
+  final DriveWorkspaceData data;
   final String selectedFilter;
   final VoidCallback onSearch;
   final ValueChanged<String> onFilter;
@@ -1810,9 +1869,20 @@ class _AllGenerationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final allGenerations = data.recentFiles
+        .expand((file) => file.generated.map((gen) => _GenerationRowData(
+              title: gen.title,
+              source: file.title,
+              kind: gen.kind.name,
+              count: gen.detail,
+              time: gen.updatedLabel,
+            )))
+        .toList();
+
     final visible = selectedFilter == 'Tümü'
-        ? _generationRows
-        : _generationRows.where((row) => row.kind == selectedFilter).toList();
+        ? allGenerations
+        : allGenerations.where((row) => row.kind == selectedFilter).toList();
+
     return _BaseForcePage(
       title: 'Tüm Üretimler',
       subtitle:
@@ -2648,19 +2718,30 @@ class _UploadDropZone extends StatelessWidget {
 
 class _SelectedSourcesTray extends StatelessWidget {
   const _SelectedSourcesTray({
+    required this.data,
     required this.selectedSources,
     required this.onRemove,
     required this.onContinue,
   });
 
+  final DriveWorkspaceData data;
   final Set<String> selectedSources;
   final ValueChanged<String> onRemove;
   final VoidCallback onContinue;
 
   @override
   Widget build(BuildContext context) {
-    final selected = _demoSources
-        .where((source) => selectedSources.contains(source.id))
+    final selected = data.recentFiles
+        .where((file) => selectedSources.contains(file.id))
+        .map((file) => _BFSource(
+              id: file.id,
+              name: file.title,
+              kind: file.kind,
+              size: file.sizeLabel,
+              pages: file.pageLabel,
+              subject: file.courseTitle,
+              time: 'Az önce',
+            ))
         .toList();
     return _BasePanel(
       padding: const EdgeInsets.all(18),
@@ -2780,8 +2861,9 @@ class _SelectedSourceChip extends StatelessWidget {
 }
 
 class _SourcesPanel extends StatelessWidget {
-  const _SourcesPanel({required this.onPickSources});
+  const _SourcesPanel({required this.data, required this.onPickSources});
 
+  final DriveWorkspaceData data;
   final VoidCallback onPickSources;
 
   @override
@@ -2795,10 +2877,21 @@ class _SourcesPanel extends StatelessWidget {
             title: 'Kaynaklarınız',
           ),
           const SizedBox(height: 18),
-          for (final source in _demoSources.take(2))
+          for (final file in data.recentFiles.take(2))
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: _CompactSourceTile(source: source, selected: true),
+              child: _CompactSourceTile(
+                source: _BFSource(
+                  id: file.id,
+                  name: file.title,
+                  kind: file.kind,
+                  size: file.sizeLabel,
+                  pages: file.pageLabel,
+                  subject: file.courseTitle,
+                  time: 'Az önce',
+                ),
+                selected: true,
+              ),
             ),
           InkWell(
             onTap: onPickSources,
@@ -2859,16 +2952,20 @@ class _SourcesPanel extends StatelessWidget {
 
 class _SelectedSourceChips extends StatelessWidget {
   const _SelectedSourceChips({
+    required this.data,
     required this.onPickSources,
     this.includeThird = false,
   });
 
+  final DriveWorkspaceData data;
   final VoidCallback onPickSources;
   final bool includeThird;
 
   @override
   Widget build(BuildContext context) {
-    final sources = includeThird ? _demoSources.take(3) : _demoSources.take(2);
+    final sources = includeThird
+        ? data.recentFiles.take(3)
+        : data.recentFiles.take(2);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2878,8 +2975,19 @@ class _SelectedSourceChips extends StatelessWidget {
           spacing: 10,
           runSpacing: 10,
           children: [
-            for (final source in sources)
-              _SourceChipCard(source: source, onTap: onPickSources),
+            for (final file in sources)
+              _SourceChipCard(
+                source: _BFSource(
+                  id: file.id,
+                  name: file.title,
+                  kind: file.kind,
+                  size: file.sizeLabel,
+                  pages: file.pageLabel,
+                  subject: file.courseTitle,
+                  time: 'Az önce',
+                ),
+                onTap: onPickSources,
+              ),
             _DashedAddButton(onTap: onPickSources),
           ],
         ),
@@ -5961,6 +6069,7 @@ GeneratedKind _kindForTurkishLabel(String label) {
   };
 }
 
+
 class _BFSource {
   const _BFSource({
     required this.id,
@@ -5998,145 +6107,3 @@ class _GenerationRowData {
   final String count;
   final String time;
 }
-
-const _demoSources = [
-  _BFSource(
-    id: 'pharma-pdf',
-    name: 'Farmakoloji Ders Notları.pdf',
-    kind: DriveFileKind.pdf,
-    size: '12.4 MB',
-    pages: '42 sayfa',
-    subject: 'Farmakoloji',
-    time: 'Az önce',
-  ),
-  _BFSource(
-    id: 'cardio-ppt',
-    name: 'Kardiyovasküler Sistem.pptx',
-    kind: DriveFileKind.pptx,
-    size: '8.7 MB',
-    pages: '23 slayt',
-    subject: 'Anatomi',
-    time: '2 saat önce',
-  ),
-  _BFSource(
-    id: 'bio-docx',
-    name: 'Biyokimya Enzimler.docx',
-    kind: DriveFileKind.docx,
-    size: '2.3 MB',
-    pages: '16 sayfa',
-    subject: 'Biyokimya',
-    time: 'Dün',
-  ),
-  _BFSource(
-    id: 'anatomy-pdf',
-    name: 'Anatomi Atlası.pdf',
-    kind: DriveFileKind.pdf,
-    size: '45.1 MB',
-    pages: '120 sayfa',
-    subject: 'Anatomi',
-    time: 'Dün',
-    warning: true,
-  ),
-  _BFSource(
-    id: 'bio-ppt',
-    name: 'Biyokimya Metabolizma.pptx',
-    kind: DriveFileKind.pptx,
-    size: '5.6 MB',
-    pages: '18 slayt',
-    subject: 'Biyokimya',
-    time: 'Dün',
-  ),
-];
-
-const _demoQueueSources = [
-  _BFSource(
-    id: 'queue-bio',
-    name: 'Biyokimya Enzimler.docx',
-    kind: DriveFileKind.docx,
-    size: '2.3 MB',
-    pages: '12 Sayfa',
-    subject: 'Biyokimya',
-    time: 'Şimdi',
-  ),
-  _BFSource(
-    id: 'queue-pharma',
-    name: 'Farmakoloji Ders Notları.pdf',
-    kind: DriveFileKind.pdf,
-    size: '12.4 MB',
-    pages: '28 Sayfa',
-    subject: 'Farmakoloji',
-    time: 'Şimdi',
-  ),
-  _BFSource(
-    id: 'queue-cardio',
-    name: 'Kardiyovasküler Sistem.pptx',
-    kind: DriveFileKind.pptx,
-    size: '8.7 MB',
-    pages: '23 Slayt',
-    subject: 'Kardiyoloji',
-    time: 'Dün',
-  ),
-  _BFSource(
-    id: 'queue-table',
-    name: 'Karşılaştırma Tablosu.xlsx',
-    kind: DriveFileKind.doc,
-    size: '1.1 MB',
-    pages: '4 Sayfa',
-    subject: 'Kardiyoloji',
-    time: 'Dün',
-  ),
-  _BFSource(
-    id: 'queue-micro',
-    name: 'Mikrobiyoloji Özet.pptx',
-    kind: DriveFileKind.pptx,
-    size: '5.6 MB',
-    pages: '15 Slayt',
-    subject: 'Mikrobiyoloji',
-    time: 'Dün',
-  ),
-];
-
-const _generationRows = [
-  _GenerationRowData(
-    title: 'Farmakoloji Ders Notları',
-    source: 'Farmakoloji Ders Notları.pdf',
-    kind: 'Flashcard',
-    count: '48 kart',
-    time: 'Bugün 14:32',
-  ),
-  _GenerationRowData(
-    title: 'Kardiyovasküler Sistem Soruları',
-    source: 'Kardiyovasküler Sistem.pptx',
-    kind: 'Soru',
-    count: '20 soru',
-    time: 'Bugün 13:08',
-  ),
-  _GenerationRowData(
-    title: 'Sınav Sabahı Özeti',
-    source: 'Biyokimya Enzimler.docx',
-    kind: 'Özet',
-    count: '1 özet',
-    time: 'Bugün 10:45',
-  ),
-  _GenerationRowData(
-    title: 'Akış Şeması - İlaç Metabolizması',
-    source: 'Farmakoloji Ders Notları.pdf',
-    kind: 'Algoritma',
-    count: '1 algoritma',
-    time: 'Dün 17:22',
-  ),
-  _GenerationRowData(
-    title: 'Karşılaştırma Tablosu - NSAİİ',
-    source: 'Farmakoloji Ders Notları.pdf',
-    kind: 'Tablo',
-    count: '1 tablo',
-    time: 'Dün 15:41',
-  ),
-  _GenerationRowData(
-    title: 'Enzimler Flashcard Seti',
-    source: 'Biyokimya Enzimler.docx',
-    kind: 'Flashcard',
-    count: '36 kart',
-    time: 'Dün 11:09',
-  ),
-];

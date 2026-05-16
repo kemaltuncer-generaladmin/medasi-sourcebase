@@ -81,41 +81,50 @@ class _BottomNavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        height: 78,
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.selectedBlue : Colors.transparent,
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              item.icon,
-              color: selected ? AppColors.blue : const Color(0xFF6C7892),
-              size: 30,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: item.label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(15),
+        child: ExcludeSemantics(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            height: 78,
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+            decoration: BoxDecoration(
+              color: selected ? AppColors.selectedBlue : Colors.transparent,
+              borderRadius: BorderRadius.circular(15),
             ),
-            const SizedBox(height: 7),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                item.label,
-                maxLines: 1,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: selected ? AppColors.blue : const Color(0xFF56637E),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  height: 1,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  item.icon,
+                  color: selected ? AppColors.blue : const Color(0xFF6C7892),
+                  size: 30,
                 ),
-              ),
+                const SizedBox(height: 7),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    item.label,
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: selected
+                          ? AppColors.blue
+                          : const Color(0xFF56637E),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

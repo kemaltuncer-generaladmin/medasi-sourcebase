@@ -77,19 +77,23 @@ class FolderScreen extends StatelessWidget {
             const Spacer(),
             SizedBox(
               width: 150,
-              child: PrimaryGradientButton(
+              child: SBPrimaryButton(
                 label: 'Dosya Yükle',
                 icon: Icons.add_rounded,
-                onTap: onOpenUploads,
+                onPressed: onOpenUploads,
+                size: SBButtonSize.medium,
+                fullWidth: false,
               ),
             ),
             const SizedBox(width: 12),
             SizedBox(
               width: 95,
-              child: OutlineIconButton(
+              child: SBSecondaryButton(
                 label: 'Seç',
                 icon: Icons.select_all_rounded,
-                onTap: () {},
+                onPressed: () {},
+                size: SBButtonSize.medium,
+                fullWidth: false,
               ),
             ),
           ],
@@ -99,10 +103,18 @@ class FolderScreen extends StatelessWidget {
         const SizedBox(height: 18),
         _HeaderRow(),
         const SizedBox(height: 10),
-        for (final file in section.files) ...[
-          _FileListRow(file: file, onTap: onOpenFile),
-          const SizedBox(height: 12),
-        ],
+        if (section.files.isEmpty)
+          const GlassPanel(
+            child: EmptyState(
+              message: 'Bu bölümde henüz dosya yok.',
+              subMessage: 'Yeni dosyalar yükleyerek başlayabilirsiniz.',
+            ),
+          )
+        else
+          for (final file in section.files) ...[
+            _FileListRow(file: file, onTap: onOpenFile),
+            const SizedBox(height: 12),
+          ],
         _SelectionTray(onOpenCollections: onOpenCollections),
         SectionTitle(
           title: 'Akıllı Öneriler',
@@ -117,14 +129,14 @@ class FolderScreen extends StatelessWidget {
                 icon: Icons.description_outlined,
                 color: AppColors.purple,
                 title: 'Bu bölüm için sınav sabahı özeti üret',
-                subtitle: 'Önemli noktaları çıkarıp 1 sayfalık özet hazırla.',
+                subtitle: 'Önemli noktaları çıkarıp hızlı bir özet hazırlayabilirsin.',
               ),
               SizedBox(height: 10),
               _SuggestionRow(
                 icon: Icons.style_outlined,
                 color: Color(0xFF21C56B),
-                title: '14 sayfalık PDF için önce flashcard üret',
-                subtitle: 'Aritmiler Final.pdf dosyası için uygundur.',
+                title: 'Yüklediğin PDF dosyalarından flashcard üret',
+                subtitle: 'Ders çalışma verimliliğini artırmak için uygundur.',
               ),
             ],
           ),
@@ -428,7 +440,7 @@ class _SelectionTray extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '2 öğe seçildi',
+                  '- öğe seçildi',
                   style: TextStyle(
                     color: AppColors.navy,
                     fontSize: 20,
@@ -437,7 +449,7 @@ class _SelectionTray extends StatelessWidget {
                 ),
                 SizedBox(height: 6),
                 Text(
-                  'Toplam 3.7 MB',
+                  'Toplam - MB',
                   style: TextStyle(color: AppColors.navy, fontSize: 16),
                 ),
               ],

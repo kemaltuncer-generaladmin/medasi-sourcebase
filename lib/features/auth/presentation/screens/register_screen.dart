@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design_system/design_system.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/sourcebase_auth_backend.dart';
 import '../widgets/auth_widgets.dart';
@@ -183,32 +184,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
           AuthStatusBox(message: errorMessage!),
         ],
         const SizedBox(height: 22),
-        GradientActionButton(
-          label: loading ? 'Kaydediliyor...' : 'Kayıt Ol',
-          onPressed: loading ? () {} : _signUp,
+        SBPrimaryButton(
+          label: 'Kayıt Ol',
+          onPressed: loading ? null : _signUp,
+          loading: loading,
+          size: SBButtonSize.large,
         ),
         const SizedBox(height: 16),
-        OutlineActionButton(
+        SBSecondaryButton(
           label: 'Giriş Yap',
           onPressed: () => Navigator.pushNamed(context, LoginScreen.route),
-        ),
-        const SizedBox(height: 22),
-        const DividerLabel('veya devam et'),
-        const SizedBox(height: 18),
-        SocialAuthButton(
-          label: 'Apple ile devam et',
-          icon: const Icon(Icons.apple_rounded, size: 28, color: Colors.black),
-          onPressed: SourceBaseAuthBackend.isConfigured
-              ? SourceBaseAuthBackend.signInWithApple
-              : () {},
-        ),
-        const SizedBox(height: 12),
-        SocialAuthButton(
-          label: 'Google ile devam et',
-          icon: const GoogleGlyph(),
-          onPressed: SourceBaseAuthBackend.isConfigured
-              ? SourceBaseAuthBackend.signInWithGoogle
-              : () {},
+          size: SBButtonSize.large,
         ),
         const SizedBox(height: 24),
         Center(

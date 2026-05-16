@@ -11,31 +11,40 @@ class AuthScreenFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: CustomPaint(
-        painter: const AuthBackgroundPainter(),
-        child: SafeArea(
-          bottom: false,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 480),
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(36, 36, 36, 44),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight - 80,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: children,
+      body: Semantics(
+        container: true,
+        explicitChildNodes: true,
+        label: 'Kimlik doğrulama ekranı',
+        child: CustomPaint(
+          painter: const AuthBackgroundPainter(),
+          child: SafeArea(
+            bottom: false,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(36, 36, 36, 44),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight - 80,
+                        ),
+                        child: Semantics(
+                          container: true,
+                          explicitChildNodes: true,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: children,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -57,46 +66,51 @@ class AuthHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Align(
-          alignment: Alignment.topRight,
-          child: SizedBox(
-            width: 210,
-            height: 210,
-            child: CustomPaint(painter: AuthArtPainter(art)),
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: '$title. $subtitle',
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Align(
+            alignment: Alignment.topRight,
+            child: SizedBox(
+              width: 210,
+              height: 210,
+              child: CustomPaint(painter: AuthArtPainter(art)),
+            ),
           ),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SourceBaseBrand(),
-            const SizedBox(height: 88),
-            Text(
-              title,
-              style: const TextStyle(
-                color: AppColors.navy,
-                fontSize: 46,
-                height: 1.08,
-                letterSpacing: 0,
-                fontWeight: FontWeight.w800,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SourceBaseBrand(),
+              const SizedBox(height: 88),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 46,
+                  height: 1.08,
+                  letterSpacing: 0,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                color: AppColors.muted,
-                fontSize: 21,
-                height: 1.34,
-                letterSpacing: 0,
-                fontWeight: FontWeight.w400,
+              const SizedBox(height: 18),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 21,
+                  height: 1.34,
+                  letterSpacing: 0,
+                  fontWeight: FontWeight.w400,
+                ),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -111,6 +125,7 @@ class AuthTextField extends StatelessWidget {
     this.textInputAction,
     this.onSubmitted,
     this.trailing,
+    this.autofillHints,
     super.key,
   });
 
@@ -122,6 +137,7 @@ class AuthTextField extends StatelessWidget {
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
   final Widget? trailing;
+  final Iterable<String>? autofillHints;
 
   @override
   Widget build(BuildContext context) {
@@ -151,6 +167,7 @@ class AuthTextField extends StatelessWidget {
               keyboardType: keyboardType,
               textInputAction: textInputAction,
               onSubmitted: onSubmitted,
+              autofillHints: autofillHints,
               cursorColor: AppColors.blue,
               decoration: InputDecoration(
                 border: InputBorder.none,
@@ -322,20 +339,25 @@ class AuthCheck extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        width: 24,
-        height: 24,
-        decoration: BoxDecoration(
-          color: value ? AppColors.blue : AppColors.white,
-          borderRadius: BorderRadius.circular(5),
-          border: Border.all(color: AppColors.blue, width: 1.2),
+    return Semantics(
+      button: true,
+      toggled: value,
+      label: 'Beni hatırla',
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: value ? AppColors.blue : AppColors.white,
+            borderRadius: BorderRadius.circular(5),
+            border: Border.all(color: AppColors.blue, width: 1.2),
+          ),
+          child: value
+              ? const Icon(Icons.check_rounded, size: 19, color: Colors.white)
+              : null,
         ),
-        child: value
-            ? const Icon(Icons.check_rounded, size: 19, color: Colors.white)
-            : null,
       ),
     );
   }

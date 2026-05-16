@@ -19,6 +19,14 @@ class SourceBaseApp extends StatelessWidget {
       title: 'SourceBase',
       debugShowCheckedModeBanner: false,
       theme: SourceBaseTheme.light(),
+      builder: (context, child) {
+        return Semantics(
+          container: true,
+          explicitChildNodes: true,
+          label: 'SourceBase uygulaması',
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       initialRoute: _initialRoute,
       routes: {
         LoginScreen.route: (_) => const LoginScreen(),

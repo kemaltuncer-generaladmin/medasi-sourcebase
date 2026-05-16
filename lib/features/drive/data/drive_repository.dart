@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'drive_models.dart';
 import 'drive_upload_payload.dart';
-import 'seed_drive_data.dart';
 import 'sourcebase_drive_api.dart';
 
 class DriveRepository {
@@ -12,7 +11,7 @@ class DriveRepository {
 
   Future<DriveWorkspaceData> loadWorkspace() async {
     if (!api.isConfigured) {
-      return SeedDriveData.workspace();
+      return DriveWorkspaceData.empty;
     }
 
     try {
@@ -21,9 +20,9 @@ class DriveRepository {
       if (data is Map<String, dynamic>) {
         return _workspaceFromJson(data);
       }
-      return SeedDriveData.workspace();
+      return DriveWorkspaceData.empty;
     } catch (_) {
-      return SeedDriveData.workspace();
+      return DriveWorkspaceData.empty;
     }
   }
 
@@ -111,7 +110,7 @@ DriveWorkspaceData _workspaceFromJson(Map<String, dynamic> json) {
   final rawOutputs = _list(json['generatedOutputs']);
 
   if (rawCourses.isEmpty) {
-    return SeedDriveData.workspace();
+    return DriveWorkspaceData.empty;
   }
 
   final courses = rawCourses
@@ -349,9 +348,9 @@ String _generatedTitle(GeneratedKind kind) {
 
 String _generatedDetail(GeneratedKind kind) {
   return switch (kind) {
-    GeneratedKind.flashcard => '125 kart',
-    GeneratedKind.question => '60 soru',
-    GeneratedKind.summary => '4 sayfa',
+    GeneratedKind.flashcard => '- kart',
+    GeneratedKind.question => '- soru',
+    GeneratedKind.summary => '- sayfa',
     GeneratedKind.algorithm => 'Karar akışı',
     GeneratedKind.comparison => 'Konu karşılaştırması',
     GeneratedKind.podcast => 'Sesli anlatım',

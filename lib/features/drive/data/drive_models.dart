@@ -23,14 +23,31 @@ class DriveWorkspaceData {
     required this.collections,
   });
 
+  static const empty = DriveWorkspaceData(
+    courses: [],
+    recentFiles: [],
+    uploads: [],
+    collections: [],
+  );
+
   final List<DriveCourse> courses;
   final List<DriveFile> recentFiles;
   final List<UploadTask> uploads;
   final List<CollectionBundle> collections;
 
-  DriveCourse get primaryCourse => courses.first;
-  DriveSection get primarySection => primaryCourse.sections.first;
-  DriveFile get primaryFile => primarySection.files.first;
+  DriveCourse? get primaryCourse => courses.isEmpty ? null : courses.first;
+
+  DriveSection? get primarySection {
+    final course = primaryCourse;
+    if (course == null || course.sections.isEmpty) return null;
+    return course.sections.first;
+  }
+
+  DriveFile? get primaryFile {
+    final section = primarySection;
+    if (section == null || section.files.isEmpty) return null;
+    return section.files.first;
+  }
 
   DriveWorkspaceData copyWith({
     List<DriveCourse>? courses,

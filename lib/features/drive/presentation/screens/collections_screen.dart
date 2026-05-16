@@ -66,28 +66,28 @@ class CollectionsScreen extends StatelessWidget {
               _Metric(
                 icon: Icons.style_rounded,
                 color: AppColors.blue,
-                value: '124',
+                value: '-',
                 label: 'Flashcard',
               ),
               _MetricDivider(),
               _Metric(
                 icon: Icons.help_rounded,
                 color: Color(0xFF0BB0D4),
-                value: '86',
+                value: '-',
                 label: 'Soru',
               ),
               _MetricDivider(),
               _Metric(
                 icon: Icons.description_rounded,
                 color: AppColors.purple,
-                value: '9',
+                value: '-',
                 label: 'Özet',
               ),
               _MetricDivider(),
               _Metric(
                 icon: Icons.account_tree_rounded,
                 color: AppColors.green,
-                value: '12',
+                value: '-',
                 label: 'Algoritma',
               ),
             ],
@@ -134,10 +134,18 @@ class CollectionsScreen extends StatelessWidget {
             ),
           ],
         ),
-        for (final bundle in data.collections) ...[
-          _CollectionCard(bundle: bundle),
-          const SizedBox(height: 12),
-        ],
+        if (data.collections.isEmpty)
+          const GlassPanel(
+            child: EmptyState(
+              message: 'Henüz bir koleksiyonunuz yok.',
+              subMessage: 'Dosyalarınızdan AI çıktıları üreterek başlayın.',
+            ),
+          )
+        else
+          for (final bundle in data.collections) ...[
+            _CollectionCard(bundle: bundle),
+            const SizedBox(height: 12),
+          ],
         const SizedBox(height: 10),
         const TrustStrip(),
       ],
@@ -150,7 +158,11 @@ class _CollectionHeroArt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(painter: _CollectionHeroPainter());
+    return Semantics(
+      image: true,
+      label: 'Koleksiyon kartları illüstrasyonu',
+      child: CustomPaint(painter: _CollectionHeroPainter()),
+    );
   }
 }
 
@@ -199,31 +211,39 @@ class _Metric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 30),
-            const SizedBox(width: 9),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Semantics(
+        label: '$label sayısı: $value',
+        child: ExcludeSemantics(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 25,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                Text(
-                  label,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 14),
+                Icon(icon, color: color, size: 30),
+                const SizedBox(width: 9),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 25,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -235,7 +255,13 @@ class _MetricDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(width: 1, height: 42, color: AppColors.line);
+    return const ExcludeSemantics(
+      child: SizedBox(
+        width: 1,
+        height: 42,
+        child: DecoratedBox(decoration: BoxDecoration(color: AppColors.line)),
+      ),
+    );
   }
 }
 
@@ -252,36 +278,46 @@ class _CollectionFilter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => _showCollectionsToast(context, '$label filtresi uygulandı.'),
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.blue : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: selected ? AppColors.blue : AppColors.line),
-        ),
-        child: Row(
-          children: [
-            if (icon != null) ...[
-              Icon(
-                icon,
-                color: selected ? Colors.white : AppColors.blue,
-                size: 20,
-              ),
-              const SizedBox(width: 7),
-            ],
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? Colors.white : AppColors.navy,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$label filtresi',
+      child: InkWell(
+        onTap: () =>
+            _showCollectionsToast(context, '$label filtresi uygulandı.'),
+        borderRadius: BorderRadius.circular(18),
+        child: ExcludeSemantics(
+          child: Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+            decoration: BoxDecoration(
+              color: selected ? AppColors.blue : Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: selected ? AppColors.blue : AppColors.line,
               ),
             ),
-          ],
+            child: Row(
+              children: [
+                if (icon != null) ...[
+                  Icon(
+                    icon,
+                    color: selected ? Colors.white : AppColors.blue,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 7),
+                ],
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: selected ? Colors.white : AppColors.navy,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -382,34 +418,40 @@ class _CollectionCard extends StatelessWidget {
       visualDensity: VisualDensity.compact,
     );
 
-    return GlassPanel(
-      padding: const EdgeInsets.all(16),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth < 520) {
-            return Column(
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label:
+          '${file.title} koleksiyonu. ${bundle.outputs.length} çıktı. ${bundle.subject}. Son güncelleme: ${file.updatedLabel}.',
+      child: GlassPanel(
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 520) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  details,
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [preview, const Spacer(), menu],
+                  ),
+                ],
+              );
+            }
+            return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                details,
-                const SizedBox(height: 16),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [preview, const Spacer(), menu],
-                ),
+                Expanded(child: details),
+                const SizedBox(width: 12),
+                preview,
+                const SizedBox(width: 6),
+                menu,
               ],
             );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: details),
-              const SizedBox(width: 12),
-              preview,
-              const SizedBox(width: 6),
-              menu,
-            ],
-          );
-        },
+          },
+        ),
       ),
     );
   }
@@ -424,24 +466,29 @@ class _OutputLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 160),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            generatedIcon(output.kind),
-            color: generatedColor(output.kind),
-            size: 18,
+      child: Semantics(
+        label: 'Çıktı: ${output.title}',
+        child: ExcludeSemantics(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                generatedIcon(output.kind),
+                color: generatedColor(output.kind),
+                size: 18,
+              ),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  output.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.muted, fontSize: 14),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text(
-              output.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: AppColors.muted, fontSize: 14),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -455,19 +502,24 @@ class _MetaLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: AppColors.muted, size: 20),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: AppColors.muted, fontSize: 15),
-          ),
+    return Semantics(
+      label: text,
+      child: ExcludeSemantics(
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.muted, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.muted, fontSize: 15),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -479,16 +531,22 @@ class _CollectionPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 118,
-      height: 78,
-      padding: const EdgeInsets.all(9),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.line),
+    return Semantics(
+      image: true,
+      label: '${kind.name} önizlemesi',
+      child: ExcludeSemantics(
+        child: Container(
+          width: 118,
+          height: 78,
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: CustomPaint(painter: _PreviewMiniPainter(kind)),
+        ),
       ),
-      child: CustomPaint(painter: _PreviewMiniPainter(kind)),
     );
   }
 }

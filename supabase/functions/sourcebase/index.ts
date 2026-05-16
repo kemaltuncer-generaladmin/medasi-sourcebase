@@ -1,3 +1,14 @@
+import { SafeError, isRecord } from "./types.ts";
+import {
+  processFileExtraction,
+  createGenerationJob,
+  getJobStatus,
+  getGeneratedContent,
+  listUserJobs,
+  cancelJob,
+  retryJob,
+} from "./actions/ai-generation.ts";
+
 type JsonMap = Record<string, unknown>;
 
 const corsHeaders = {
@@ -24,6 +35,7 @@ Deno.serve(async (request) => {
     const user = await authenticate(request);
 
     switch (action) {
+      // Drive actions
       case "drive_bootstrap":
         return success(await driveBootstrap(user.id));
       case "create_course":
@@ -36,6 +48,23 @@ Deno.serve(async (request) => {
         return success(await completeUpload(user.id, payload));
       case "create_generated_output":
         return success(await createGeneratedOutput(user.id, payload));
+      
+      // AI Generation actions
+      case "process_file_extraction":
+        return success(await processFileExtraction(user.id, payload));
+      case "create_generation_job":
+        return success(await createGenerationJob(user.id, payload));
+      case "get_job_status":
+        return success(await getJobStatus(user.id, payload));
+      case "get_generated_content":
+        return success(await getGeneratedContent(user.id, payload));
+      case "list_user_jobs":
+        return success(await listUserJobs(user.id, payload));
+      case "cancel_job":
+        return success(await cancelJob(user.id, payload));
+      case "retry_job":
+        return success(await retryJob(user.id, payload));
+      
       default:
         return failure("UNKNOWN_ACTION", "SourceBase işlemi bulunamadı.", 400);
     }

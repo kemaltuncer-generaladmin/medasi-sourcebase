@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design_system/design_system.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../drive/presentation/screens/drive_workspace_screen.dart';
 import '../../data/sourcebase_auth_backend.dart';
@@ -18,7 +19,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final emailController = TextEditingController();
-  final passwordController = TextEditingController(text: '**********');
+  final passwordController = TextEditingController();
   bool remember = true;
   bool obscure = true;
   bool loading = false;
@@ -86,6 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
           controller: emailController,
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.email],
         ),
         const SizedBox(height: 18),
         AuthTextField(
@@ -95,7 +97,9 @@ class _LoginScreenState extends State<LoginScreen> {
           obscureText: obscure,
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => _signIn(),
+          autofillHints: const [AutofillHints.password],
           trailing: IconButton(
+            tooltip: obscure ? 'Şifreyi göster' : 'Şifreyi gizle',
             onPressed: () => setState(() => obscure = !obscure),
             icon: Icon(
               obscure
@@ -146,32 +150,17 @@ class _LoginScreenState extends State<LoginScreen> {
           AuthStatusBox(message: errorMessage!),
         ],
         const SizedBox(height: 18),
-        GradientActionButton(
-          label: loading ? 'Giriş yapılıyor...' : 'Giriş Yap',
-          onPressed: loading ? () {} : _signIn,
+        SBPrimaryButton(
+          label: 'Giriş Yap',
+          onPressed: loading ? null : _signIn,
+          loading: loading,
+          size: SBButtonSize.large,
         ),
         const SizedBox(height: 16),
-        OutlineActionButton(
+        SBSecondaryButton(
           label: 'Hesap Oluştur',
           onPressed: () => Navigator.pushNamed(context, RegisterScreen.route),
-        ),
-        const SizedBox(height: 26),
-        const DividerLabel('veya devam et'),
-        const SizedBox(height: 20),
-        SocialAuthButton(
-          label: 'Apple ile devam et',
-          icon: const Icon(Icons.apple_rounded, size: 28, color: Colors.black),
-          onPressed: SourceBaseAuthBackend.isConfigured
-              ? SourceBaseAuthBackend.signInWithApple
-              : () {},
-        ),
-        const SizedBox(height: 12),
-        SocialAuthButton(
-          label: 'Google ile devam et',
-          icon: const GoogleGlyph(),
-          onPressed: SourceBaseAuthBackend.isConfigured
-              ? SourceBaseAuthBackend.signInWithGoogle
-              : () {},
+          size: SBButtonSize.large,
         ),
         const SizedBox(height: 28),
         Center(

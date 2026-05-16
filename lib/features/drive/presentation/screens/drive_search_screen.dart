@@ -18,9 +18,10 @@ class DriveSearchScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final resultCount = files.length;
     return WorkspaceScroll(
       children: [
-        DriveTopBar(title: 'Drive', onSearch: () {}, onBack: onBack),
+        DriveTopBar(title: 'Dosya Arama', onSearch: () {}, onBack: onBack),
         Container(
           height: 58,
           padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -35,8 +36,8 @@ class DriveSearchScreen extends StatelessWidget {
               SizedBox(width: 14),
               Expanded(
                 child: Text(
-                  'aritmi',
-                  style: TextStyle(color: AppColors.navy, fontSize: 24),
+                  'Dosya ara...',
+                  style: TextStyle(color: AppColors.muted, fontSize: 24),
                 ),
               ),
               CircleAvatar(
@@ -79,35 +80,40 @@ class DriveSearchScreen extends StatelessWidget {
               ),
               _FilterChip(
                 icon: Icons.favorite_border_rounded,
-                label: 'Kardiyoloji',
+                label: 'Favoriler',
                 color: AppColors.red,
               ),
             ],
           ),
         ),
         const SizedBox(height: 22),
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                '12 sonuç bulundu',
-                style: TextStyle(color: AppColors.muted, fontSize: 19),
-              ),
-            ),
-            OutlinedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.swap_vert_rounded),
-              label: const Text('Sırala: En Yeni'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.navy,
-                backgroundColor: AppColors.selectedBlue,
-                side: const BorderSide(color: AppColors.softLine),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+        Semantics(
+          container: true,
+          explicitChildNodes: true,
+          label: 'Dosya arama sonuçları ve sıralama',
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '$resultCount sonuç bulundu',
+                  style: TextStyle(color: AppColors.muted, fontSize: 19),
                 ),
               ),
-            ),
-          ],
+              OutlinedButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.swap_vert_rounded),
+                label: const Text('Sırala: En Yeni'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.navy,
+                  backgroundColor: AppColors.selectedBlue,
+                  side: const BorderSide(color: AppColors.softLine),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 18),
         GlassPanel(
@@ -123,12 +129,12 @@ class DriveSearchScreen extends StatelessWidget {
               _FilterRow(
                 icon: Icons.menu_book_outlined,
                 title: 'Ders',
-                value: 'Kardiyoloji',
+                value: 'Tümü',
               ),
               _FilterRow(
                 icon: Icons.list_alt_outlined,
                 title: 'Bölüm',
-                value: 'Aritmiler',
+                value: 'Tümü',
               ),
               _FilterRow(
                 icon: Icons.insert_drive_file_outlined,
@@ -268,21 +274,30 @@ class _FilterRow extends StatelessWidget {
         children: [
           Icon(icon, color: AppColors.navy, size: 25),
           const SizedBox(width: 16),
-          Text(
-            title,
-            style: TextStyle(
-              color: AppColors.navy,
-              fontSize: headline ? 19 : 17,
-              fontWeight: FontWeight.w800,
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.navy,
+                fontSize: headline ? 19 : 17,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              color: headline ? AppColors.blue : AppColors.muted,
-              fontSize: 16,
-              fontWeight: headline ? FontWeight.w700 : FontWeight.w500,
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                color: headline ? AppColors.blue : AppColors.muted,
+                fontSize: 16,
+                fontWeight: headline ? FontWeight.w700 : FontWeight.w500,
+              ),
             ),
           ),
           if (!headline) ...[
