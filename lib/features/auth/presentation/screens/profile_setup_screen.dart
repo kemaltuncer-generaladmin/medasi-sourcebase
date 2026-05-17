@@ -126,7 +126,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         const SizedBox(height: 28),
         GradientActionButton(
           label: loading ? 'Kaydediliyor...' : 'Devam Et',
-          onPressed: loading ? () {} : _completeProfile,
+          onPressed: loading ? null : _completeProfile,
         ),
       ],
     );

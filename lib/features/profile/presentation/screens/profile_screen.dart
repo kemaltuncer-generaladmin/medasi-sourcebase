@@ -505,8 +505,8 @@ class _StorePackageTileState extends State<_StorePackageTile> {
         );
       } else {
         setState(
-          () =>
-              _buyError = json['error']?['message'] ?? 'Ödeme başlatılamadı.',
+          () => _buyError =
+              'Ödeme başlatılamadı. Lütfen paketi kontrol edip tekrar deneyin.',
         );
       }
     } catch (_) {

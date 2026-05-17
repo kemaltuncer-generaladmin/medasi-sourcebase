@@ -98,7 +98,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 48),
         GradientActionButton(
           label: loading ? 'Gönderiliyor...' : 'Sıfırlama bağlantısı gönder',
-          onPressed: loading ? () {} : _sendReset,
+          onPressed: loading ? null : _sendReset,
         ),
         const SizedBox(height: 18),
         OutlineActionButton(

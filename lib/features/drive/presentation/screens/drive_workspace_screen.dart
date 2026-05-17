@@ -79,10 +79,26 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        errorMessage = e.toString();
+        errorMessage = _friendlyErrorMessage(e);
         loading = false;
       });
     }
+  }
+
+  String _friendlyErrorMessage(Object error) {
+    final raw = error.toString();
+    final cleaned = raw
+        .replaceFirst('Exception: ', '')
+        .replaceFirst('Bad state: ', '')
+        .trim();
+    if (cleaned.isEmpty ||
+        cleaned.contains('PostgrestException') ||
+        cleaned.contains('SocketException') ||
+        cleaned.contains('FunctionsException') ||
+        cleaned.contains('ClientException')) {
+      return 'İçerik yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin.';
+    }
+    return cleaned.length > 180 ? '${cleaned.substring(0, 180)}...' : cleaned;
   }
 
   void _go(WorkspaceRouteKey next) {
@@ -358,7 +374,7 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
       try {
         course = await repository.createCourse(title.trim());
       } catch (error) {
-        _showSnack(error.toString().replaceFirst('Exception: ', ''));
+        _showSnack(_friendlyErrorMessage(error));
         return null;
       }
       setState(() {
@@ -384,7 +400,7 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
           title: title.trim(),
         );
       } catch (error) {
-        _showSnack(error.toString().replaceFirst('Exception: ', ''));
+        _showSnack(_friendlyErrorMessage(error));
         return null;
       }
       final updatedCourse = course.copyWith(
@@ -415,7 +431,7 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
     try {
       await action();
     } catch (error) {
-      _showSnack(error.toString().replaceFirst('Exception: ', ''));
+      _showSnack(_friendlyErrorMessage(error));
     } finally {
       if (mounted) setState(() => busy = false);
     }

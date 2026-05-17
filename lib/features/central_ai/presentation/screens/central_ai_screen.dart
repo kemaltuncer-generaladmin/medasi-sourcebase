@@ -55,8 +55,9 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
       if (!mounted) return;
       setState(() {
         _messages.add(
-          _ChatMessage(
-            text: error.toString().replaceFirst('Bad state: ', ''),
+          const _ChatMessage(
+            text:
+                'Yanıt alınamadı. Bağlantınızı kontrol edip kısa bir süre sonra tekrar deneyin.',
             isAi: true,
           ),
         );

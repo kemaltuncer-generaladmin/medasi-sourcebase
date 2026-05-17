@@ -133,7 +133,7 @@ class UploadsScreen extends StatelessWidget {
           )
         else
           for (final upload in uploads) ...[
-            _UploadRow(upload: upload),
+            _UploadRow(upload: upload, onRetryUpload: onNewFile),
             const SizedBox(height: 12),
           ],
       ],
@@ -244,9 +244,10 @@ class _UploadFilter extends StatelessWidget {
 }
 
 class _UploadRow extends StatelessWidget {
-  const _UploadRow({required this.upload});
+  const _UploadRow({required this.upload, required this.onRetryUpload});
 
   final UploadTask upload;
+  final VoidCallback onRetryUpload;
 
   @override
   Widget build(BuildContext context) {
@@ -296,7 +297,10 @@ class _UploadRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          SizedBox(width: 140, child: _UploadState(upload: upload)),
+          SizedBox(
+            width: 140,
+            child: _UploadState(upload: upload, onRetry: onRetryUpload),
+          ),
           const Icon(Icons.more_vert_rounded, color: AppColors.muted),
         ],
       ),
@@ -305,9 +309,10 @@ class _UploadRow extends StatelessWidget {
 }
 
 class _UploadState extends StatelessWidget {
-  const _UploadState({required this.upload});
+  const _UploadState({required this.upload, required this.onRetry});
 
   final UploadTask upload;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -336,7 +341,7 @@ class _UploadState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: onRetry,
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('Tekrar Dene'),
               style: OutlinedButton.styleFrom(

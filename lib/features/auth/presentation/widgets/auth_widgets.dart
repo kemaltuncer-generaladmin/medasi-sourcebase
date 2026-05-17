@@ -250,25 +250,29 @@ class GradientActionButton extends StatelessWidget {
   });
 
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final double height;
 
   @override
   Widget build(BuildContext context) {
+    final disabled = onPressed == null;
     return SizedBox(
       width: double.infinity,
       height: height,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: AppColors.primaryGradient,
+          gradient: disabled ? null : AppColors.primaryGradient,
+          color: disabled ? AppColors.line : null,
           borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.blue.withValues(alpha: .24),
-              blurRadius: 18,
-              offset: const Offset(0, 10),
-            ),
-          ],
+          boxShadow: disabled
+              ? null
+              : [
+                  BoxShadow(
+                    color: AppColors.blue.withValues(alpha: .24),
+                    blurRadius: 18,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
         ),
         child: ElevatedButton(
           onPressed: onPressed,
@@ -276,7 +280,7 @@ class GradientActionButton extends StatelessWidget {
             elevation: 0,
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
-            foregroundColor: AppColors.white,
+            foregroundColor: disabled ? AppColors.muted : AppColors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
