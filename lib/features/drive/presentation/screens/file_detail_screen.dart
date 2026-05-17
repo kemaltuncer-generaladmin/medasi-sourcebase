@@ -150,87 +150,97 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
         const SectionTitle(title: 'Dosya Özeti'),
         GlassPanel(
           padding: const EdgeInsets.all(18),
-          child: GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 18,
-            crossAxisSpacing: 18,
-            childAspectRatio: 2.5,
-            children: [
-              _SummaryMetric(
-                icon: Icons.description_outlined,
-                color: AppColors.blue,
-                title: file.pageLabel,
-                subtitle: 'Sayfa bilgisi',
-              ),
-              _SummaryMetric(
-                icon: Icons.menu_book_outlined,
-                color: AppColors.purple,
-                title: generatedCount > 0 ? '$generatedCount' : '-',
-                subtitle: 'Üretilen çıktı',
-              ),
-              _SummaryMetric(
-                icon: Icons.table_chart_outlined,
-                color: AppColors.green,
-                title: FileKindBadge.kindLabel(file.kind),
-                subtitle: 'Dosya türü',
-              ),
-              _SummaryMetric(
-                icon: Icons.task_alt_rounded,
-                color: AppColors.blue,
-                title: _statusShortLabel(file.status),
-                subtitle: 'Durum',
-              ),
-            ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 520 ? 2 : 1;
+              return GridView.count(
+                crossAxisCount: columns,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: columns == 1 ? 4.2 : 2.45,
+                children: [
+                  _SummaryMetric(
+                    icon: Icons.description_outlined,
+                    color: AppColors.blue,
+                    title: file.pageLabel,
+                    subtitle: 'Sayfa bilgisi',
+                  ),
+                  _SummaryMetric(
+                    icon: Icons.menu_book_outlined,
+                    color: AppColors.purple,
+                    title: generatedCount > 0 ? '$generatedCount' : '-',
+                    subtitle: 'Üretilen çıktı',
+                  ),
+                  _SummaryMetric(
+                    icon: Icons.table_chart_outlined,
+                    color: AppColors.green,
+                    title: FileKindBadge.kindLabel(file.kind),
+                    subtitle: 'Dosya türü',
+                  ),
+                  _SummaryMetric(
+                    icon: Icons.task_alt_rounded,
+                    color: AppColors.blue,
+                    title: _statusShortLabel(file.status),
+                    subtitle: 'Durum',
+                  ),
+                ],
+              );
+            },
           ),
         ),
         const SectionTitle(title: 'Bu dosyadan üret'),
-        GridView.count(
-          crossAxisCount: 3,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 1.65,
-          children: [
-            _GenerateTile(
-              kind: GeneratedKind.flashcard,
-              title: 'Flashcard',
-              subtitle: 'Anki uyumlu kartlar',
-              onTap: widget.onGenerate,
-            ),
-            _GenerateTile(
-              kind: GeneratedKind.question,
-              title: 'Soru',
-              subtitle: 'Çoktan seçmeli sorular',
-              onTap: widget.onGenerate,
-            ),
-            _GenerateTile(
-              kind: GeneratedKind.summary,
-              title: 'Özet',
-              subtitle: 'Kısa ve kapsamlı özet',
-              onTap: widget.onGenerate,
-            ),
-            _GenerateTile(
-              kind: GeneratedKind.algorithm,
-              title: 'Algoritma',
-              subtitle: 'Karar algoritmaları',
-              onTap: widget.onGenerate,
-            ),
-            _GenerateTile(
-              kind: GeneratedKind.comparison,
-              title: 'Karşılaştırma',
-              subtitle: 'Konuları karşılaştır',
-              onTap: widget.onGenerate,
-            ),
-            _GenerateTile(
-              kind: GeneratedKind.podcast,
-              title: 'Podcast',
-              subtitle: 'Sesli anlatım oluştur',
-              onTap: widget.onGenerate,
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 720 ? 3 : 2;
+            return GridView.count(
+              crossAxisCount: columns,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: columns == 2 ? 2.25 : 1.65,
+              children: [
+                _GenerateTile(
+                  kind: GeneratedKind.flashcard,
+                  title: 'Flashcard',
+                  subtitle: 'Anki uyumlu kartlar',
+                  onTap: widget.onGenerate,
+                ),
+                _GenerateTile(
+                  kind: GeneratedKind.question,
+                  title: 'Soru',
+                  subtitle: 'Çoktan seçmeli sorular',
+                  onTap: widget.onGenerate,
+                ),
+                _GenerateTile(
+                  kind: GeneratedKind.summary,
+                  title: 'Özet',
+                  subtitle: 'Kısa ve kapsamlı özet',
+                  onTap: widget.onGenerate,
+                ),
+                _GenerateTile(
+                  kind: GeneratedKind.algorithm,
+                  title: 'Algoritma',
+                  subtitle: 'Karar algoritmaları',
+                  onTap: widget.onGenerate,
+                ),
+                _GenerateTile(
+                  kind: GeneratedKind.comparison,
+                  title: 'Karşılaştırma',
+                  subtitle: 'Konuları karşılaştır',
+                  onTap: widget.onGenerate,
+                ),
+                _GenerateTile(
+                  kind: GeneratedKind.podcast,
+                  title: 'Podcast',
+                  subtitle: 'Sesli anlatım oluştur',
+                  onTap: widget.onGenerate,
+                ),
+              ],
+            );
+          },
         ),
         SectionTitle(
           title: 'Üretilenler',
