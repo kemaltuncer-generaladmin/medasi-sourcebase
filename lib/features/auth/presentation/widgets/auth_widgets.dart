@@ -10,6 +10,9 @@ class AuthScreenFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.viewInsetsOf(context);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final horizontalPadding = screenWidth < 380 ? 22.0 : 36.0;
     return Scaffold(
       body: Semantics(
         container: true,
@@ -18,7 +21,6 @@ class AuthScreenFrame extends StatelessWidget {
         child: CustomPaint(
           painter: const AuthBackgroundPainter(),
           child: SafeArea(
-            bottom: false,
             child: LayoutBuilder(
               builder: (context, constraints) {
                 return Center(
@@ -26,10 +28,15 @@ class AuthScreenFrame extends StatelessWidget {
                     constraints: const BoxConstraints(maxWidth: 480),
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(36, 36, 36, 44),
+                      padding: EdgeInsets.fromLTRB(
+                        horizontalPadding,
+                        28,
+                        horizontalPadding,
+                        44 + viewInsets.bottom,
+                      ),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight - 80,
+                          minHeight: constraints.maxHeight - 72,
                         ),
                         child: Semantics(
                           container: true,
@@ -66,6 +73,8 @@ class AuthHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final compact = screenWidth < 380;
     return Semantics(
       container: true,
       explicitChildNodes: true,
@@ -85,23 +94,23 @@ class AuthHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SourceBaseBrand(),
-              const SizedBox(height: 88),
+              SizedBox(height: compact ? 62 : 88),
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.navy,
-                  fontSize: 46,
+                  fontSize: compact ? 38 : 46,
                   height: 1.08,
                   letterSpacing: 0,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: compact ? 14 : 18),
               Text(
                 subtitle,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.muted,
-                  fontSize: 21,
+                  fontSize: compact ? 18 : 21,
                   height: 1.34,
                   letterSpacing: 0,
                   fontWeight: FontWeight.w400,
@@ -207,21 +216,25 @@ class GradientActionButton extends StatelessWidget {
   });
 
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final double height;
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onPressed != null;
     return SizedBox(
       width: double.infinity,
       height: height,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: AppColors.primaryGradient,
+          gradient: enabled ? AppColors.primaryGradient : null,
+          color: enabled ? null : const Color(0xFFE2E8F3),
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-              color: AppColors.blue.withValues(alpha: .24),
+              color: enabled
+                  ? AppColors.blue.withValues(alpha: .24)
+                  : Colors.transparent,
               blurRadius: 18,
               offset: const Offset(0, 10),
             ),
@@ -233,6 +246,7 @@ class GradientActionButton extends StatelessWidget {
             elevation: 0,
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
+            disabledForegroundColor: AppColors.muted,
             foregroundColor: AppColors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
@@ -243,7 +257,7 @@ class GradientActionButton extends StatelessWidget {
               letterSpacing: 0,
             ),
           ),
-          child: Text(label),
+          child: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
         ),
       ),
     );
@@ -259,7 +273,7 @@ class OutlineActionButton extends StatelessWidget {
   });
 
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final double height;
 
   @override
@@ -281,7 +295,7 @@ class OutlineActionButton extends StatelessWidget {
             letterSpacing: 0,
           ),
         ),
-        child: Text(label),
+        child: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
       ),
     );
   }
@@ -297,7 +311,7 @@ class SocialAuthButton extends StatelessWidget {
 
   final String label;
   final Widget icon;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -332,17 +346,23 @@ class SocialAuthButton extends StatelessWidget {
 }
 
 class AuthCheck extends StatelessWidget {
-  const AuthCheck({required this.value, required this.onTap, super.key});
+  const AuthCheck({
+    required this.value,
+    required this.onTap,
+    this.label = 'Seçili',
+    super.key,
+  });
 
   final bool value;
   final VoidCallback onTap;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
       toggled: value,
-      label: 'Beni hatırla',
+      label: label,
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(

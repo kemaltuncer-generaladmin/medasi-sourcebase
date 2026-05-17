@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../drive/presentation/screens/drive_workspace_screen.dart';
 import '../../data/sourcebase_auth_backend.dart';
 import '../widgets/auth_widgets.dart';
+import 'login_screen.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -20,20 +21,49 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   String? errorMessage;
 
   @override
+  void initState() {
+    super.initState();
+    final metadata = SourceBaseAuthBackend.currentUser?.userMetadata ?? {};
+    final faculty = metadata['sourcebase_faculty']?.toString().trim() ?? '';
+    final savedDepartment =
+        metadata['sourcebase_department']?.toString().trim() ?? '';
+    facultyController.text = faculty;
+    if (['Tıp', 'Diş Hekimliği', 'Hemşirelik'].contains(savedDepartment)) {
+      department = savedDepartment;
+    }
+  }
+
+  @override
   void dispose() {
     facultyController.dispose();
     super.dispose();
   }
 
   Future<void> _completeProfile() async {
+    if (loading) {
+      return;
+    }
     if (facultyController.text.trim().isEmpty) {
       setState(() => errorMessage = 'Fakülte bilgisini doldurmalısın.');
       return;
     }
-    if (!SourceBaseAuthBackend.isConfigured) {
+    if (department.trim().isEmpty) {
+      setState(() => errorMessage = 'Bölüm bilgisini seçmelisin.');
+      return;
+    }
+    if (!SourceBaseAuthBackend.isConfigured ||
+        SourceBaseAuthBackend.initializationError != null) {
+      setState(
+        () => errorMessage = SourceBaseAuthBackend.friendlyError(
+          SourceBaseAuthBackend.initializationError ?? Object(),
+        ),
+      );
+      return;
+    }
+    if (SourceBaseAuthBackend.currentUser == null) {
       Navigator.pushNamedAndRemoveUntil(
         context,
-        DriveWorkspaceScreen.route,
+        LoginScreen.route,
         (_) => false,
       );
       return;
@@ -111,11 +141,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   child: Text('Hemşirelik'),
                 ),
               ],
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => department = value);
-                }
-              },
+              onChanged: loading
+                  ? null
+                  : (value) {
+                      if (value != null) {
+                        setState(() => department = value);
+                      }
+                    },
             ),
           ),
         ),
@@ -126,7 +158,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         const SizedBox(height: 28),
         GradientActionButton(
           label: loading ? 'Kaydediliyor...' : 'Devam Et',
-          onPressed: loading ? () {} : _completeProfile,
+          onPressed: loading ? null : _completeProfile,
         ),
       ],
     );
