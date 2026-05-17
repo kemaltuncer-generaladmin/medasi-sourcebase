@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
 import '../../../auth/data/sourcebase_auth_backend.dart';
@@ -903,6 +904,23 @@ class _MedasiWalletBalance {
 
   String get label => '${_formatAmount(amount)} MC';
 
+  static Future<_MedasiWalletBalance> loadCurrent() async {
+    final client = SourceBaseAuthBackend.client;
+    final userId = SourceBaseAuthBackend.currentUser?.id;
+    if (client == null || userId == null) {
+      return const _MedasiWalletBalance(0);
+    }
+    final row = await client
+        .from('profiles')
+        .select()
+        .eq('id', userId)
+        .maybeSingle();
+    if (row == null) {
+      return const _MedasiWalletBalance(0);
+    }
+    return _MedasiWalletBalance.fromProfileRow(Map<String, dynamic>.from(row));
+  }
+
   static _MedasiWalletBalance fromProfileRow(Map<String, dynamic> row) {
     return _MedasiWalletBalance(
       _safeDouble(
@@ -940,22 +958,31 @@ class MedasiCoinStoreScreen extends StatefulWidget {
 
 class _MedasiCoinStoreScreenState extends State<MedasiCoinStoreScreen> {
   late Future<List<_MedasiCoinPackage>> _packagesFuture;
+  late Future<_MedasiWalletBalance> _walletFuture;
 
   @override
   void initState() {
     super.initState();
     _packagesFuture = _MedasiCoinPackage.loadStoreProducts();
+    _walletFuture = _MedasiWalletBalance.loadCurrent();
   }
 
-  Future<void> _refreshPackages() async {
-    setState(() => _packagesFuture = _MedasiCoinPackage.loadStoreProducts());
-    await _packagesFuture;
+  Future<void> _refreshStoreData() async {
+    setState(() {
+      _packagesFuture = _MedasiCoinPackage.loadStoreProducts();
+      _walletFuture = _MedasiWalletBalance.loadCurrent();
+    });
+    await Future.wait([_packagesFuture, _walletFuture]);
+  }
+
+  void _refreshWallet() {
+    setState(() => _walletFuture = _MedasiWalletBalance.loadCurrent());
   }
 
   @override
   Widget build(BuildContext context) {
     return WorkspaceScroll(
-      onRefresh: _refreshPackages,
+      onRefresh: _refreshStoreData,
       children: [
         DriveTopBar(
           title: 'MedAsiCoin Mağazası',
@@ -1003,6 +1030,8 @@ class _MedasiCoinStoreScreenState extends State<MedasiCoinStoreScreen> {
           ),
         ),
         const SizedBox(height: 14),
+        _StoreWalletSummary(future: _walletFuture, onRefresh: _refreshWallet),
+        const SizedBox(height: 14),
         FutureBuilder<List<_MedasiCoinPackage>>(
           future: _packagesFuture,
           builder: (context, snapshot) {
@@ -1040,7 +1069,10 @@ class _MedasiCoinStoreScreenState extends State<MedasiCoinStoreScreen> {
             return Column(
               children: [
                 for (final item in packages) ...[
-                  _StorePackageTile(package: item),
+                  _StorePackageTile(
+                    package: item,
+                    onPurchaseStateChanged: _refreshWallet,
+                  ),
                   const SizedBox(height: 12),
                 ],
               ],
@@ -1053,9 +1085,13 @@ class _MedasiCoinStoreScreenState extends State<MedasiCoinStoreScreen> {
 }
 
 class _StorePackageTile extends StatefulWidget {
-  const _StorePackageTile({required this.package});
+  const _StorePackageTile({
+    required this.package,
+    required this.onPurchaseStateChanged,
+  });
 
   final _MedasiCoinPackage package;
+  final VoidCallback onPurchaseStateChanged;
 
   @override
   State<_StorePackageTile> createState() => _StorePackageTileState();
@@ -1065,6 +1101,7 @@ class _StorePackageTileState extends State<_StorePackageTile> {
   bool _buying = false;
   String? _buyError;
   String? _buyInfo;
+  String? _checkoutUrl;
 
   Future<void> _purchase() async {
     if (_buying) return;
@@ -1079,6 +1116,7 @@ class _StorePackageTileState extends State<_StorePackageTile> {
       _buying = true;
       _buyError = null;
       _buyInfo = null;
+      _checkoutUrl = null;
     });
     try {
       final client = SourceBaseAuthBackend.client;
@@ -1109,14 +1147,17 @@ class _StorePackageTileState extends State<_StorePackageTile> {
         if (!mounted) return;
         setState(
           () => _buyInfo =
-              'Ödeme sayfası hazırlandı. Uygulama içi ödeme yönlendirmesi henüz bağlı değil; bakiye onaylı ödeme sonrası güncellenir.',
+              'Ödeme bağlantısı hazırlandı. Linki kopyalayıp güvenli ödeme sayfasında işlemi tamamlayabilirsin.',
         );
+        setState(() => _checkoutUrl = checkoutUrl);
+        widget.onPurchaseStateChanged();
       } else if (json['ok'] == true) {
         if (!mounted) return;
         setState(
           () => _buyInfo =
               'Ödeme işlemi başlatıldı. Bakiye yalnızca backend onayı sonrası güncellenir.',
         );
+        widget.onPurchaseStateChanged();
       } else {
         final error = json['error'];
         final message = error is Map ? _safeText(error['message']) : '';
@@ -1279,6 +1320,10 @@ class _StorePackageTileState extends State<_StorePackageTile> {
                   ),
                 ),
               ],
+              if (_checkoutUrl != null) ...[
+                const SizedBox(height: 10),
+                _CheckoutLinkActions(url: _checkoutUrl!),
+              ],
               if (_buyError != null) ...[
                 const SizedBox(height: 8),
                 Text(
@@ -1294,6 +1339,135 @@ class _StorePackageTileState extends State<_StorePackageTile> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _StoreWalletSummary extends StatelessWidget {
+  const _StoreWalletSummary({required this.future, required this.onRefresh});
+
+  final Future<_MedasiWalletBalance> future;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_MedasiWalletBalance>(
+      future: future,
+      builder: (context, snapshot) {
+        final loading = snapshot.connectionState == ConnectionState.waiting;
+        final balance = snapshot.data ?? const _MedasiWalletBalance(0);
+        return GlassPanel(
+          padding: const EdgeInsets.all(18),
+          borderColor: AppColors.blue.withValues(alpha: .16),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.selectedBlue,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet_rounded,
+                  color: AppColors.blue,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Mevcut Bakiye',
+                      style: TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      loading
+                          ? 'Bakiye yükleniyor'
+                          : snapshot.hasError
+                          ? 'Bakiye alınamadı'
+                          : balance.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: snapshot.hasError
+                            ? AppColors.red
+                            : AppColors.navy,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Bakiyeyi yenile',
+                onPressed: onRefresh,
+                icon: const Icon(Icons.refresh_rounded, color: AppColors.blue),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CheckoutLinkActions extends StatelessWidget {
+  const _CheckoutLinkActions({required this.url});
+
+  final String url;
+
+  Future<void> _copyUrl(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: url));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Ödeme bağlantısı kopyalandı.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.selectedBlue,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.softLine),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.link_rounded, color: AppColors.blue, size: 20),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Ödeme linki hazır. İşlemi tamamladıktan sonra bakiyeyi yenile.',
+              style: TextStyle(
+                color: AppColors.navy,
+                fontSize: 12,
+                height: 1.25,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () => _copyUrl(context),
+            child: const Text('Kopyala'),
+          ),
+        ],
       ),
     );
   }
