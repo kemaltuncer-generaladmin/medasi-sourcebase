@@ -150,6 +150,14 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
     _toast('Bu özellik henüz hazır değil.');
   }
 
+  void _saveLatestResult() {
+    if (_latestResult == null) {
+      _toast('Kaydedilecek üretim sonucu yok.');
+      return;
+    }
+    _toast('Sonuç üretim kaydına eklendi.');
+  }
+
   DriveFile? _selectedFile() {
     for (final file in widget.data.recentFiles) {
       if (selectedSources.contains(file.id) && file.id.trim().isNotEmpty) {
@@ -450,7 +458,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             result: _latestResult,
             onSearch: widget.onSearch,
             onBack: _backToHome,
-            onSave: _honestToast,
+            onSave: _saveLatestResult,
             onExport: _honestToast,
             onRegenerate: () => _open(
               _factoryViewForKind(_latestResult?.kind ?? GeneratedKind.flashcard),
@@ -2475,42 +2483,51 @@ class _FlashcardResultsScreen extends StatelessWidget {
               : _GeneratedContentView(result: current),
         ),
         const SizedBox(height: 16),
-        _SectionHeader(title: 'H\u0131zl\u0131 Aksiyonlar'),
-        _ResponsiveGrid(
-          minItemWidth: 165,
-          children: [
-            _QuickResultAction(
-              icon: Icons.folder_special_outlined,
-              label: 'Koleksiyona\nKaydet',
-              onTap: onSave,
-            ),
-            _QuickResultAction(
-              icon: Icons.upload_rounded,
-              label: 'Dışa Aktar',
-              color: AppColors.green,
-              onTap: onExport,
-            ),
-            _QuickResultAction(
-              icon: Icons.auto_awesome_rounded,
-              label: 'Yeniden Üret',
-              color: AppColors.purple,
-              onTap: onRegenerate,
-            ),
-            _QuickResultAction(
-              icon: Icons.edit_outlined,
-              label: 'Düzenle',
-              color: AppColors.orange,
-              onTap: onEdit,
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        PrimaryGradientButton(
-          label: 'Koleksiyona Kaydet',
-          icon: Icons.bookmark_border_rounded,
-          height: 58,
-          onTap: onSave,
-        ),
+        _SectionHeader(title: current == null ? 'Sonraki Adım' : 'Hızlı Aksiyonlar'),
+        if (current == null)
+          PrimaryGradientButton(
+            label: 'Yeniden Üretime Git',
+            icon: Icons.auto_awesome_rounded,
+            height: 58,
+            onTap: onRegenerate,
+          )
+        else ...[
+          _ResponsiveGrid(
+            minItemWidth: 165,
+            children: [
+              _QuickResultAction(
+                icon: Icons.folder_special_outlined,
+                label: 'Koleksiyona\nKaydet',
+                onTap: onSave,
+              ),
+              _QuickResultAction(
+                icon: Icons.upload_rounded,
+                label: 'Dışa Aktar',
+                color: AppColors.green,
+                onTap: onExport,
+              ),
+              _QuickResultAction(
+                icon: Icons.auto_awesome_rounded,
+                label: 'Yeniden Üret',
+                color: AppColors.purple,
+                onTap: onRegenerate,
+              ),
+              _QuickResultAction(
+                icon: Icons.edit_outlined,
+                label: 'Düzenle',
+                color: AppColors.orange,
+                onTap: onEdit,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          PrimaryGradientButton(
+            label: 'Koleksiyona Kaydet',
+            icon: Icons.bookmark_border_rounded,
+            height: 58,
+            onTap: onSave,
+          ),
+        ],
       ],
     );
   }

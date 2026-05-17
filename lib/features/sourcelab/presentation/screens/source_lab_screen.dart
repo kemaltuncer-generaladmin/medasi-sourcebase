@@ -208,6 +208,40 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
     return null;
   }
 
+  Future<void> _saveLabResult() async {
+    final result = _labResult;
+    if (result == null) {
+      _toast('Kaydedilecek üretim sonucu yok.');
+      return;
+    }
+    final kind = _sourceLabGeneratedKind(result.tool);
+    if (kind == null) {
+      _toast('${result.title} için kaydetme backend desteği bekleniyor.');
+      return;
+    }
+    final file = selectedSources.isEmpty ? null : _driveFileForSource(selectedSources.first);
+    if (file == null || file.id.trim().isEmpty) {
+      _toast('Kaydetmek için geçerli Drive kaynağı bulunamadı.');
+      return;
+    }
+    try {
+      await _api.createGeneratedOutput(
+        fileId: file.id,
+        kind: kind,
+        itemCount: _sourceLabContentCount(result.content),
+      );
+      if (!mounted) return;
+      _toast('Sonuç üretimler listesine kaydedildi.');
+    } catch (error) {
+      if (!mounted) return;
+      _toast(_friendlyLabError(error));
+    }
+  }
+
+  void _unsupportedExport() {
+    _toast('Dışa aktarma/paylaşma entegrasyonu bu sürümde bağlı değil.');
+  }
+
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
@@ -382,10 +416,12 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             error: _labError,
             onBack: _back,
             onSearch: widget.onSearch,
-            onSave: () => _toast('Bu özellik henüz hazır değil.'),
-            onExport: () => _toast('Bu özellik henüz hazır değil.'),
+            onSave: () {
+              _saveLabResult();
+            },
+            onExport: _unsupportedExport,
             onRegenerate: () => _open(SourceLabView.clinicalBuilder),
-            onComplete: () => _toast('Bu özellik henüz hazır değil.'),
+            onComplete: _unsupportedExport,
           ),
           SourceLabView.planBuilder => _LearningPlanBuilder(
             selectedSources: selectedSources,
@@ -414,9 +450,11 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             result: _labResult,
             error: _labError,
             onBack: _back,
-            onSave: () => _toast('Bu özellik henüz hazır değil.'),
-            onCalendar: () => _toast('Bu özellik henüz hazır değil.'),
-            onExport: () => _toast('Bu özellik henüz hazır değil.'),
+            onSave: () {
+              _saveLabResult();
+            },
+            onCalendar: _unsupportedExport,
+            onExport: _unsupportedExport,
             onRegenerate: () => _open(SourceLabView.planBuilder),
           ),
           SourceLabView.podcastBuilder => _PodcastBuilder(
@@ -446,11 +484,13 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onBack: _back,
             onTogglePlay: () => _toast('Ses dosyası üretilmedi; metinsel podcast scripti gösteriliyor.'),
             onPosition: (value) => setState(() => podcastPosition = value),
-            onSpeed: () => _toast('Bu özellik henüz hazır değil.'),
-            onShare: () => _toast('Bu özellik henüz hazır değil.'),
-            onExport: () => _toast('Bu özellik henüz hazır değil.'),
+            onSpeed: _unsupportedExport,
+            onShare: _unsupportedExport,
+            onExport: _unsupportedExport,
             onRegenerate: () => _open(SourceLabView.podcastBuilder),
-            onSave: () => _toast('Bu özellik henüz hazır değil.'),
+            onSave: () {
+              _saveLabResult();
+            },
             onSkipBack: () {
               setState(() {
                 podcastPosition = math.max(0, podcastPosition - .08);
@@ -487,9 +527,11 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             error: _labError,
             onBack: _back,
             onSearch: widget.onSearch,
-            onSave: () => _toast('Bu özellik henüz hazır değil.'),
-            onPng: () => _toast('Bu özellik henüz hazır değil.'),
-            onPdf: () => _toast('Bu özellik henüz hazır değil.'),
+            onSave: () {
+              _saveLabResult();
+            },
+            onPng: _unsupportedExport,
+            onPdf: _unsupportedExport,
             onRegenerate: () => _open(SourceLabView.infographicBuilder),
           ),
           SourceLabView.mindMapBuilder => _MindMapBuilder(
@@ -526,8 +568,10 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             result: _labResult,
             error: _labError,
             onBack: _back,
-            onSave: () => _toast('Bu özellik henüz hazır değil.'),
-            onExport: () => _toast('Bu özellik henüz hazır değil.'),
+            onSave: () {
+              _saveLabResult();
+            },
+            onExport: _unsupportedExport,
             onRegenerate: () => _open(SourceLabView.mindMapBuilder),
           ),
             },
@@ -595,6 +639,36 @@ String? _sourceLabJobType(_ToolKind tool) {
     _ToolKind.infographic ||
     _ToolKind.mindMap => null,
   };
+}
+
+GeneratedKind? _sourceLabGeneratedKind(_ToolKind tool) {
+  return switch (tool) {
+    _ToolKind.podcast => GeneratedKind.podcast,
+    _ToolKind.clinical ||
+    _ToolKind.plan ||
+    _ToolKind.infographic ||
+    _ToolKind.mindMap => null,
+  };
+}
+
+int _sourceLabContentCount(Object? content) {
+  if (content is List) return content.length;
+  if (content is Map) {
+    for (final key in const [
+      'segments',
+      'chapters',
+      'steps',
+      'days',
+      'nodes',
+      'questions',
+      'rows',
+      'bulletPoints',
+    ]) {
+      final value = content[key];
+      if (value is List) return value.length;
+    }
+  }
+  return content == null ? 0 : 1;
 }
 
 String _sourceLabToolTitle(_ToolKind tool) {
@@ -2629,25 +2703,32 @@ class _SourceLabGeneratedResult extends StatelessWidget {
                           ],
                         ),
         ),
-        _ResponsiveActions(
-          children: [
-            _SecondaryLabButton(
-              label: 'Kaydet',
-              icon: Icons.bookmark_border_rounded,
-              onTap: onSave,
-            ),
-            _SecondaryLabButton(
-              label: 'Dışa Aktar',
-              icon: Icons.file_download_outlined,
-              onTap: onExport,
-            ),
-            _SecondaryLabButton(
-              label: 'Yeniden Üret',
-              icon: Icons.refresh_rounded,
-              onTap: onRegenerate,
-            ),
-          ],
-        ),
+        if (result != null && error == null && !loading)
+          _ResponsiveActions(
+            children: [
+              _SecondaryLabButton(
+                label: 'Kaydet',
+                icon: Icons.bookmark_border_rounded,
+                onTap: onSave,
+              ),
+              _SecondaryLabButton(
+                label: 'Dışa Aktar',
+                icon: Icons.file_download_outlined,
+                onTap: onExport,
+              ),
+              _SecondaryLabButton(
+                label: 'Yeniden Üret',
+                icon: Icons.refresh_rounded,
+                onTap: onRegenerate,
+              ),
+            ],
+          )
+        else if (!loading)
+          _PrimaryLabButton(
+            label: 'Yeniden Üret',
+            icon: Icons.refresh_rounded,
+            onTap: onRegenerate,
+          ),
       ],
     );
   }
