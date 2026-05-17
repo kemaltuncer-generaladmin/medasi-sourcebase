@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
 import '../../../auth/data/sourcebase_auth_backend.dart';
@@ -35,6 +36,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _refreshProfile() async {
     setState(() => _profileFuture = _ProfileSnapshot.load());
     await _profileFuture;
+  }
+
+  void _openProfileSetup() {
+    Navigator.of(context).pushNamed(ProfileSetupScreen.route).then((_) {
+      if (mounted) {
+        setState(() => _profileFuture = _ProfileSnapshot.load());
+      }
+    });
+  }
+
+  void _showSettingsInfo({
+    required String title,
+    required String message,
+    IconData icon = Icons.info_outline_rounded,
+  }) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(icon, color: AppColors.blue),
+            const SizedBox(width: 10),
+            Expanded(child: Text(title)),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Tamam'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _signOut(BuildContext context) async {
@@ -136,31 +171,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _ProfileHeader(
-                  profile: current,
-                  onEdit: () {
-                    if (current.isComplete) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Profil düzenleme özelliği yakında aktif olacak.',
-                          ),
-                          behavior: SnackBarBehavior.floating,
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                      return;
-                    }
-                    Navigator.of(context).pushNamed(ProfileSetupScreen.route);
-                  },
-                ),
+                _ProfileHeader(profile: current, onEdit: _openProfileSetup),
                 if (!current.isComplete) ...[
                   const SizedBox(height: 12),
-                  _ProfileCompletionPanel(
-                    onComplete: () => Navigator.of(
-                      context,
-                    ).pushNamed(ProfileSetupScreen.route),
-                  ),
+                  _ProfileCompletionPanel(onComplete: _openProfileSetup),
                 ],
                 if (current.profileLoadFailed) ...[
                   const SizedBox(height: 12),
@@ -182,17 +196,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 12),
                 const SectionTitle(title: 'Hesap Ayarları'),
-                const _SettingsGroup(
+                _SettingsGroup(
                   items: [
                     _SettingsItem(
                       icon: Icons.person_outline_rounded,
                       title: 'Profil Bilgileri',
                       description:
                           'Fakülte, bölüm ve sınıf bilgileri profil tamamlama ekranından yönetilir.',
-                      enabled: false,
-                      onTap: null,
+                      onTap: _openProfileSetup,
                     ),
-                    _SettingsItem(
+                    const _SettingsItem(
                       icon: Icons.notifications_none_rounded,
                       title: 'Bildirim Tercihleri',
                       description:
@@ -204,17 +217,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: Icons.security_rounded,
                       title: 'Güvenlik ve Şifre',
                       description:
-                          'Şifre işlemleri mevcut auth akışlarından yapılır.',
-                      enabled: false,
-                      onTap: null,
+                          'Şifre sıfırlama ve oturum güvenliği mevcut auth akışlarıyla yönetilir.',
+                      onTap: () => _showSettingsInfo(
+                        title: 'Güvenlik ve Şifre',
+                        message:
+                            'Şifre yenileme işlemi giriş ekranındaki şifremi unuttum akışından yapılır. Aktif oturumu sonlandırmak için bu ekrandaki Çıkış Yap butonunu kullanabilirsin.',
+                        icon: Icons.security_rounded,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 const SectionTitle(title: 'Uygulama'),
-                const _SettingsGroup(
+                _SettingsGroup(
                   items: [
-                    _SettingsItem(
+                    const _SettingsItem(
                       icon: Icons.dark_mode_outlined,
                       title: 'Görünüm',
                       description:
@@ -222,7 +239,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       enabled: false,
                       onTap: null,
                     ),
-                    _SettingsItem(
+                    const _SettingsItem(
                       icon: Icons.language_rounded,
                       title: 'Dil',
                       description:
@@ -231,12 +248,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onTap: null,
                     ),
                     _SettingsItem(
+                      icon: Icons.privacy_tip_outlined,
+                      title: 'Gizlilik ve Destek',
+                      description:
+                          'Veri güvenliği, ödeme doğrulama ve destek kanalı bilgilerini gösterir.',
+                      onTap: () => _showSettingsInfo(
+                        title: 'Gizlilik ve Destek',
+                        message:
+                            'SourceBase hesap, profil, dosya ve cüzdan verilerini sadece oturum sahibi kullanıcı için gösterir. Ödeme ve bakiye güncellemeleri backend doğrulaması olmadan client tarafında yapılmaz. Destek için uygulama içi resmi destek kanalı yayınlandığında bu alana bağlanacaktır.',
+                        icon: Icons.privacy_tip_outlined,
+                      ),
+                    ),
+                    _SettingsItem(
                       icon: Icons.info_outline_rounded,
                       title: 'SourceBase Hakkında',
                       description:
-                          'Sürüm ve yasal metin bağlantıları henüz yayınlanmadı.',
-                      enabled: false,
-                      onTap: null,
+                          'SourceBase amacı, hesap ve mağaza gerçeklik durumunu gösterir.',
+                      onTap: () => _showSettingsInfo(
+                        title: 'SourceBase Hakkında',
+                        message:
+                            'SourceBase, öğrencinin kendi kaynaklarını Drive’da düzenleyip bu kaynaklardan öğrenme çıktıları üretmesi için tasarlanmıştır. Profil ve mağaza ekranı kimlik, profil tamamlama, cüzdan, paket ve çıkış yönetimini sağlar.',
+                        icon: Icons.info_outline_rounded,
+                      ),
                     ),
                   ],
                 ),
@@ -903,6 +936,23 @@ class _MedasiWalletBalance {
 
   String get label => '${_formatAmount(amount)} MC';
 
+  static Future<_MedasiWalletBalance> loadCurrent() async {
+    final client = SourceBaseAuthBackend.client;
+    final userId = SourceBaseAuthBackend.currentUser?.id;
+    if (client == null || userId == null) {
+      return const _MedasiWalletBalance(0);
+    }
+    final row = await client
+        .from('profiles')
+        .select()
+        .eq('id', userId)
+        .maybeSingle();
+    if (row == null) {
+      return const _MedasiWalletBalance(0);
+    }
+    return _MedasiWalletBalance.fromProfileRow(Map<String, dynamic>.from(row));
+  }
+
   static _MedasiWalletBalance fromProfileRow(Map<String, dynamic> row) {
     return _MedasiWalletBalance(
       _safeDouble(
@@ -940,22 +990,31 @@ class MedasiCoinStoreScreen extends StatefulWidget {
 
 class _MedasiCoinStoreScreenState extends State<MedasiCoinStoreScreen> {
   late Future<List<_MedasiCoinPackage>> _packagesFuture;
+  late Future<_MedasiWalletBalance> _walletFuture;
 
   @override
   void initState() {
     super.initState();
     _packagesFuture = _MedasiCoinPackage.loadStoreProducts();
+    _walletFuture = _MedasiWalletBalance.loadCurrent();
   }
 
-  Future<void> _refreshPackages() async {
-    setState(() => _packagesFuture = _MedasiCoinPackage.loadStoreProducts());
-    await _packagesFuture;
+  Future<void> _refreshStoreData() async {
+    setState(() {
+      _packagesFuture = _MedasiCoinPackage.loadStoreProducts();
+      _walletFuture = _MedasiWalletBalance.loadCurrent();
+    });
+    await Future.wait([_packagesFuture, _walletFuture]);
+  }
+
+  void _refreshWallet() {
+    setState(() => _walletFuture = _MedasiWalletBalance.loadCurrent());
   }
 
   @override
   Widget build(BuildContext context) {
     return WorkspaceScroll(
-      onRefresh: _refreshPackages,
+      onRefresh: _refreshStoreData,
       children: [
         DriveTopBar(
           title: 'MedAsiCoin Mağazası',
@@ -1003,6 +1062,8 @@ class _MedasiCoinStoreScreenState extends State<MedasiCoinStoreScreen> {
           ),
         ),
         const SizedBox(height: 14),
+        _StoreWalletSummary(future: _walletFuture, onRefresh: _refreshWallet),
+        const SizedBox(height: 14),
         FutureBuilder<List<_MedasiCoinPackage>>(
           future: _packagesFuture,
           builder: (context, snapshot) {
@@ -1040,7 +1101,10 @@ class _MedasiCoinStoreScreenState extends State<MedasiCoinStoreScreen> {
             return Column(
               children: [
                 for (final item in packages) ...[
-                  _StorePackageTile(package: item),
+                  _StorePackageTile(
+                    package: item,
+                    onPurchaseStateChanged: _refreshWallet,
+                  ),
                   const SizedBox(height: 12),
                 ],
               ],
@@ -1053,9 +1117,13 @@ class _MedasiCoinStoreScreenState extends State<MedasiCoinStoreScreen> {
 }
 
 class _StorePackageTile extends StatefulWidget {
-  const _StorePackageTile({required this.package});
+  const _StorePackageTile({
+    required this.package,
+    required this.onPurchaseStateChanged,
+  });
 
   final _MedasiCoinPackage package;
+  final VoidCallback onPurchaseStateChanged;
 
   @override
   State<_StorePackageTile> createState() => _StorePackageTileState();
@@ -1065,6 +1133,7 @@ class _StorePackageTileState extends State<_StorePackageTile> {
   bool _buying = false;
   String? _buyError;
   String? _buyInfo;
+  String? _checkoutUrl;
 
   Future<void> _purchase() async {
     if (_buying) return;
@@ -1079,6 +1148,7 @@ class _StorePackageTileState extends State<_StorePackageTile> {
       _buying = true;
       _buyError = null;
       _buyInfo = null;
+      _checkoutUrl = null;
     });
     try {
       final client = SourceBaseAuthBackend.client;
@@ -1104,19 +1174,41 @@ class _StorePackageTileState extends State<_StorePackageTile> {
         return;
       }
       final data = json['data'];
-      final checkoutUrl = data is Map ? _safeText(data['url']) : '';
-      if (json['ok'] == true && checkoutUrl.isNotEmpty) {
+      final purchaseData = data is Map ? Map<String, dynamic>.from(data) : null;
+      final checkoutUrl = _safeText(
+        purchaseData?['url'] ?? purchaseData?['checkout_url'],
+      );
+      final status = _safeText(
+        purchaseData?['status'] ?? purchaseData?['payment_status'],
+      ).toLowerCase();
+      if (json['ok'] == true && _isPaidStatus(status)) {
         if (!mounted) return;
         setState(
           () => _buyInfo =
-              'Ödeme sayfası hazırlandı. Uygulama içi ödeme yönlendirmesi henüz bağlı değil; bakiye onaylı ödeme sonrası güncellenir.',
+              'Ödeme backend tarafından onaylandı. Bakiye yenileniyor.',
         );
+        widget.onPurchaseStateChanged();
+      } else if (json['ok'] == true && _isCancelledStatus(status)) {
+        if (!mounted) return;
+        setState(() => _buyError = 'Satın alma iptal edildi.');
+      } else if (json['ok'] == true && _isFailedStatus(status)) {
+        if (!mounted) return;
+        setState(() => _buyError = 'Ödeme tamamlanamadı. Lütfen tekrar dene.');
+      } else if (json['ok'] == true && checkoutUrl.isNotEmpty) {
+        if (!mounted) return;
+        setState(
+          () => _buyInfo =
+              'Ödeme bağlantısı hazırlandı. Linki kopyalayıp güvenli ödeme sayfasında işlemi tamamlayabilirsin.',
+        );
+        setState(() => _checkoutUrl = checkoutUrl);
+        widget.onPurchaseStateChanged();
       } else if (json['ok'] == true) {
         if (!mounted) return;
         setState(
           () => _buyInfo =
               'Ödeme işlemi başlatıldı. Bakiye yalnızca backend onayı sonrası güncellenir.',
         );
+        widget.onPurchaseStateChanged();
       } else {
         final error = json['error'];
         final message = error is Map ? _safeText(error['message']) : '';
@@ -1215,7 +1307,7 @@ class _StorePackageTileState extends State<_StorePackageTile> {
                   : const FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        'Satın Al',
+                        'Ödeme Linki Al',
                         style: TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
@@ -1279,6 +1371,10 @@ class _StorePackageTileState extends State<_StorePackageTile> {
                   ),
                 ),
               ],
+              if (_checkoutUrl != null) ...[
+                const SizedBox(height: 10),
+                _CheckoutLinkActions(url: _checkoutUrl!),
+              ],
               if (_buyError != null) ...[
                 const SizedBox(height: 8),
                 Text(
@@ -1294,6 +1390,150 @@ class _StorePackageTileState extends State<_StorePackageTile> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+bool _isPaidStatus(String status) {
+  return status == 'paid' ||
+      status == 'success' ||
+      status == 'succeeded' ||
+      status == 'completed';
+}
+
+bool _isCancelledStatus(String status) {
+  return status == 'cancel' || status == 'canceled' || status == 'cancelled';
+}
+
+bool _isFailedStatus(String status) {
+  return status == 'failed' || status == 'failure' || status == 'declined';
+}
+
+class _StoreWalletSummary extends StatelessWidget {
+  const _StoreWalletSummary({required this.future, required this.onRefresh});
+
+  final Future<_MedasiWalletBalance> future;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_MedasiWalletBalance>(
+      future: future,
+      builder: (context, snapshot) {
+        final loading = snapshot.connectionState == ConnectionState.waiting;
+        final balance = snapshot.data ?? const _MedasiWalletBalance(0);
+        return GlassPanel(
+          padding: const EdgeInsets.all(18),
+          borderColor: AppColors.blue.withValues(alpha: .16),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.selectedBlue,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet_rounded,
+                  color: AppColors.blue,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Mevcut Bakiye',
+                      style: TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      loading
+                          ? 'Bakiye yükleniyor'
+                          : snapshot.hasError
+                          ? 'Bakiye alınamadı'
+                          : balance.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: snapshot.hasError
+                            ? AppColors.red
+                            : AppColors.navy,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Bakiyeyi yenile',
+                onPressed: onRefresh,
+                icon: const Icon(Icons.refresh_rounded, color: AppColors.blue),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CheckoutLinkActions extends StatelessWidget {
+  const _CheckoutLinkActions({required this.url});
+
+  final String url;
+
+  Future<void> _copyUrl(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: url));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Ödeme bağlantısı kopyalandı.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.selectedBlue,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.softLine),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.link_rounded, color: AppColors.blue, size: 20),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Ödeme linki hazır. İşlemi tamamladıktan sonra bakiyeyi yenile.',
+              style: TextStyle(
+                color: AppColors.navy,
+                fontSize: 12,
+                height: 1.25,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () => _copyUrl(context),
+            child: const Text('Kopyala'),
+          ),
+        ],
       ),
     );
   }
