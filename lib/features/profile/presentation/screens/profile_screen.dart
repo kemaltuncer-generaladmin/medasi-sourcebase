@@ -54,6 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: Row(
           children: [
             Icon(icon, color: AppColors.blue),
@@ -1004,7 +1005,11 @@ class _MedasiCoinStoreScreenState extends State<MedasiCoinStoreScreen> {
       _packagesFuture = _MedasiCoinPackage.loadStoreProducts();
       _walletFuture = _MedasiWalletBalance.loadCurrent();
     });
-    await Future.wait([_packagesFuture, _walletFuture]);
+    try {
+      await Future.wait([_packagesFuture, _walletFuture]);
+    } catch (_) {
+      // FutureBuilder panels surface the user-facing error states.
+    }
   }
 
   void _refreshWallet() {
