@@ -317,17 +317,21 @@ class _LoginScreenState extends State<LoginScreen> {
         SocialAuthButton(
           label: 'Google ile devam et',
           icon: const GoogleGlyph(),
-          onPressed: () { if (!_socialLoading && !loading) _signInWithGoogle(); },
+          onPressed: _socialLoading || loading
+              ? null
+              : () {
+                  _signInWithGoogle();
+                },
         ),
         const SizedBox(height: 12),
         SocialAuthButton(
           label: 'Apple ile devam et',
-          icon: const Icon(
-            Icons.apple,
-            size: 26,
-            color: AppColors.navy,
-          ),
-          onPressed: () { if (!_socialLoading && !loading) _signInWithApple(); },
+          icon: const Icon(Icons.apple, size: 26, color: AppColors.navy),
+          onPressed: _socialLoading || loading
+              ? null
+              : () {
+                  _signInWithApple();
+                },
         ),
         const SizedBox(height: 22),
         SBSecondaryButton(
