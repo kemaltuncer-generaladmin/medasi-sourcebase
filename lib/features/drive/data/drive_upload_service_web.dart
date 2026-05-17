@@ -4,6 +4,8 @@ import 'dart:async';
 import 'dart:html' as html;
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+
 import 'drive_upload_payload.dart';
 
 class DriveUploadService {
@@ -46,13 +48,42 @@ class DriveUploadService {
     required String uploadUrl,
     required Map<String, String> headers,
     required PickedDriveFile file,
+    ValueChanged<double>? onProgress,
   }) async {
-    await html.HttpRequest.request(
-      uploadUrl,
-      method: 'PUT',
-      requestHeaders: headers,
-      sendData: file.bytes,
-    );
+    onProgress?.call(0);
+    final request = html.HttpRequest();
+    request.open('PUT', uploadUrl);
+    for (final entry in headers.entries) {
+      try {
+        request.setRequestHeader(entry.key, entry.value);
+      } catch (_) {
+        // browser may block cross-origin header
+      }
+    }
+    final completed = Completer<void>();
+    request.upload.onProgress.listen((event) {
+      final total = event.total ?? file.sizeBytes;
+      if (total > 0) {
+        onProgress?.call((event.loaded ?? 0) / total);
+      }
+    });
+    request.onLoadEnd.listen((_) {
+      if (request.status != null &&
+          request.status! >= 200 &&
+          request.status! < 300) {
+        onProgress?.call(1);
+        completed.complete();
+      } else {
+        completed.completeError(
+          StateError('GCS upload failed: HTTP ${request.status}'),
+        );
+      }
+    });
+    request.onError.listen((_) {
+      completed.completeError(StateError('GCS upload failed.'));
+    });
+    request.send(file.bytes);
+    await completed.future;
   }
 
   String _fallbackContentType(String fileName) {

@@ -11,6 +11,7 @@ class DriveUploadService {
     required String uploadUrl,
     required Map<String, String> headers,
     required PickedDriveFile file,
+    void Function(double progress)? onProgress,
   }) async {
     throw UnsupportedError('Dosya yükleme bu platformda henüz desteklenmiyor.');
   }

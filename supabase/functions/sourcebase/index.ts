@@ -1,5 +1,10 @@
 import { isRecord, SafeError } from "./types.ts";
 import {
+  getGcsConfig,
+  parseGoogleServiceAccount,
+  runtimeConfigStatus,
+} from "./config.ts";
+import {
   cancelJob,
   centralAiChat,
   createGenerationJob,
@@ -37,6 +42,8 @@ Deno.serve(async (request) => {
 
     switch (action) {
       // Drive actions
+      case "runtime_config":
+        return success(runtimeConfigStatus());
       case "drive_bootstrap":
         return success(await driveBootstrap(user.id));
       case "create_course":
@@ -49,6 +56,16 @@ Deno.serve(async (request) => {
         return success(await completeUpload(user.id, payload));
       case "create_generated_output":
         return success(await createGeneratedOutput(user.id, payload));
+      case "rename_file":
+        return success(await renameFile(user.id, payload));
+      case "move_files":
+        return success(await moveFiles(user.id, payload));
+      case "delete_files":
+        return success(await deleteFiles(user.id, payload));
+      case "retry_file_processing":
+        return success(await retryFileProcessing(user.id, payload));
+      case "add_to_collection":
+        return success(await addToCollection(user.id, payload));
 
       // AI Generation actions
       case "process_file_extraction":
@@ -128,11 +145,12 @@ async function driveBootstrap(userId: string) {
       `generated_outputs?owner_user_id=eq.${userId}&select=*&order=created_at.desc`,
     ),
   ]);
+  const configStatus = runtimeConfigStatus();
   return {
     storage: {
-      provider: "gcs",
-      bucketConfigured: Boolean(Deno.env.get("SOURCEBASE_GCS_BUCKET")),
+      ...configStatus.gcs,
     },
+    ai: configStatus.vertex,
     courses,
     sections,
     files,
@@ -142,16 +160,36 @@ async function driveBootstrap(userId: string) {
 
 async function createCourse(userId: string, payload: JsonMap) {
   const title = requireString(payload.title, "title");
+  const description = optionalString(payload.description);
+  const category = optionalString(payload.category);
+  const iconName = optionalString(payload.iconName) ?? "book";
+  const colorHex = optionalString(payload.colorHex);
+  const initialSections = stringList(payload.initialSections);
   const [row] = await dbInsert("courses", [{
     owner_user_id: userId,
     title,
-    icon_name: "book",
-    subject: title,
+    icon_name: iconName,
+    subject: category ?? title,
     status: "active",
     metadata: {
-      description: `${title} dersine ait içerikler için yeni alan hazır.`,
+      description: description ??
+        `${title} dersine ait içerikler için yeni alan hazır.`,
+      category,
+      colorHex,
     },
   }]);
+  if (initialSections.length > 0) {
+    await dbInsert(
+      "sections",
+      initialSections.map((sectionTitle, index) => ({
+        owner_user_id: userId,
+        course_id: row.id,
+        title: sectionTitle,
+        status: "active",
+        sort_order: index,
+      })),
+    );
+  }
   await audit(userId, "create_course", "course", row.id, { title });
   return { row };
 }
@@ -188,32 +226,24 @@ async function createUploadSession(userId: string, payload: JsonMap) {
     );
   }
 
-  const bucket = Deno.env.get("SOURCEBASE_GCS_BUCKET");
-  const serviceJson = Deno.env.get("SOURCEBASE_GCS_SERVICE_ACCOUNT_JSON");
-  if (!bucket || !serviceJson) {
-    throw new SafeError(
-      "GCS_NOT_CONFIGURED",
-      "GCS yükleme ayarları tamamlanmamış.",
-      500,
-    );
-  }
+  const gcs = getGcsConfig();
 
   const safeName = sanitizeFileName(fileName);
   const sourceId = crypto.randomUUID();
   const objectName = `user/${userId}/sources/${sourceId}/${safeName}`;
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
   const uploadUrl = await createGcsV4SignedPutUrl({
-    bucket,
+    bucket: gcs.bucket,
     objectName,
     contentType,
-    serviceAccountJson: serviceJson,
+    serviceAccountJson: gcs.serviceAccountJson,
     expiresInSeconds: 900,
   });
 
   return {
     uploadUrl,
     objectName,
-    bucket,
+    bucket: gcs.bucket,
     expiresAt: expiresAt.toISOString(),
     headers: { "Content-Type": contentType },
     metadata: { sourceId, courseId, sectionId },
@@ -233,7 +263,7 @@ async function completeUpload(userId: string, payload: JsonMap) {
   await assertOwned(userId, "courses", courseId);
   await assertOwned(userId, "sections", sectionId);
   await assertSectionInCourse(userId, sectionId, courseId);
-  const bucket = Deno.env.get("SOURCEBASE_GCS_BUCKET") ?? "";
+  const gcs = getGcsConfig();
   const [row] = await dbInsert("drive_files", [{
     owner_user_id: userId,
     course_id: courseId,
@@ -241,7 +271,7 @@ async function completeUpload(userId: string, payload: JsonMap) {
     title: fileName,
     file_type: fileKind(fileName),
     original_filename: fileName,
-    gcs_bucket: bucket,
+    gcs_bucket: gcs.bucket,
     gcs_object_name: objectName,
     mime_type: contentType,
     size_bytes: Number.isFinite(sizeBytes) ? sizeBytes : null,
@@ -272,7 +302,15 @@ async function completeUpload(userId: string, payload: JsonMap) {
         },
       },
     );
-    throw error;
+    const [failedRow] = await dbSelect(
+      `drive_files?id=eq.${row.id}&owner_user_id=eq.${userId}&select=*&limit=1`,
+    );
+    return {
+      row: failedRow ?? row,
+      objectName,
+      status: "processing_failed",
+      nextAction: "retry_file_processing",
+    };
   }
 
   const [readyRow] = await dbSelect(
@@ -285,6 +323,132 @@ async function completeUpload(userId: string, payload: JsonMap) {
     status: "ready",
     nextAction: "generate",
   };
+}
+
+async function renameFile(userId: string, payload: JsonMap) {
+  const fileId = requireString(payload.fileId, "fileId");
+  const title = requireString(payload.title, "title");
+  await assertOwned(userId, "drive_files", fileId);
+  const [row] = await dbPatchReturning(
+    "drive_files",
+    `id=eq.${fileId}&owner_user_id=eq.${userId}`,
+    { title, updated_at: new Date().toISOString() },
+  );
+  await audit(userId, "rename_file", "drive_file", fileId, { title });
+  return { row };
+}
+
+async function moveFiles(userId: string, payload: JsonMap) {
+  const fileIds = requireStringList(payload.fileIds, "fileIds");
+  const courseId = requireString(payload.courseId, "courseId");
+  const sectionId = requireString(payload.sectionId, "sectionId");
+  await assertOwned(userId, "courses", courseId);
+  await assertOwned(userId, "sections", sectionId);
+  await assertSectionInCourse(userId, sectionId, courseId);
+  await assertFilesOwned(userId, fileIds);
+  const rows = await dbPatchReturning(
+    "drive_files",
+    `id=in.(${fileIds.join(",")})&owner_user_id=eq.${userId}`,
+    {
+      course_id: courseId,
+      section_id: sectionId,
+      updated_at: new Date().toISOString(),
+    },
+  );
+  await audit(userId, "move_files", "drive_file", null, {
+    fileIds,
+    courseId,
+    sectionId,
+  });
+  return { rows };
+}
+
+async function deleteFiles(userId: string, payload: JsonMap) {
+  const fileIds = requireStringList(payload.fileIds, "fileIds");
+  await assertFilesOwned(userId, fileIds);
+  const rows = await dbSelect(
+    `drive_files?id=in.(${
+      fileIds.join(",")
+    })&owner_user_id=eq.${userId}&select=id,gcs_bucket,gcs_object_name`,
+  );
+  const gcs = getGcsConfig();
+  for (const row of rows) {
+    const objectName = String(row.gcs_object_name ?? "");
+    const bucket = String(row.gcs_bucket ?? "") || gcs.bucket;
+    if (objectName) {
+      await deleteGcsObject({
+        bucket,
+        objectName,
+        serviceAccountJson: gcs.serviceAccountJson,
+      });
+    }
+  }
+  await dbDelete(
+    "drive_files",
+    `id=in.(${fileIds.join(",")})&owner_user_id=eq.${userId}`,
+  );
+  await audit(userId, "delete_files", "drive_file", null, { fileIds });
+  return { deletedIds: fileIds };
+}
+
+async function retryFileProcessing(userId: string, payload: JsonMap) {
+  const fileId = requireString(payload.fileId, "fileId");
+  await assertOwned(userId, "drive_files", fileId);
+  await dbPatch(
+    "drive_files",
+    `id=eq.${fileId}&owner_user_id=eq.${userId}`,
+    {
+      ai_status: "processing",
+      updated_at: new Date().toISOString(),
+    },
+  );
+  try {
+    await processFileExtraction(userId, { fileId });
+  } catch (error) {
+    await dbPatch(
+      "drive_files",
+      `id=eq.${fileId}&owner_user_id=eq.${userId}`,
+      {
+        ai_status: "failed",
+        metadata: {
+          extractionError: error instanceof SafeError
+            ? error.message
+            : "Dosya metni çıkarılamadı.",
+          extractionFailedAt: new Date().toISOString(),
+        },
+      },
+    );
+    throw error;
+  }
+  const [row] = await dbSelect(
+    `drive_files?id=eq.${fileId}&owner_user_id=eq.${userId}&select=*&limit=1`,
+  );
+  await audit(userId, "retry_file_processing", "drive_file", fileId, {});
+  return { row };
+}
+
+async function addToCollection(userId: string, payload: JsonMap) {
+  const fileIds = requireStringList(payload.fileIds, "fileIds");
+  await assertFilesOwned(userId, fileIds);
+  const existingRows = await dbSelect(
+    `drive_files?id=in.(${
+      fileIds.join(",")
+    })&owner_user_id=eq.${userId}&select=id,metadata`,
+  );
+  const pinnedAt = new Date().toISOString();
+  for (const row of existingRows) {
+    const metadata = isRecord(row.metadata) ? row.metadata : {};
+    await dbPatch(
+      "drive_files",
+      `id=eq.${row.id}&owner_user_id=eq.${userId}`,
+      {
+        metadata: { ...metadata, collectionPinnedAt: pinnedAt },
+        updated_at: pinnedAt,
+      },
+    );
+  }
+  await audit(userId, "add_to_collection", "drive_file", null, { fileIds });
+  return { fileIds, collectionPinnedAt: pinnedAt };
 }
 
 async function createGeneratedOutput(userId: string, payload: JsonMap) {
@@ -314,6 +478,17 @@ async function assertOwned(userId: string, table: string, id: string) {
   );
   if (rows.length === 0) {
     throw new SafeError("NOT_FOUND", "Kayıt bulunamadı veya yetkin yok.", 404);
+  }
+}
+
+async function assertFilesOwned(userId: string, fileIds: string[]) {
+  const rows = await dbSelect(
+    `drive_files?id=in.(${
+      fileIds.join(",")
+    })&owner_user_id=eq.${userId}&select=id`,
+  );
+  if (rows.length !== fileIds.length) {
+    throw new SafeError("NOT_FOUND", "Dosya bulunamadı veya yetkin yok.", 404);
   }
 }
 
@@ -362,6 +537,24 @@ async function dbPatch(
     method: "PATCH",
     body: JSON.stringify(body),
   });
+}
+
+async function dbPatchReturning(
+  table: string,
+  query: string,
+  body: JsonMap,
+): Promise<JsonMap[]> {
+  const response = await supabaseRest(`${table}?${query}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json();
+  return Array.isArray(data) ? data.filter(isRecord) : [];
+}
+
+async function dbDelete(table: string, query: string): Promise<void> {
+  await supabaseRest(`${table}?${query}`, { method: "DELETE" });
 }
 
 async function audit(
@@ -414,22 +607,16 @@ async function createGcsV4SignedPutUrl(input: {
   serviceAccountJson: string;
   expiresInSeconds: number;
 }) {
-  const serviceAccount = JSON.parse(input.serviceAccountJson);
-  const clientEmail = String(serviceAccount.client_email ?? "");
-  const privateKey = String(serviceAccount.private_key ?? "");
-  if (!clientEmail || !privateKey) {
-    throw new SafeError(
-      "GCS_SERVICE_ACCOUNT_INVALID",
-      "GCS service JSON geçersiz.",
-      500,
-    );
-  }
+  const serviceAccount = parseGoogleServiceAccount(
+    input.serviceAccountJson,
+    "GCS_SERVICE_ACCOUNT_INVALID",
+  );
 
   const now = new Date();
   const date = formatDate(now);
   const timestamp = `${date}T${formatTime(now)}Z`;
   const scope = `${date}/auto/storage/goog4_request`;
-  const credential = `${clientEmail}/${scope}`;
+  const credential = `${serviceAccount.clientEmail}/${scope}`;
   const canonicalUri = `/${encodePath(input.bucket)}/${
     encodePath(input.objectName)
   }`;
@@ -438,17 +625,16 @@ async function createGcsV4SignedPutUrl(input: {
     "X-Goog-Credential": credential,
     "X-Goog-Date": timestamp,
     "X-Goog-Expires": String(input.expiresInSeconds),
-    "X-Goog-SignedHeaders": "content-type;host",
+    "X-Goog-SignedHeaders": "host",
   };
   const canonicalQuery = canonicalQueryString(query);
-  const canonicalHeaders =
-    `content-type:${input.contentType}\nhost:storage.googleapis.com\n`;
+  const canonicalHeaders = "host:storage.googleapis.com\n";
   const canonicalRequest = [
     "PUT",
     canonicalUri,
     canonicalQuery,
     canonicalHeaders,
-    "content-type;host",
+    "host",
     "UNSIGNED-PAYLOAD",
   ].join("\n");
   const stringToSign = [
@@ -457,7 +643,71 @@ async function createGcsV4SignedPutUrl(input: {
     scope,
     await sha256Hex(canonicalRequest),
   ].join("\n");
-  const signature = await rsaSha256(privateKey, stringToSign);
+  const signature = await rsaSha256(serviceAccount.privateKey, stringToSign);
+  return `https://storage.googleapis.com${canonicalUri}?${canonicalQuery}&X-Goog-Signature=${signature}`;
+}
+
+async function deleteGcsObject(input: {
+  bucket: string;
+  objectName: string;
+  serviceAccountJson: string;
+}) {
+  const url = await createGcsV4SignedDeleteUrl({
+    ...input,
+    expiresInSeconds: 300,
+  });
+  const response = await fetch(url, { method: "DELETE" });
+  if (!response.ok && response.status !== 404) {
+    throw new SafeError(
+      "GCS_DELETE_FAILED",
+      "Dosya depolama alanından silinemedi.",
+      500,
+    );
+  }
+}
+
+async function createGcsV4SignedDeleteUrl(input: {
+  bucket: string;
+  objectName: string;
+  serviceAccountJson: string;
+  expiresInSeconds: number;
+}) {
+  const serviceAccount = parseGoogleServiceAccount(
+    input.serviceAccountJson,
+    "GCS_SERVICE_ACCOUNT_INVALID",
+  );
+  const now = new Date();
+  const date = formatDate(now);
+  const timestamp = `${date}T${formatTime(now)}Z`;
+  const scope = `${date}/auto/storage/goog4_request`;
+  const credential = `${serviceAccount.clientEmail}/${scope}`;
+  const canonicalUri = `/${encodePath(input.bucket)}/${
+    encodePath(input.objectName)
+  }`;
+  const query: Record<string, string> = {
+    "X-Goog-Algorithm": "GOOG4-RSA-SHA256",
+    "X-Goog-Credential": credential,
+    "X-Goog-Date": timestamp,
+    "X-Goog-Expires": String(input.expiresInSeconds),
+    "X-Goog-SignedHeaders": "host",
+  };
+  const canonicalQuery = canonicalQueryString(query);
+  const canonicalHeaders = "host:storage.googleapis.com\n";
+  const canonicalRequest = [
+    "DELETE",
+    canonicalUri,
+    canonicalQuery,
+    canonicalHeaders,
+    "host",
+    "UNSIGNED-PAYLOAD",
+  ].join("\n");
+  const stringToSign = [
+    "GOOG4-RSA-SHA256",
+    timestamp,
+    scope,
+    await sha256Hex(canonicalRequest),
+  ].join("\n");
+  const signature = await rsaSha256(serviceAccount.privateKey, stringToSign);
   return `https://storage.googleapis.com${canonicalUri}?${canonicalQuery}&X-Goog-Signature=${signature}`;
 }
 
@@ -485,6 +735,26 @@ function requireString(value: unknown, name: string) {
     throw new SafeError("INVALID_PAYLOAD", `${name} alanı zorunlu.`, 400);
   }
   return text;
+}
+
+function optionalString(value: unknown) {
+  const text = value?.toString().trim() ?? "";
+  return text.length === 0 ? undefined : text;
+}
+
+function stringList(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => item?.toString().trim() ?? "")
+    .filter((item) => item.length > 0);
+}
+
+function requireStringList(value: unknown, name: string) {
+  const list = stringList(value);
+  if (list.length === 0) {
+    throw new SafeError("INVALID_PAYLOAD", `${name} alanı zorunlu.`, 400);
+  }
+  return list;
 }
 
 function sanitizeFileName(fileName: string) {
