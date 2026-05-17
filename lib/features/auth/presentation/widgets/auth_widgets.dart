@@ -36,7 +36,9 @@ class AuthScreenFrame extends StatelessWidget {
                       ),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight - 72,
+                          minHeight: constraints.maxHeight > 72
+                              ? constraints.maxHeight - 72
+                              : 0,
                         ),
                         child: Semantics(
                           container: true,
