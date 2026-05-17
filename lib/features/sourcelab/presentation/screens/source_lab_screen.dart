@@ -501,7 +501,7 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
                 podcastPosition = math.min(1, podcastPosition + .08);
               });
             },
-            onVolume: () => _toast('Bu özellik henüz hazır değil.'),
+            onVolume: _unsupportedExport,
           ),
           SourceLabView.infographicBuilder => _InfographicBuilder(
             selectedSources: selectedSources,

@@ -41,6 +41,8 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
   late final Set<String> selectedSources;
   final List<_BaseForceJobState> _jobs = [];
   _GenerationResult? _latestResult;
+  bool _latestResultSaved = false;
+  String? _latestResultSaveError;
 
   @override
   void initState() {
@@ -98,6 +100,8 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
   void _openResult(_GenerationResult result) {
     setState(() {
       _latestResult = result;
+      _latestResultSaved = result.sourceFileId == null;
+      _latestResultSaveError = null;
       view = BaseForceView.flashcardResults;
     });
   }
@@ -150,12 +154,43 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
     _toast('Bu özellik henüz hazır değil.');
   }
 
-  void _saveLatestResult() {
-    if (_latestResult == null) {
+  Future<void> _saveLatestResult() async {
+    final result = _latestResult;
+    if (result == null) {
       _toast('Kaydedilecek üretim sonucu yok.');
       return;
     }
-    _toast('Sonuç üretim kaydına eklendi.');
+    if (_latestResultSaved) {
+      _toast('Sonuç üretimler listesinde kayıtlı.');
+      return;
+    }
+    if (result.sourceFileId == null) {
+      _toast('Bu üretim kaydı zaten koleksiyon listesinde görünüyor.');
+      return;
+    }
+    final retryingAfterError = _latestResultSaveError != null;
+    try {
+      await _api.createGeneratedOutput(
+        fileId: result.sourceFileId!,
+        kind: result.kind,
+        itemCount: _baseForceContentCount(result.content),
+      );
+      if (!mounted) return;
+      setState(() {
+        _latestResultSaved = true;
+        _latestResultSaveError = null;
+      });
+      _toast(
+        retryingAfterError
+            ? 'Kayıt yeniden denendi ve üretimler listesine eklendi.'
+            : 'Sonuç üretimler listesine kaydedildi.',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final message = _friendlyBaseForceError(error);
+      setState(() => _latestResultSaveError = message);
+      _toast('Sonuç görüntülendi, kayıt oluşturulamadı: $message');
+    }
   }
 
   DriveFile? _selectedFile() {
@@ -208,20 +243,26 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
         kind: kind,
         title: _baseForceTitle(kind),
         sourceTitle: file.title,
+        sourceFileId: file.id,
         content: content,
       );
+      var resultSaved = false;
+      String? saveError;
       try {
         await _api.createGeneratedOutput(
           fileId: file.id,
           kind: kind,
           itemCount: _baseForceContentCount(content),
         );
-      } catch (_) {
-        // İçerik gösterimi tamamlandı; kayıt hatası kullanıcıyı bloklamasın.
+        resultSaved = true;
+      } catch (error) {
+        saveError = _friendlyBaseForceError(error);
       }
       if (!mounted) return;
       setState(() {
         _latestResult = result;
+        _latestResultSaved = resultSaved;
+        _latestResultSaveError = saveError;
         _updateJobValue(
           job.localId,
           status: _JobUiStatus.completed,
@@ -458,7 +499,9 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             result: _latestResult,
             onSearch: widget.onSearch,
             onBack: _backToHome,
-            onSave: _saveLatestResult,
+            onSave: () {
+              _saveLatestResult();
+            },
             onExport: _honestToast,
             onRegenerate: () => _open(
               _factoryViewForKind(_latestResult?.kind ?? GeneratedKind.flashcard),
@@ -535,11 +578,13 @@ class _GenerationResult {
     required this.title,
     required this.sourceTitle,
     required this.content,
+    this.sourceFileId,
   });
 
   final GeneratedKind kind;
   final String title;
   final String sourceTitle;
+  final String? sourceFileId;
   final Object? content;
 }
 
