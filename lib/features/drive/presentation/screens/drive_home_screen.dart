@@ -680,58 +680,83 @@ class _CourseRow extends StatelessWidget {
       button: true,
       label:
           '${course.title}. ${course.sections.length} bölüm. ${course.fileCount} dosya. $statusLabel.',
-      child: InkWell(
-        onTap: onTap,
-        child: ExcludeSemantics(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-            child: Row(
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: course.iconBackground,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(course.icon, color: course.iconColor, size: 34),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
+      child: ExcludeSemantics(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(12),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        course.title,
-                        style: const TextStyle(
-                          color: AppColors.navy,
-                          fontSize: 19,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${course.sections.length} bölüm  •  ${course.fileCount} dosya',
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 15,
-                        ),
+                      Row(
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: course.iconBackground,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              course.icon,
+                              color: course.iconColor,
+                              size: 34,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  course.title,
+                                  style: const TextStyle(
+                                    color: AppColors.navy,
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${course.sections.length} bölüm  •  ${course.fileCount} dosya',
+                                  style: const TextStyle(
+                                    color: AppColors.muted,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          _CourseStatus(status: course.status),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                _CourseStatus(status: course.status),
-                const SizedBox(width: 8),
-                IconButton(
-                  tooltip: 'Ders işlemleri',
-                  onPressed: () => _showCourseActions(context),
-                  icon: const Icon(
-                    Icons.more_vert_rounded,
-                    color: AppColors.muted,
+              ),
+              const SizedBox(width: 4),
+              Tooltip(
+                message: 'Ders işlemleri',
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _showCourseActions(context),
+                    borderRadius: BorderRadius.circular(24),
+                    child: const SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Icon(
+                        Icons.more_vert_rounded,
+                        color: AppColors.muted,
+                      ),
+                    ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
