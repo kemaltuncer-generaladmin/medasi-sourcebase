@@ -84,6 +84,56 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
     setState(() => view = BaseForceView.home);
   }
 
+  BaseForceView _factoryViewForKind(GeneratedKind kind) {
+    return switch (kind) {
+      GeneratedKind.question => BaseForceView.questionFactory,
+      GeneratedKind.summary => BaseForceView.summaryFactory,
+      GeneratedKind.algorithm => BaseForceView.algorithmFactory,
+      GeneratedKind.comparison || GeneratedKind.table =>
+        BaseForceView.comparisonFactory,
+      _ => BaseForceView.flashcardFactory,
+    };
+  }
+
+  void _openResult(_GenerationResult result) {
+    setState(() {
+      _latestResult = result;
+      view = BaseForceView.flashcardResults;
+    });
+  }
+
+  void _retryGeneration(_BaseForceJobState job) {
+    setState(() {
+      selectedSources
+        ..clear()
+        ..add(job.source.id);
+      selectedFactory = switch (job.kind) {
+        GeneratedKind.question => 'question',
+        GeneratedKind.summary => 'summary',
+        GeneratedKind.algorithm => 'algorithm',
+        GeneratedKind.comparison || GeneratedKind.table => 'comparison',
+        _ => 'flashcard',
+      };
+    });
+    _startGeneration(job.kind);
+  }
+
+  void _openStoredGeneration(_GenerationRowData row) {
+    _openResult(
+      _GenerationResult(
+        kind: _kindForTurkishLabel(row.kind),
+        title: row.title,
+        sourceTitle: row.source,
+        content:
+            'Bu üretim kaydı koleksiyonda görünüyor; ham sonuç içeriği bu ekranda yeniden çekilemiyor.',
+      ),
+    );
+  }
+
+  void _regenerateStoredGeneration(_GenerationRowData row) {
+    _open(_factoryViewForKind(_kindForTurkishLabel(row.kind)));
+  }
+
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
@@ -392,8 +442,8 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             onBack: _backToHome,
             queueFilter: queueFilter,
             onFilterChanged: (v) => setState(() => queueFilter = v),
-            onOpenResult: () => _open(BaseForceView.flashcardResults),
-            onRetry: () => _open(BaseForceView.algorithmFactory),
+            onOpenResult: _openResult,
+            onRetryJob: _retryGeneration,
             onStop: _honestToast,
           ),
           BaseForceView.flashcardResults => _FlashcardResultsScreen(
@@ -402,7 +452,9 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             onBack: _backToHome,
             onSave: _honestToast,
             onExport: _honestToast,
-            onRegenerate: () => _open(BaseForceView.flashcardFactory),
+            onRegenerate: () => _open(
+              _factoryViewForKind(_latestResult?.kind ?? GeneratedKind.flashcard),
+            ),
             onEdit: _honestToast,
           ),
           BaseForceView.allGenerations => _AllGenerationsScreen(
@@ -412,8 +464,8 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             onSearch: widget.onSearch,
             onBack: _backToHome,
             onFilter: (filter) => setState(() => selectedFilter = filter),
-            onOpenResult: () => _open(BaseForceView.flashcardResults),
-            onRegenerate: () => _open(BaseForceView.flashcardFactory),
+            onOpenResult: _openStoredGeneration,
+            onRegenerate: _regenerateStoredGeneration,
             onShare: _honestToast,
             onClear: () => setState(() => selectedFilter = 'Tümü'),
           ),
@@ -2200,7 +2252,7 @@ class _QueueScreen extends StatelessWidget {
     required this.queueFilter,
     required this.onFilterChanged,
     required this.onOpenResult,
-    required this.onRetry,
+    required this.onRetryJob,
     required this.onStop,
   });
 
@@ -2210,8 +2262,8 @@ class _QueueScreen extends StatelessWidget {
   final VoidCallback onBack;
   final String queueFilter;
   final ValueChanged<String> onFilterChanged;
-  final VoidCallback onOpenResult;
-  final VoidCallback onRetry;
+  final ValueChanged<_GenerationResult> onOpenResult;
+  final ValueChanged<_BaseForceJobState> onRetryJob;
   final VoidCallback onStop;
 
   @override
@@ -2236,7 +2288,15 @@ class _QueueScreen extends StatelessWidget {
           progress: job.progress,
           time: job.errorMessage ?? _jobStatusLabel(job.status),
           filterStatus: _jobStatusLabel(job.status),
-          onAction: job.status == _JobUiStatus.completed ? onOpenResult : onRetry,
+          onAction: () {
+            if (job.status == _JobUiStatus.completed && job.result != null) {
+              onOpenResult(job.result!);
+            } else if (job.status == _JobUiStatus.failed) {
+              onRetryJob(job);
+            } else {
+              onStop();
+            }
+          },
         ),
       );
     }
@@ -2261,7 +2321,15 @@ class _QueueScreen extends StatelessWidget {
               progress: 1,
               time: gen.updatedLabel,
               filterStatus: 'Tamamland\u0131',
-              onAction: onOpenResult,
+              onAction: () => onOpenResult(
+                _GenerationResult(
+                  kind: gen.kind,
+                  title: gen.title,
+                  sourceTitle: file.title,
+                  content:
+                      'Bu üretim kaydı koleksiyonda görünüyor; ham sonuç içeriği bu ekranda yeniden çekilemiyor.',
+                ),
+              ),
             ),
           );
         }
@@ -2668,8 +2736,8 @@ class _AllGenerationsScreen extends StatelessWidget {
   final VoidCallback onSearch;
   final VoidCallback onBack;
   final ValueChanged<String> onFilter;
-  final VoidCallback onOpenResult;
-  final VoidCallback onRegenerate;
+  final ValueChanged<_GenerationRowData> onOpenResult;
+  final ValueChanged<_GenerationRowData> onRegenerate;
   final VoidCallback onShare;
   final VoidCallback onClear;
 
@@ -2787,9 +2855,9 @@ class _AllGenerationsScreen extends StatelessWidget {
           for (final row in visible)
             _GenerationListRow(
               data: row,
-              onOpen: onOpenResult,
+              onOpen: () => onOpenResult(row),
               onShare: onShare,
-              onRegenerate: onRegenerate,
+              onRegenerate: () => onRegenerate(row),
             ),
       ],
     );
