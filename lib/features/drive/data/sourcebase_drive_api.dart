@@ -20,16 +20,17 @@ class SourceBaseDriveApi {
       body: {'action': action, 'payload': payload ?? const {}},
     );
     final data = response.data;
-    if (data is Map<String, dynamic>) {
-      if (data['ok'] == false) {
-        final error = data['error'];
+    if (data is Map) {
+      final body = Map<String, dynamic>.from(data);
+      if (body['ok'] == false) {
+        final error = body['error'];
         throw StateError(
           error is Map
               ? error['message']?.toString() ?? 'SourceBase request failed.'
               : 'SourceBase request failed.',
         );
       }
-      return data;
+      return body;
     }
     throw StateError('Unexpected SourceBase response.');
   }
@@ -40,8 +41,8 @@ class SourceBaseDriveApi {
       payload: draft.toJson(),
     );
     final data = response['data'];
-    if (data is Map<String, dynamic>) {
-      return GcsUploadSession.fromJson(data);
+    if (data is Map) {
+      return GcsUploadSession.fromJson(Map<String, dynamic>.from(data));
     }
     throw StateError('Upload session response is empty.');
   }

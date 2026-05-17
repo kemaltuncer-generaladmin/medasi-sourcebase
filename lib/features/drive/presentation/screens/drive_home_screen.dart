@@ -713,6 +713,8 @@ class _CourseRow extends StatelessWidget {
                               children: [
                                 Text(
                                   course.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: AppColors.navy,
                                     fontSize: 19,

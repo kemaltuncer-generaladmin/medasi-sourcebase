@@ -293,12 +293,22 @@ class GcsUploadSession {
       }
     }
     return GcsUploadSession(
-      uploadUrl: json['uploadUrl']?.toString() ?? '',
-      objectName: json['objectName']?.toString() ?? '',
+      uploadUrl:
+          json['uploadUrl']?.toString() ??
+          json['upload_url']?.toString() ??
+          '',
+      objectName:
+          json['objectName']?.toString() ??
+          json['object_name']?.toString() ??
+          '',
       bucket: json['bucket']?.toString() ?? '',
       headers: headers,
       expiresAt:
-          DateTime.tryParse(json['expiresAt']?.toString() ?? '') ??
+          DateTime.tryParse(
+            json['expiresAt']?.toString() ??
+                json['expires_at']?.toString() ??
+                '',
+          ) ??
           DateTime.now(),
     );
   }
@@ -308,4 +318,7 @@ class GcsUploadSession {
   final String bucket;
   final Map<String, String> headers;
   final DateTime expiresAt;
+
+  bool get isUsable =>
+      uploadUrl.trim().isNotEmpty && objectName.trim().isNotEmpty;
 }

@@ -44,10 +44,14 @@ class WorkspaceScroll extends StatelessWidget {
     final isDesktop = ResponsiveLayout.isDesktop(context);
     final isTablet = ResponsiveLayout.isTablet(context);
     final horizontalPadding = ResponsiveLayout.getHorizontalPadding(context);
-    final bottomPadding = isDesktop ? 48.0 : (isTablet ? 48.0 : 138.0);
+    final mediaQuery = MediaQuery.of(context);
+    final bottomPadding =
+        (isDesktop ? 48.0 : (isTablet ? 48.0 : 138.0)) +
+        mediaQuery.viewPadding.bottom +
+        mediaQuery.viewInsets.bottom;
     final topPadding = isDesktop || isTablet
         ? 18.0
-        : MediaQuery.viewPaddingOf(context).top + 8.0;
+        : mediaQuery.viewPadding.top + 8.0;
 
     final scroll = ListView(
       physics: const BouncingScrollPhysics(),

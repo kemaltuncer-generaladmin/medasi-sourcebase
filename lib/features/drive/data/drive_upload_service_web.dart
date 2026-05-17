@@ -16,29 +16,44 @@ class DriveUploadService {
       ..accept = '.pdf,.ppt,.pptx,.doc,.docx,.zip,application/pdf'
       ..multiple = false;
     final picked = Completer<PickedDriveFile?>();
+    html.window.onFocus.first.then((_) {
+      Timer(const Duration(milliseconds: 350), () {
+        if (!picked.isCompleted && (input.files?.isEmpty ?? true)) {
+          picked.complete(null);
+        }
+      });
+    });
     input.onChange.first.then((_) async {
       final file = input.files?.isNotEmpty == true ? input.files!.first : null;
       if (file == null) {
-        picked.complete(null);
+        if (!picked.isCompleted) picked.complete(null);
         return;
       }
       final reader = html.FileReader();
       reader.readAsArrayBuffer(file);
-      await reader.onLoad.first;
+      await Future.any([reader.onLoad.first, reader.onError.first]);
+      if (reader.error != null) {
+        if (!picked.isCompleted) {
+          picked.completeError(StateError('Dosya okunamadı.'));
+        }
+        return;
+      }
       final result = reader.result;
       final bytes = result is ByteBuffer
           ? Uint8List.view(result)
           : Uint8List.fromList(const []);
-      picked.complete(
-        PickedDriveFile(
-          name: file.name,
-          contentType: file.type.isNotEmpty
-              ? file.type
-              : _fallbackContentType(file.name),
-          sizeBytes: file.size,
-          bytes: bytes,
-        ),
-      );
+      if (!picked.isCompleted) {
+        picked.complete(
+          PickedDriveFile(
+            name: file.name,
+            contentType: file.type.isNotEmpty
+                ? file.type
+                : _fallbackContentType(file.name),
+            sizeBytes: file.size,
+            bytes: bytes,
+          ),
+        );
+      }
     });
     input.click();
     return picked.future;
@@ -72,15 +87,19 @@ class DriveUploadService {
           request.status! >= 200 &&
           request.status! < 300) {
         onProgress?.call(1);
-        completed.complete();
+        if (!completed.isCompleted) completed.complete();
       } else {
-        completed.completeError(
-          StateError('GCS upload failed: HTTP ${request.status}'),
-        );
+        if (!completed.isCompleted) {
+          completed.completeError(
+            StateError('GCS upload failed: HTTP ${request.status}'),
+          );
+        }
       }
     });
     request.onError.listen((_) {
-      completed.completeError(StateError('GCS upload failed.'));
+      if (!completed.isCompleted) {
+        completed.completeError(StateError('GCS upload failed.'));
+      }
     });
     request.send(file.bytes);
     await completed.future;

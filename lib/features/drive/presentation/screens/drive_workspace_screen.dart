@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../baseforce/presentation/screens/baseforce_screen.dart';
 import '../../../sourcelab/presentation/screens/source_lab_screen.dart';
 import '../../data/drive_models.dart';
+import '../../data/drive_upload_payload.dart';
 import '../../data/drive_repository.dart';
 import '../../data/drive_upload_service.dart';
 import '../widgets/drive_ui.dart';
@@ -79,7 +80,7 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        errorMessage = e.toString();
+        errorMessage = _friendlyError(e);
         loading = false;
       });
     }
@@ -125,7 +126,16 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
   }
 
   void _openSection(DriveSection section) {
+    DriveCourse? ownerCourse;
+    for (final course in data.courses) {
+      if (course.sections.any((item) => item.id == section.id)) {
+        ownerCourse = course;
+        break;
+      }
+    }
+    final ownerCourseId = ownerCourse?.id;
     setState(() {
+      if (ownerCourseId != null) selectedCourseId = ownerCourseId;
       selectedSectionId = section.id;
       selectedFileId = section.files.firstOrNull?.id;
       route = WorkspaceRouteKey.folder;
@@ -133,7 +143,23 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
   }
 
   void _openFile(DriveFile file) {
+    var found = false;
+    String? courseId;
+    String? sectionId;
+    for (final course in data.courses) {
+      if (found) break;
+      for (final section in course.sections) {
+        if (section.files.any((item) => item.id == file.id)) {
+          courseId = course.id;
+          sectionId = section.id;
+          found = true;
+          break;
+        }
+      }
+    }
     setState(() {
+      selectedCourseId = courseId ?? selectedCourseId;
+      selectedSectionId = sectionId ?? selectedSectionId;
       selectedFileId = file.id;
       route = WorkspaceRouteKey.fileDetail;
     });
@@ -290,12 +316,30 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
   }
 
   Future<void> _uploadFile() async {
+    if (busy) return;
     final target = await _ensureUploadTarget();
     if (target == null) return;
     final (:course, :section) = target;
-    final picked = await uploadService.pickFile();
-    if (picked == null) return;
-    await _runAction('Dosya yükleniyor...', () async {
+    String? tempUploadId;
+    DriveFile? tempFile;
+    setState(() => busy = true);
+    try {
+      final picked = await uploadService.pickFile();
+      if (picked == null) return;
+      final validationError = _pickedFileError(picked);
+      if (validationError != null) {
+        _showSnack(validationError);
+        return;
+      }
+      final placeholder = _uploadPlaceholder(picked, course, section);
+      tempFile = placeholder;
+      tempUploadId = placeholder.id;
+      _upsertUploadTask(
+        placeholder,
+        status: DriveItemStatus.uploading,
+        progress: .02,
+      );
+      _showSnack('Dosya yükleniyor...');
       final draft = DriveUploadDraft(
         fileName: picked.name,
         contentType: picked.contentType,
@@ -308,6 +352,16 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
         uploadUrl: session.uploadUrl,
         headers: session.headers,
         file: picked,
+        onProgress: (progress) => _updateUploadTask(
+          placeholder.id,
+          status: DriveItemStatus.uploading,
+          progress: progress.clamp(0, 1).toDouble(),
+        ),
+      );
+      _updateUploadTask(
+        placeholder.id,
+        status: DriveItemStatus.processing,
+        progress: 1,
       );
       final uploaded = await repository.completeUpload(
         file: picked,
@@ -317,13 +371,26 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
         courseTitle: course.title,
         sectionTitle: section.title,
       );
+      _removeUploadTask(placeholder.id);
       selectedCourseId = course.id;
       selectedSectionId = section.id;
       selectedFileId = uploaded.id;
       _addFileToSection(uploaded);
       setState(() => route = WorkspaceRouteKey.uploads);
       _showSnack('${picked.name} Drive alanına yüklendi.');
-    });
+    } catch (error) {
+      if (tempUploadId != null && tempFile != null) {
+        _upsertUploadTask(
+          tempFile.copyWith(status: DriveItemStatus.failed),
+          status: DriveItemStatus.failed,
+          progress: 0,
+          errorLabel: _friendlyError(error),
+        );
+      }
+      _showSnack(_friendlyError(error));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   Future<void> _generateFromFile(
@@ -358,7 +425,7 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
       try {
         course = await repository.createCourse(title.trim());
       } catch (error) {
-        _showSnack(error.toString().replaceFirst('Exception: ', ''));
+        _showSnack(_friendlyError(error));
         return null;
       }
       setState(() {
@@ -384,7 +451,7 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
           title: title.trim(),
         );
       } catch (error) {
-        _showSnack(error.toString().replaceFirst('Exception: ', ''));
+        _showSnack(_friendlyError(error));
         return null;
       }
       final updatedCourse = course.copyWith(
@@ -415,7 +482,7 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
     try {
       await action();
     } catch (error) {
-      _showSnack(error.toString().replaceFirst('Exception: ', ''));
+      _showSnack(_friendlyError(error));
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -568,11 +635,125 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
         ],
         recentFiles: [file, ...data.recentFiles],
         uploads: [
-          UploadTask(file: file, status: DriveItemStatus.completed),
+          UploadTask(
+            file: file,
+            status: file.status,
+            progress: file.status == DriveItemStatus.uploading ? .98 : 1,
+          ),
           ...data.uploads,
         ],
       );
     });
+  }
+
+  DriveFile _uploadPlaceholder(
+    PickedDriveFile picked,
+    DriveCourse course,
+    DriveSection section,
+  ) {
+    return DriveFile(
+      id: 'local-upload-${DateTime.now().microsecondsSinceEpoch}',
+      title: picked.name,
+      kind: _kindForFileName(picked.name),
+      sizeLabel: _sizeLabel(picked.sizeBytes),
+      pageLabel: 'Yükleniyor',
+      updatedLabel: 'Şimdi',
+      courseTitle: course.title,
+      sectionTitle: section.title,
+      status: DriveItemStatus.uploading,
+    );
+  }
+
+  String? _pickedFileError(PickedDriveFile file) {
+    if (!file.hasSupportedExtension) {
+      return 'Bu dosya türü desteklenmiyor. PDF, PPT, DOC veya ZIP yükleyin.';
+    }
+    if (!file.hasReadableContent) {
+      return 'Dosya okunamadı veya boş görünüyor.';
+    }
+    const maxUploadBytes = 100 * 1024 * 1024;
+    if (file.sizeBytes > maxUploadBytes) {
+      return 'Dosya boyutu 100 MB sınırını aşıyor.';
+    }
+    return null;
+  }
+
+  void _upsertUploadTask(
+    DriveFile file, {
+    required DriveItemStatus status,
+    required double progress,
+    String? errorLabel,
+  }) {
+    if (!mounted) return;
+    setState(() {
+      final task = UploadTask(
+        file: file.copyWith(status: status),
+        status: status,
+        progress: progress.clamp(0, 1).toDouble(),
+        errorLabel: errorLabel,
+      );
+      final exists = data.uploads.any((item) => item.file.id == file.id);
+      data = data.copyWith(
+        uploads: [
+          if (!exists) task,
+          for (final item in data.uploads)
+            if (item.file.id == file.id) task else item,
+        ],
+      );
+    });
+  }
+
+  void _updateUploadTask(
+    String fileId, {
+    required DriveItemStatus status,
+    required double progress,
+  }) {
+    if (!mounted) return;
+    setState(() {
+      data = data.copyWith(
+        uploads: [
+          for (final task in data.uploads)
+            if (task.file.id == fileId)
+              UploadTask(
+                file: task.file.copyWith(status: status),
+                status: status,
+                progress: progress.clamp(0, 1).toDouble(),
+                errorLabel: task.errorLabel,
+              )
+            else
+              task,
+        ],
+      );
+    });
+  }
+
+  void _removeUploadTask(String fileId) {
+    if (!mounted) return;
+    setState(() {
+      data = data.copyWith(
+        uploads: data.uploads
+            .where((task) => task.file.id != fileId)
+            .toList(),
+      );
+    });
+  }
+
+  DriveFileKind _kindForFileName(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.pdf')) return DriveFileKind.pdf;
+    if (lower.endsWith('.ppt') || lower.endsWith('.pptx')) {
+      return DriveFileKind.pptx;
+    }
+    if (lower.endsWith('.doc')) return DriveFileKind.doc;
+    if (lower.endsWith('.zip')) return DriveFileKind.zip;
+    return DriveFileKind.docx;
+  }
+
+  String _sizeLabel(int bytes) {
+    if (bytes <= 0) return '-';
+    final mb = bytes / (1024 * 1024);
+    if (mb >= 1) return '${mb.toStringAsFixed(1)} MB';
+    return '${(bytes / 1024).toStringAsFixed(0)} KB';
   }
 
   void _replaceFile(DriveFile updated) {
@@ -625,39 +806,105 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
 
   void _showSnack(String message) {
     if (!mounted) return;
+    final safeMessage = _friendlyMessage(message);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      SnackBar(
+        content: Text(safeMessage),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
+  }
+
+  String _friendlyError(Object error) {
+    return _friendlyMessage(error.toString());
+  }
+
+  String _friendlyMessage(String message) {
+    var text = message
+        .replaceFirst('Exception: ', '')
+        .replaceFirst('StateError: ', '')
+        .replaceFirst('Bad state: ', '')
+        .replaceFirst('UnsupportedError: ', '')
+        .replaceFirst('Unsupported operation: ', '')
+        .trim();
+    if (text.contains('Supabase client is not configured')) {
+      return 'Drive bağlantısı yapılandırılmamış.';
+    }
+    if (text.contains('Unexpected SourceBase response') ||
+        text.contains('Drive workspace response is empty') ||
+        text.contains('Upload session response is empty')) {
+      return 'Drive sunucusundan beklenen yanıt alınamadı. Lütfen tekrar deneyin.';
+    }
+    if (text.contains('SourceBase request failed')) {
+      return 'Drive işlemi tamamlanamadı. Lütfen tekrar deneyin.';
+    }
+    if (text.contains('GCS upload failed') || text.contains('XMLHttpRequest')) {
+      return 'Dosya yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin.';
+    }
+    if (text.contains('Failed host lookup') ||
+        text.contains('SocketException')) {
+      return 'Drive sunucusuna ulaşılamadı. İnternet bağlantınızı kontrol edin.';
+    }
+    if (text.isEmpty) return 'İşlem tamamlanamadı. Lütfen tekrar deneyin.';
+    return text.length > 180 ? '${text.substring(0, 177)}...' : text;
   }
 
   Future<String?> _textDialog({
     required String title,
     required String label,
     required String initialValue,
-  }) {
+  }) async {
     final controller = TextEditingController(text: initialValue);
-    return showDialog<String>(
+    final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(labelText: label),
-          onSubmitted: (value) => Navigator.of(context).pop(value),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Vazgeç'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: const Text('Kaydet'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        String? errorText;
+        void submit(StateSetter setDialogState) {
+          final value = controller.text.trim();
+          if (value.isEmpty) {
+            setDialogState(() => errorText = '$label boş bırakılamaz.');
+            return;
+          }
+          Navigator.of(context).pop(value);
+        }
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(title),
+              content: SingleChildScrollView(
+                child: TextField(
+                  controller: controller,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: label,
+                    errorText: errorText,
+                  ),
+                  onChanged: (_) {
+                    if (errorText != null) {
+                      setDialogState(() => errorText = null);
+                    }
+                  },
+                  onSubmitted: (_) => submit(setDialogState),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Vazgeç'),
+                ),
+                ElevatedButton(
+                  onPressed: () => submit(setDialogState),
+                  child: const Text('Kaydet'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
+    controller.dispose();
+    return result;
   }
 
   Future<bool> _confirmDestructive({
@@ -852,6 +1099,7 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
                   onSearch: _openGlobalFileSearch,
                   onBack: () => _go(WorkspaceRouteKey.home),
                   onNewFile: _uploadFile,
+                  onRetryUpload: (_) => _uploadFile(),
                 ),
                 WorkspaceRouteKey.collections => CollectionsScreen(
                   data: workspace,

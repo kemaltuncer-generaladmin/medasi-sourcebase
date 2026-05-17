@@ -119,11 +119,15 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
                 children: [
                   const Icon(Icons.folder_outlined, color: AppColors.muted),
                   const SizedBox(width: 10),
-                  Text(
-                    file.courseTitle,
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 16,
+                  Flexible(
+                    child: Text(
+                      file.courseTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                   const Padding(
@@ -133,12 +137,16 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
                       color: AppColors.navy,
                     ),
                   ),
-                  Text(
-                    file.sectionTitle,
-                    style: const TextStyle(
-                      color: AppColors.blue,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                  Flexible(
+                    child: Text(
+                      file.sectionTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.blue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],

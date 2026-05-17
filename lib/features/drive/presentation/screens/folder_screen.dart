@@ -97,6 +97,8 @@ class _FolderScreenState extends State<FolderScreen> {
                 children: [
                   Text(
                     widget.section.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.navy,
                       fontSize: 32,
@@ -105,6 +107,8 @@ class _FolderScreenState extends State<FolderScreen> {
                   ),
                   Text(
                     '${widget.course.title}  ›  Bölüm',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.muted,
                       fontSize: 17,
