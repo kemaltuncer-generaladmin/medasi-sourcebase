@@ -34,7 +34,7 @@ class _SourceBaseAppState extends State<SourceBaseApp> {
       final tokenExpired = event.event == AuthChangeEvent.tokenRefreshed &&
           event.session == null;
       if ((isSignedOut || tokenExpired) && mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil(
+        _rootNavigatorKey.currentState?.pushNamedAndRemoveUntil(
           LoginScreen.route,
           (_) => false,
         );
