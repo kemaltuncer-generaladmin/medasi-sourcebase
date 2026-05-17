@@ -6,6 +6,7 @@ import '../../../drive/presentation/screens/drive_workspace_screen.dart';
 import '../../data/sourcebase_auth_backend.dart';
 import '../widgets/auth_widgets.dart';
 import 'forgot_password_screen.dart';
+import 'profile_setup_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -24,6 +25,10 @@ class _LoginScreenState extends State<LoginScreen> {
   bool obscure = true;
   bool loading = false;
   String? errorMessage;
+  String? successMessage;
+  bool _readRouteMessage = false;
+
+  static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   @override
   void dispose() {
@@ -32,18 +37,79 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _signIn() async {
-    if (!SourceBaseAuthBackend.isConfigured) {
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        DriveWorkspaceScreen.route,
-        (_) => false,
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_readRouteMessage) {
+      return;
+    }
+    _readRouteMessage = true;
+    final arguments = ModalRoute.of(context)?.settings.arguments;
+    if (arguments is String && arguments.trim().isNotEmpty) {
+      errorMessage = arguments.trim();
+    } else if (arguments is Map) {
+      final error = arguments['error'];
+      final success = arguments['success'];
+      if (error is String && error.trim().isNotEmpty) {
+        errorMessage = error.trim();
+      }
+      if (success is String && success.trim().isNotEmpty) {
+        successMessage = success.trim();
+      }
+    }
+  }
+
+  String? _validateEmail(String value) {
+    final email = value.trim();
+    if (email.isEmpty) {
+      return 'E-posta adresini girmelisin.';
+    }
+    if (!_emailPattern.hasMatch(email)) {
+      return 'Geçerli bir e-posta adresi gir.';
+    }
+    return null;
+  }
+
+  String? _validateSignInForm() {
+    final emailError = _validateEmail(emailController.text);
+    if (emailError != null) {
+      return emailError;
+    }
+    if (passwordController.text.isEmpty) {
+      return 'Şifreni girmelisin.';
+    }
+    if (!SourceBaseAuthBackend.isConfigured ||
+        SourceBaseAuthBackend.initializationError != null) {
+      return SourceBaseAuthBackend.friendlyError(
+        SourceBaseAuthBackend.initializationError ?? Object(),
       );
+    }
+    return null;
+  }
+
+  String get _postLoginRoute {
+    if (SourceBaseAuthBackend.currentUserNeedsSourceBaseProfile) {
+      return ProfileSetupScreen.route;
+    }
+    return DriveWorkspaceScreen.route;
+  }
+
+  Future<void> _signIn() async {
+    if (loading || _socialLoading) {
+      return;
+    }
+    final validationError = _validateSignInForm();
+    if (validationError != null) {
+      setState(() {
+        errorMessage = validationError;
+        successMessage = null;
+      });
       return;
     }
     setState(() {
       loading = true;
       errorMessage = null;
+      successMessage = null;
     });
     try {
       await SourceBaseAuthBackend.signIn(
@@ -55,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       Navigator.pushNamedAndRemoveUntil(
         context,
-        DriveWorkspaceScreen.route,
+        _postLoginRoute,
         (_) => false,
       );
     } catch (error) {
@@ -74,9 +140,23 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _socialLoading = false;
 
   Future<void> _signInWithGoogle() async {
+    if (loading || _socialLoading) {
+      return;
+    }
+    if (!SourceBaseAuthBackend.isConfigured ||
+        SourceBaseAuthBackend.initializationError != null) {
+      setState(() {
+        errorMessage = SourceBaseAuthBackend.friendlyError(
+          SourceBaseAuthBackend.initializationError ?? Object(),
+        );
+        successMessage = null;
+      });
+      return;
+    }
     setState(() {
       _socialLoading = true;
       errorMessage = null;
+      successMessage = null;
     });
     try {
       await SourceBaseAuthBackend.signInWithGoogle();
@@ -94,9 +174,23 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _signInWithApple() async {
+    if (loading || _socialLoading) {
+      return;
+    }
+    if (!SourceBaseAuthBackend.isConfigured ||
+        SourceBaseAuthBackend.initializationError != null) {
+      setState(() {
+        errorMessage = SourceBaseAuthBackend.friendlyError(
+          SourceBaseAuthBackend.initializationError ?? Object(),
+        );
+        successMessage = null;
+      });
+      return;
+    }
     setState(() {
       _socialLoading = true;
       errorMessage = null;
+      successMessage = null;
     });
     try {
       await SourceBaseAuthBackend.signInWithApple();
@@ -156,6 +250,7 @@ class _LoginScreenState extends State<LoginScreen> {
             AuthCheck(
               value: remember,
               onTap: () => setState(() => remember = !remember),
+              label: 'Beni hatırla',
             ),
             const SizedBox(width: 12),
             const Text(
@@ -166,8 +261,12 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () =>
-                      Navigator.pushNamed(context, ForgotPasswordScreen.route),
+                  onPressed: loading || _socialLoading
+                      ? null
+                      : () => Navigator.pushNamed(
+                            context,
+                            ForgotPasswordScreen.route,
+                          ),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.blue,
                     padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -191,10 +290,14 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 10),
           AuthStatusBox(message: errorMessage!),
         ],
+        if (successMessage != null) ...[
+          const SizedBox(height: 10),
+          AuthStatusBox(message: successMessage!, error: false),
+        ],
         const SizedBox(height: 18),
         SBPrimaryButton(
           label: 'Giriş Yap',
-          onPressed: loading ? null : _signIn,
+          onPressed: loading || _socialLoading ? null : _signIn,
           loading: loading,
           size: SBButtonSize.large,
         ),
@@ -219,13 +322,17 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 22),
         SBSecondaryButton(
           label: 'Hesap Oluştur',
-          onPressed: () => Navigator.pushNamed(context, RegisterScreen.route),
+          onPressed: loading || _socialLoading
+              ? null
+              : () => Navigator.pushNamed(context, RegisterScreen.route),
           size: SBButtonSize.large,
         ),
         const SizedBox(height: 28),
         Center(
           child: TextButton(
-            onPressed: () => Navigator.pushNamed(context, RegisterScreen.route),
+            onPressed: loading || _socialLoading
+                ? null
+                : () => Navigator.pushNamed(context, RegisterScreen.route),
             style: TextButton.styleFrom(foregroundColor: AppColors.blue),
             child: const Text.rich(
               TextSpan(

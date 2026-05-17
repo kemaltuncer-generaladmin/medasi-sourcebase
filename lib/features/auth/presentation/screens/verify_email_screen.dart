@@ -6,6 +6,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../drive/presentation/screens/drive_workspace_screen.dart';
 import '../../data/sourcebase_auth_backend.dart';
 import '../widgets/auth_widgets.dart';
+import 'login_screen.dart';
+import 'profile_setup_screen.dart';
 import 'register_screen.dart';
 
 class VerifyEmailScreen extends StatefulWidget {
@@ -31,6 +33,12 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !SourceBaseAuthBackend.currentUserHasVerifiedEmail) {
+        return;
+      }
+      Navigator.pushNamedAndRemoveUntil(context, _routeAfterAuth, (_) => false);
+    });
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
@@ -65,18 +73,33 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
   String get _enteredCode => _otpControllers.map((c) => c.text).join();
 
+  String get _routeAfterAuth {
+    if (SourceBaseAuthBackend.currentUser == null) {
+      return LoginScreen.route;
+    }
+    if (SourceBaseAuthBackend.currentUserNeedsSourceBaseProfile) {
+      return ProfileSetupScreen.route;
+    }
+    return DriveWorkspaceScreen.route;
+  }
+
   Future<void> _verify(String email) async {
     if (loading) return;
-    final code = _enteredCode;
-    if (code.length != 6) {
-      setState(() => errorMessage = 'Lutfen 6 haneli dogrulama kodunu girin.');
+    if (email.trim().isEmpty) {
+      setState(() => errorMessage = 'E-posta adresi bulunamadı.');
       return;
     }
-    if (!SourceBaseAuthBackend.isConfigured) {
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        DriveWorkspaceScreen.route,
-        (_) => false,
+    final code = _enteredCode;
+    if (code.length != 6) {
+      setState(() => errorMessage = 'Lütfen 6 haneli doğrulama kodunu gir.');
+      return;
+    }
+    if (!SourceBaseAuthBackend.isConfigured ||
+        SourceBaseAuthBackend.initializationError != null) {
+      setState(
+        () => errorMessage = SourceBaseAuthBackend.friendlyError(
+          SourceBaseAuthBackend.initializationError ?? Object(),
+        ),
       );
       return;
     }
@@ -93,7 +116,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       if (!mounted) return;
       Navigator.pushNamedAndRemoveUntil(
         context,
-        DriveWorkspaceScreen.route,
+        _routeAfterAuth,
         (_) => false,
       );
     } catch (error) {
@@ -110,8 +133,20 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   }
 
   Future<void> _resend(String email) async {
-    if (!SourceBaseAuthBackend.isConfigured) {
-      setState(() => message = 'Doğrulama kodu tekrar gönderildi.');
+    if (loading || !_canResend) {
+      return;
+    }
+    if (email.trim().isEmpty) {
+      setState(() => errorMessage = 'E-posta adresi bulunamadı.');
+      return;
+    }
+    if (!SourceBaseAuthBackend.isConfigured ||
+        SourceBaseAuthBackend.initializationError != null) {
+      setState(
+        () => errorMessage = SourceBaseAuthBackend.friendlyError(
+          SourceBaseAuthBackend.initializationError ?? Object(),
+        ),
+      );
       return;
     }
     setState(() {
@@ -122,7 +157,10 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     try {
       final result = await SourceBaseAuthBackend.resendSignupEmail(email);
       if (mounted) {
-        setState(() => message = result.message);
+        setState(() {
+          message = result.message;
+          _remainingSeconds = 120;
+        });
       }
     } catch (error) {
       if (mounted) {
@@ -141,30 +179,36 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   Widget build(BuildContext context) {
     final email =
         ModalRoute.of(context)?.settings.arguments as String? ??
-        'ornek@universite.edu.tr';
+        SourceBaseAuthBackend.currentUser?.email ??
+        '';
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final codeBoxWidth = ((screenWidth - 122) / 6).clamp(38.0, 50.0).toDouble();
     return AuthScreenFrame(
       children: [
         const AuthHeader(
           title: 'E-postanı\ndoğrula',
-          subtitle: 'Sana gönderdiğimiz 6 haneli\ndoğrulama kodunu gir.',
+          subtitle: 'E-postandaki bağlantıyı aç veya\n6 haneli doğrulama kodunu gir.',
           art: AuthArtType.verify,
         ),
         const SizedBox(height: 50),
-        Text(
-          email,
-          style: const TextStyle(
-            color: AppColors.navy,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
+        if (email.isNotEmpty)
+          Text(
+            email,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
         const SizedBox(height: 24),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(
             6,
             (index) => SizedBox(
-              width: 50,
+              width: codeBoxWidth,
               height: 64,
               child: TextField(
                 controller: _otpControllers[index],
@@ -255,12 +299,17 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         const SizedBox(height: 38),
         GradientActionButton(
           label: loading ? 'Doğrulanıyor...' : 'Doğrula',
-          onPressed: () => _verify(email),
+          onPressed: loading ? null : () => _verify(email),
         ),
         const SizedBox(height: 22),
         Center(
           child: TextButton(
-            onPressed: () => Navigator.pushNamed(context, RegisterScreen.route),
+            onPressed: loading
+                ? null
+                : () => Navigator.pushReplacementNamed(
+                      context,
+                      RegisterScreen.route,
+                    ),
             style: TextButton.styleFrom(foregroundColor: AppColors.blue),
             child: const Text(
               'E-postayı değiştir',

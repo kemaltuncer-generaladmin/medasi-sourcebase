@@ -60,9 +60,11 @@ class SourceBaseAuthBackend {
   const SourceBaseAuthBackend._();
 
   static bool _initialized = false;
+  static String? _initializationError;
 
   static bool get isConfigured => SourceBaseAuthConfig.isConfigured;
   static bool get isInitialized => _initialized;
+  static String? get initializationError => _initializationError;
 
   static SupabaseClient? get client {
     if (!_initialized) {
@@ -75,6 +77,14 @@ class SourceBaseAuthBackend {
 
   static bool get currentUserNeedsSourceBaseProfile =>
       userNeedsSourceBaseProfile(currentUser);
+
+  static bool get currentUserHasVerifiedEmail {
+    final user = currentUser;
+    if (user == null) {
+      return false;
+    }
+    return user.emailConfirmedAt != null;
+  }
 
   static bool userNeedsSourceBaseProfile(User? user) {
     if (user == null) {
@@ -92,14 +102,21 @@ class SourceBaseAuthBackend {
       return;
     }
 
-    await Supabase.initialize(
-      url: SourceBaseAuthConfig.supabaseUrl,
-      anonKey: SourceBaseAuthConfig.supabaseAnonKey,
-      authOptions: const FlutterAuthClientOptions(
-        authFlowType: AuthFlowType.pkce,
-      ),
-    );
-    _initialized = true;
+    try {
+      await Supabase.initialize(
+        url: SourceBaseAuthConfig.supabaseUrl,
+        anonKey: SourceBaseAuthConfig.supabaseAnonKey,
+        authOptions: const FlutterAuthClientOptions(
+          authFlowType: AuthFlowType.pkce,
+        ),
+      );
+      _initialized = true;
+      _initializationError = null;
+    } catch (_) {
+      _initialized = false;
+      _initializationError =
+          'Kimlik doğrulama yapılandırması başlatılamadı. Lütfen daha sonra tekrar dene.';
+    }
   }
 
   static Future<AuthActionResult> signIn({
@@ -108,7 +125,7 @@ class SourceBaseAuthBackend {
   }) async {
     final auth = _authOrThrow();
     await auth.signInWithPassword(email: email.trim(), password: password);
-    return const AuthActionResult.success('Giris basarili.');
+    return const AuthActionResult.success('Giriş başarılı.');
   }
 
   static Future<AuthActionResult> signUp({
@@ -125,13 +142,14 @@ class SourceBaseAuthBackend {
       data: {
         'app_code': SourceBaseAuthConfig.appCode,
         'display_name': fullName.trim(),
+        'full_name': fullName.trim(),
         'signup_source': SourceBaseAuthConfig.appCode,
         'ecosystem': 'medasi',
         if (profile != null) ...profile.toMetadata(),
       },
     );
     return const AuthActionResult.success(
-      'Dogrulama e-postasi SourceBase baglantisiyla gonderildi.',
+      'Doğrulama e-postası SourceBase bağlantısıyla gönderildi.',
     );
   }
 
@@ -157,11 +175,14 @@ class SourceBaseAuthBackend {
     SourceBaseProfile profile,
   ) async {
     final auth = _authOrThrow();
+    if (auth.currentUser == null) {
+      throw const AuthException('Oturum bulunamadı.');
+    }
     final currentMetadata = auth.currentUser?.userMetadata ?? {};
     await auth.updateUser(
       UserAttributes(data: {...currentMetadata, ...profile.toMetadata()}),
     );
-    return const AuthActionResult.success('SourceBase bilgilerin tamamlandi.');
+    return const AuthActionResult.success('SourceBase bilgilerin tamamlandı.');
   }
 
   static Future<AuthActionResult> resendSignupEmail(String email) async {
@@ -172,7 +193,7 @@ class SourceBaseAuthBackend {
       emailRedirectTo: SourceBaseAuthConfig.authRedirectTo,
     );
     return const AuthActionResult.success(
-      'Dogrulama e-postasi yeniden gonderildi.',
+      'Doğrulama e-postası yeniden gönderildi.',
     );
   }
 
@@ -183,14 +204,14 @@ class SourceBaseAuthBackend {
       redirectTo: SourceBaseAuthConfig.authRedirectTo,
     );
     return const AuthActionResult.success(
-      'Sifre sifirlama e-postasi SourceBase baglantisiyla gonderildi.',
+      'Şifre sıfırlama e-postası SourceBase bağlantısıyla gönderildi.',
     );
   }
 
   static Future<AuthActionResult> updatePassword(String password) async {
     final auth = _authOrThrow();
     await auth.updateUser(UserAttributes(password: password));
-    return const AuthActionResult.success('Sifren guncellendi.');
+    return const AuthActionResult.success('Şifren güncellendi.');
   }
 
   static Future<AuthActionResult> verifyEmailOtp({
@@ -203,7 +224,50 @@ class SourceBaseAuthBackend {
       token: token.trim(),
       type: OtpType.signup,
     );
-    return const AuthActionResult.success('E-posta dogrulamasi tamamlandi.');
+    return const AuthActionResult.success('E-posta doğrulaması tamamlandı.');
+  }
+
+  static Future<AuthActionResult> completeCallback(Uri uri) async {
+    final auth = _authOrThrow();
+    final fragmentParameters = _fragmentParameters(uri);
+    final errorDescription = uri.queryParameters['error_description'] ??
+        fragmentParameters['error_description'];
+    final error = uri.queryParameters['error'] ?? fragmentParameters['error'];
+    if (errorDescription != null || error != null) {
+      throw AuthException(errorDescription ?? error ?? 'Auth callback failed.');
+    }
+
+    final code = uri.queryParameters['code'] ?? fragmentParameters['code'];
+    if (code != null && code.trim().isNotEmpty) {
+      await auth.exchangeCodeForSession(code);
+    } else if (uri.queryParameters.containsKey('access_token')) {
+      await auth.getSessionFromUrl(uri);
+    } else if (fragmentParameters.containsKey('access_token')) {
+      await auth.getSessionFromUrl(
+        uri.replace(queryParameters: fragmentParameters, fragment: ''),
+      );
+    }
+
+    if (auth.currentUser == null) {
+      throw const AuthException('Oturum bulunamadı.');
+    }
+
+    return const AuthActionResult.success('Oturum doğrulandı.');
+  }
+
+  static Map<String, String> _fragmentParameters(Uri uri) {
+    final fragment = uri.fragment;
+    if (fragment.isEmpty) {
+      return const {};
+    }
+    final queryStart = fragment.indexOf('?');
+    final query = queryStart >= 0
+        ? fragment.substring(queryStart + 1)
+        : fragment;
+    if (!query.contains('=')) {
+      return const {};
+    }
+    return Uri.splitQueryString(query);
   }
 
   static Future<void> signOut() async {
@@ -218,16 +282,62 @@ class SourceBaseAuthBackend {
     final auth = client?.auth;
     if (auth == null) {
       throw const AuthException(
-        'SourceBase Supabase baglantisi yapilandirilmamis.',
+        'SourceBase Supabase bağlantısı yapılandırılmamış.',
       );
     }
     return auth;
   }
 
   static String friendlyError(Object error) {
-    if (error is AuthException) {
-      return error.message;
+    if (!isConfigured || _initializationError != null) {
+      return 'Kimlik doğrulama yapılandırması eksik. Lütfen daha sonra tekrar dene.';
     }
-    return 'Islem tamamlanamadi. Lutfen bilgileri kontrol edip tekrar dene.';
+    if (error is AuthException) {
+      final message = error.message.toLowerCase();
+      final code = error.code?.toLowerCase() ?? '';
+
+      if (message.contains('invalid login') ||
+          message.contains('invalid credentials') ||
+          code.contains('invalid_credentials')) {
+        return 'E-posta veya şifre hatalı.';
+      }
+      if (message.contains('email not confirmed') ||
+          message.contains('email not verified')) {
+        return 'E-postanı doğruladıktan sonra giriş yapabilirsin.';
+      }
+      if (message.contains('already registered') ||
+          message.contains('user already') ||
+          code.contains('user_already_exists')) {
+        return 'Bu e-posta ile zaten bir hesap var.';
+      }
+      if (message.contains('weak password') ||
+          message.contains('password should') ||
+          code.contains('weak_password')) {
+        return 'Şifre daha güçlü olmalı. En az 8 karakter kullan.';
+      }
+      if (message.contains('rate limit') ||
+          message.contains('too many') ||
+          code.contains('over_email_send_rate_limit')) {
+        return 'Çok fazla deneme yapıldı. Lütfen biraz bekleyip tekrar dene.';
+      }
+      if (message.contains('otp') ||
+          message.contains('token') ||
+          code.contains('otp_expired')) {
+        return 'Doğrulama kodu geçersiz veya süresi dolmuş.';
+      }
+      if (message.contains('no code detected') ||
+          message.contains('no access_token') ||
+          message.contains('session') ||
+          message.contains('oturum bulunamad')) {
+        return 'Oturum doğrulanamadı. Lütfen tekrar giriş yap.';
+      }
+      if (message.contains('network') ||
+          message.contains('socket') ||
+          message.contains('connection')) {
+        return 'Bağlantı kurulamadı. İnternetini kontrol edip tekrar dene.';
+      }
+      return 'İşlem tamamlanamadı. Lütfen bilgileri kontrol edip tekrar dene.';
+    }
+    return 'İşlem tamamlanamadı. Lütfen bilgileri kontrol edip tekrar dene.';
   }
 }

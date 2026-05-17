@@ -19,6 +19,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool loading = false;
   String? errorMessage;
   String? successMessage;
+  static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   @override
   void dispose() {
@@ -26,9 +27,33 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
+  String? _validateEmail() {
+    final email = emailController.text.trim();
+    if (email.isEmpty) {
+      return 'E-posta adresini girmelisin.';
+    }
+    if (!_emailPattern.hasMatch(email)) {
+      return 'Geçerli bir e-posta adresi gir.';
+    }
+    if (!SourceBaseAuthBackend.isConfigured ||
+        SourceBaseAuthBackend.initializationError != null) {
+      return SourceBaseAuthBackend.friendlyError(
+        SourceBaseAuthBackend.initializationError ?? Object(),
+      );
+    }
+    return null;
+  }
+
   Future<void> _sendReset() async {
-    if (!SourceBaseAuthBackend.isConfigured) {
-      setState(() => successMessage = 'Sıfırlama bağlantısı gönderildi.');
+    if (loading) {
+      return;
+    }
+    final validationError = _validateEmail();
+    if (validationError != null) {
+      setState(() {
+        errorMessage = validationError;
+        successMessage = null;
+      });
       return;
     }
     setState(() {
@@ -98,12 +123,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 48),
         GradientActionButton(
           label: loading ? 'Gönderiliyor...' : 'Sıfırlama bağlantısı gönder',
-          onPressed: loading ? () {} : _sendReset,
+          onPressed: loading ? null : _sendReset,
         ),
         const SizedBox(height: 18),
         OutlineActionButton(
           label: 'Giriş ekranına dön',
-          onPressed: () => Navigator.pushNamed(context, LoginScreen.route),
+          onPressed: loading
+              ? null
+              : () => Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    LoginScreen.route,
+                    (_) => false,
+                  ),
         ),
       ],
     );

@@ -26,6 +26,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool obscureTwo = true;
   bool loading = false;
   String? errorMessage;
+  static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   @override
   void dispose() {
@@ -36,23 +37,50 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  Future<void> _signUp() async {
+  String? _validateForm() {
+    final name = nameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+    final repeatedPassword = repeatPasswordController.text;
+
+    if (name.isEmpty) {
+      return 'Ad soyad bilgisini doldurmalısın.';
+    }
+    if (email.isEmpty) {
+      return 'E-posta adresini girmelisin.';
+    }
+    if (!_emailPattern.hasMatch(email)) {
+      return 'Geçerli bir e-posta adresi gir.';
+    }
+    if (password.length < 8) {
+      return 'Şifre en az 8 karakter olmalı.';
+    }
+    if (!RegExp(r'[A-Za-z]').hasMatch(password) ||
+        !RegExp(r'\d').hasMatch(password)) {
+      return 'Şifre en az bir harf ve bir rakam içermeli.';
+    }
+    if (password != repeatedPassword) {
+      return 'Şifreler birbiriyle eşleşmiyor.';
+    }
     if (!terms) {
-      setState(() => errorMessage = 'Kullanım koşullarını kabul etmelisin.');
-      return;
+      return 'Kullanım koşullarını kabul etmelisin.';
     }
-    if (passwordController.text != repeatPasswordController.text) {
-      setState(() => errorMessage = 'Şifreler birbiriyle eşleşmiyor.');
-      return;
-    }
-    if (!SourceBaseAuthBackend.isConfigured) {
-      Navigator.pushNamed(
-        context,
-        VerifyEmailScreen.route,
-        arguments: emailController.text.trim().isEmpty
-            ? 'ornek@universite.edu.tr'
-            : emailController.text.trim(),
+    if (!SourceBaseAuthBackend.isConfigured ||
+        SourceBaseAuthBackend.initializationError != null) {
+      return SourceBaseAuthBackend.friendlyError(
+        SourceBaseAuthBackend.initializationError ?? Object(),
       );
+    }
+    return null;
+  }
+
+  Future<void> _signUp() async {
+    if (loading) {
+      return;
+    }
+    final validationError = _validateForm();
+    if (validationError != null) {
+      setState(() => errorMessage = validationError);
       return;
     }
 
@@ -151,6 +179,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             AuthCheck(
               value: terms,
               onTap: () => setState(() => terms = !terms),
+              label: 'Kullanım koşullarını kabul ediyorum',
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -193,13 +222,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const SizedBox(height: 16),
         SBSecondaryButton(
           label: 'Giriş Yap',
-          onPressed: () => Navigator.pushNamed(context, LoginScreen.route),
+          onPressed: loading
+              ? null
+              : () => Navigator.pushNamed(context, LoginScreen.route),
           size: SBButtonSize.large,
         ),
         const SizedBox(height: 24),
         Center(
           child: TextButton(
-            onPressed: () => Navigator.pushNamed(context, LoginScreen.route),
+            onPressed: loading
+                ? null
+                : () => Navigator.pushNamed(context, LoginScreen.route),
             style: TextButton.styleFrom(foregroundColor: AppColors.blue),
             child: const Text.rich(
               TextSpan(
