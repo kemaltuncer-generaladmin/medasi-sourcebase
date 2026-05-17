@@ -102,8 +102,8 @@ class _UploadsScreenState extends State<UploadsScreen> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    SizedBox(height: 18),
-                    Text(
+                    const SizedBox(height: 18),
+                    const Text(
                       'Dosyalar Drive alanınıza yükleniyor.\nİşlemleri aşağıdan takip edebilirsiniz.',
                       style: TextStyle(
                         color: AppColors.muted,
@@ -170,7 +170,7 @@ class _UploadsScreenState extends State<UploadsScreen> {
         ),
         const SizedBox(height: 18),
         if (widget.uploads.isEmpty)
-          GlassPanel(
+          const GlassPanel(
             child: EmptyState(
               message: 'Aktif yükleme bulunmuyor.',
               subMessage: 'Yeni dosyalar yükleyerek başlayabilirsiniz.',

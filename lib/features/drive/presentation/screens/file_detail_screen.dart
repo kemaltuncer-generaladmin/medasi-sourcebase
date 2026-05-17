@@ -32,6 +32,7 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
     final file = widget.file;
     final generatedCount = file.generated.length;
     final hasGenerated = generatedCount > 0;
+    final readyForGeneration = file.status == DriveItemStatus.completed;
 
     return WorkspaceScroll(
       children: [
@@ -186,52 +187,68 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
           ),
         ),
         const SectionTitle(title: 'Bu dosyadan üret'),
-        GridView.count(
-          crossAxisCount: 3,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 1.65,
-          children: [
-            _GenerateTile(
-              kind: GeneratedKind.flashcard,
-              title: 'Flashcard',
-              subtitle: 'Anki uyumlu kartlar',
-              onTap: widget.onGenerate,
+        if (readyForGeneration)
+          GridView.count(
+            crossAxisCount: 3,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.65,
+            children: [
+              _GenerateTile(
+                kind: GeneratedKind.flashcard,
+                title: 'Flashcard',
+                subtitle: 'Anki uyumlu kartlar',
+                onTap: widget.onGenerate,
+              ),
+              _GenerateTile(
+                kind: GeneratedKind.question,
+                title: 'Soru',
+                subtitle: 'Çoktan seçmeli sorular',
+                onTap: widget.onGenerate,
+              ),
+              _GenerateTile(
+                kind: GeneratedKind.summary,
+                title: 'Özet',
+                subtitle: 'Kısa ve kapsamlı özet',
+                onTap: widget.onGenerate,
+              ),
+              _GenerateTile(
+                kind: GeneratedKind.algorithm,
+                title: 'Algoritma',
+                subtitle: 'Karar algoritmaları',
+                onTap: widget.onGenerate,
+              ),
+              _GenerateTile(
+                kind: GeneratedKind.comparison,
+                title: 'Karşılaştırma',
+                subtitle: 'Konuları karşılaştır',
+                onTap: widget.onGenerate,
+              ),
+              _GenerateTile(
+                kind: GeneratedKind.podcast,
+                title: 'Podcast',
+                subtitle: 'Sesli anlatım oluştur',
+                onTap: widget.onGenerate,
+              ),
+            ],
+          )
+        else
+          GlassPanel(
+            padding: const EdgeInsets.all(18),
+            child: EmptyState(
+              icon: file.status == DriveItemStatus.failed
+                  ? Icons.error_outline_rounded
+                  : Icons.hourglass_top_rounded,
+              message: file.status == DriveItemStatus.failed
+                  ? 'Dosya işlenemedi.'
+                  : 'Dosya üretime hazırlanıyor.',
+              subMessage: file.status == DriveItemStatus.failed
+                  ? 'Bu kaynaktan üretim almak için dosyayı yeniden yükleyin.'
+                  : 'İşleme tamamlandığında flashcard, soru ve özet üretebilirsiniz.',
             ),
-            _GenerateTile(
-              kind: GeneratedKind.question,
-              title: 'Soru',
-              subtitle: 'Çoktan seçmeli sorular',
-              onTap: widget.onGenerate,
-            ),
-            _GenerateTile(
-              kind: GeneratedKind.summary,
-              title: 'Özet',
-              subtitle: 'Kısa ve kapsamlı özet',
-              onTap: widget.onGenerate,
-            ),
-            _GenerateTile(
-              kind: GeneratedKind.algorithm,
-              title: 'Algoritma',
-              subtitle: 'Karar algoritmaları',
-              onTap: widget.onGenerate,
-            ),
-            _GenerateTile(
-              kind: GeneratedKind.comparison,
-              title: 'Karşılaştırma',
-              subtitle: 'Konuları karşılaştır',
-              onTap: widget.onGenerate,
-            ),
-            _GenerateTile(
-              kind: GeneratedKind.podcast,
-              title: 'Podcast',
-              subtitle: 'Sesli anlatım oluştur',
-              onTap: widget.onGenerate,
-            ),
-          ],
-        ),
+          ),
         SectionTitle(
           title: 'Üretilenler',
           actionLabel: hasGenerated ? 'Tümünü Gör' : null,

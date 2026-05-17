@@ -411,6 +411,10 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
       _showSnack('Üretim için önce Drive’dan bir dosya seçin.');
       return;
     }
+    if (file.status != DriveItemStatus.completed) {
+      _showSnack('Üretim için dosyanın yüklenip işlenmesi tamamlanmalı.');
+      return;
+    }
     await _runAction('Üretim başlatılıyor...', () async {
       final output = await repository.createGeneratedOutput(
         file: file,
