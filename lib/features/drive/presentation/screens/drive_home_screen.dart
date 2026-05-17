@@ -102,8 +102,8 @@ class DriveHomeScreen extends StatelessWidget {
         ),
         SectionTitle(
           title: 'Derslerim',
-          actionLabel: 'Tümünü Gör',
-          onAction: hasCourses ? () {} : onCreateCourse,
+          actionLabel: hasCourses ? null : 'Ders Ekle',
+          onAction: hasCourses ? null : onCreateCourse,
         ),
         GlassPanel(
           padding: EdgeInsets.zero,

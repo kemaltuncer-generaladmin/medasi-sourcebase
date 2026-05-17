@@ -14,6 +14,40 @@ class ProfileScreen extends StatelessWidget {
   final VoidCallback onSearch;
   final VoidCallback onOpenStore;
 
+  Future<void> _signOut(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cikis Yap'),
+        content: const Text('Hesabindan cikis yapmak istedigine emin misin?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Vazgec'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Cikis Yap'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await SourceBaseAuthBackend.signOut();
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cikis yapilirken bir sorun olustu.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = SourceBaseAuthBackend.currentUser;
@@ -46,7 +80,19 @@ class ProfileScreen extends StatelessWidget {
             ],
           ),
         ),
-        _ProfileHeader(displayName: displayName, email: email),
+        _ProfileHeader(
+          displayName: displayName,
+          email: email,
+          onEdit: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Profil düzenleme özelliği yakında aktif olacak.'),
+                behavior: SnackBarBehavior.floating,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
         const SizedBox(height: 24),
         const SectionTitle(title: 'Cüzdan'),
         _WalletPanel(onOpenStore: onOpenStore),
@@ -57,17 +103,20 @@ class ProfileScreen extends StatelessWidget {
             _SettingsItem(
               icon: Icons.person_outline_rounded,
               title: 'Profil Bilgileri',
-              onTap: () {},
+              enabled: false,
+              onTap: null,
             ),
             _SettingsItem(
               icon: Icons.notifications_none_rounded,
               title: 'Bildirim Tercihleri',
-              onTap: () {},
+              enabled: false,
+              onTap: null,
             ),
             _SettingsItem(
               icon: Icons.security_rounded,
               title: 'Güvenlik ve Şifre',
-              onTap: () {},
+              enabled: false,
+              onTap: null,
             ),
           ],
         ),
@@ -78,17 +127,20 @@ class ProfileScreen extends StatelessWidget {
             _SettingsItem(
               icon: Icons.dark_mode_outlined,
               title: 'Görünüm (Aydınlık)',
-              onTap: () {},
+              enabled: false,
+              onTap: null,
             ),
             _SettingsItem(
               icon: Icons.language_rounded,
               title: 'Dil (Türkçe)',
-              onTap: () {},
+              enabled: false,
+              onTap: null,
             ),
             _SettingsItem(
               icon: Icons.info_outline_rounded,
               title: 'SourceBase Hakkında',
-              onTap: () {},
+              enabled: false,
+              onTap: null,
             ),
           ],
         ),
@@ -96,9 +148,7 @@ class ProfileScreen extends StatelessWidget {
         SBPrimaryButton(
           label: 'Çıkış Yap',
           icon: Icons.logout_rounded,
-          onPressed: () async {
-            await SourceBaseAuthBackend.signOut();
-          },
+          onPressed: () => _signOut(context),
           size: SBButtonSize.medium,
         ),
       ],
@@ -107,9 +157,14 @@ class ProfileScreen extends StatelessWidget {
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.displayName, required this.email});
+  const _ProfileHeader({
+    required this.displayName,
+    required this.email,
+    required this.onEdit,
+  });
   final String displayName;
   final String email;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -150,7 +205,8 @@ class _ProfileHeader extends StatelessWidget {
             ),
           ),
           IconButton(
-            onPressed: () {},
+            onPressed: onEdit,
+            tooltip: 'Profili düzenle',
             icon: const Icon(Icons.edit_outlined, color: AppColors.blue),
           ),
         ],
@@ -366,49 +422,144 @@ class MedasiCoinStoreScreen extends StatelessWidget {
   }
 }
 
-class _StorePackageTile extends StatelessWidget {
+class _StorePackageTile extends StatefulWidget {
   const _StorePackageTile({required this.package});
 
   final _MedasiCoinPackage package;
 
   @override
+  State<_StorePackageTile> createState() => _StorePackageTileState();
+}
+
+class _StorePackageTileState extends State<_StorePackageTile> {
+  bool _buying = false;
+  String? _buyError;
+
+  Future<void> _purchase() async {
+    setState(() {
+      _buying = true;
+      _buyError = null;
+    });
+    try {
+      final client = SourceBaseAuthBackend.client;
+      if (client == null) {
+        setState(() => _buyError = 'Giris yapmaniz gerekiyor.');
+        return;
+      }
+      final result = await client.functions.invoke(
+        'sourcebase',
+        body: {
+          'action': 'purchase_medasicoin',
+          'payload': {
+            'product_code': widget.package.code,
+            'success_url': '${SourceBaseAuthConfig.publicUrl}/home',
+            'cancel_url':
+                '${SourceBaseAuthConfig.publicUrl}/home?cancelled=1',
+          },
+        },
+      );
+      final json = result.data as Map<String, dynamic>;
+      if (json['ok'] == true && json['data']?['url'] != null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Odeme sayfasina yonlendiriliyorsunuz...'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        setState(
+          () => _buyError = json['error']?['message'] ?? 'Odeme baslatilamadi.',
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _buyError = 'Odeme baslatilamadi. Lutfen tekrar deneyin.');
+      }
+    } finally {
+      if (mounted) setState(() => _buying = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GlassPanel(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: AppColors.selectedBlue,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(
-              Icons.toll_rounded,
-              color: AppColors.blue,
-              size: 26,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: AppColors.selectedBlue,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.toll_rounded,
+                  color: AppColors.blue,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  '${widget.package.coin} MC',
+                  style: const TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Text(
+                '${widget.package.priceTl} TL',
+                style: const TextStyle(
+                  color: AppColors.blue,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                height: 40,
+                child: FilledButton(
+                  onPressed: _buying ? null : _purchase,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.blue,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: _buying
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Satın Al',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              '${package.coin} MC',
+          if (_buyError != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _buyError!,
               style: const TextStyle(
-                color: AppColors.navy,
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
+                color: AppColors.red,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ),
-          Text(
-            '${package.priceTl} TL',
-            style: const TextStyle(
-              color: AppColors.blue,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -499,25 +650,54 @@ class _SettingsItem extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.onTap,
+    this.enabled = true,
   });
   final IconData icon;
   final String title;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon, color: AppColors.navy),
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: AppColors.navy,
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.45,
+      child: ListTile(
+        leading: Icon(icon, color: AppColors.navy),
+        title: Row(
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.navy,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (!enabled) ...[
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.softBlue,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'Yakında',
+                  style: TextStyle(
+                    color: AppColors.blue,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
+        trailing: enabled
+            ? const Icon(Icons.chevron_right_rounded, color: AppColors.muted)
+            : null,
+        onTap: onTap,
       ),
-      trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
-      onTap: onTap,
     );
   }
 }

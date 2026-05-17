@@ -43,6 +43,7 @@ class SourceLabScreen extends StatefulWidget {
 class _SourceLabScreenState extends State<SourceLabScreen> {
   SourceLabView view = SourceLabView.home;
   late List<_LabSource> selectedSources;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -105,6 +106,18 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
         SourceLabView.mindMapResult => SourceLabView.mindMapBuilder,
         _ => SourceLabView.home,
       };
+    });
+  }
+
+  void _generate(SourceLabView resultView) {
+    setState(() {
+      _isLoading = true;
+      view = resultView;
+    });
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     });
   }
 
@@ -259,15 +272,15 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onBranch: (value) => setState(() => clinicalBranch = value),
             onAge: (value) => setState(() => patientAge = value),
             onFeedback: (value) => setState(() => clinicalFeedback = value),
-            onGenerate: () => _open(SourceLabView.clinicalResult),
+            onGenerate: () => _generate(SourceLabView.clinicalResult),
           ),
           SourceLabView.clinicalResult => _ClinicalScenarioResult(
             onBack: _back,
             onSearch: widget.onSearch,
-            onSave: () => _toast('Klinik senaryo koleksiyona kaydedildi.'),
-            onExport: () => _toast('PDF dışa aktarma hazırlandı.'),
+            onSave: () => _toast('Bu özellik henüz hazır değil.'),
+            onExport: () => _toast('Bu özellik henüz hazır değil.'),
             onRegenerate: () => _open(SourceLabView.clinicalBuilder),
-            onComplete: () => _toast('Senaryo tamamlandı ve ilerleme işlendi.'),
+            onComplete: () => _toast('Bu özellik henüz hazır değil.'),
           ),
           SourceLabView.planBuilder => _LearningPlanBuilder(
             selectedSources: selectedSources,
@@ -286,16 +299,16 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onDaysChanged: (value) => setState(() => planDays = value),
             onDuration: (value) => setState(() => dailyDuration = value),
             onReviews: (value) => setState(() => includeReviews = value),
-            onGenerate: () => _open(SourceLabView.planResult),
+            onGenerate: () => _generate(SourceLabView.planResult),
           ),
           SourceLabView.planResult => _LearningPlanResult(
             selectedSources: selectedSources,
             planDays: planDays,
             planGoal: planGoal,
             onBack: _back,
-            onSave: () => _toast('Öğrenme planı kaydedildi.'),
-            onCalendar: () => _toast('Takvim etkinlikleri hazırlandı.'),
-            onExport: () => _toast('Plan PDF olarak hazırlandı.'),
+            onSave: () => _toast('Bu özellik henüz hazır değil.'),
+            onCalendar: () => _toast('Bu özellik henüz hazır değil.'),
+            onExport: () => _toast('Bu özellik henüz hazır değil.'),
             onRegenerate: () => _open(SourceLabView.planBuilder),
           ),
           SourceLabView.podcastBuilder => _PodcastBuilder(
@@ -314,7 +327,7 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onFocus: (value) => setState(() => podcastFocus = value),
             onPace: (value) => setState(() => podcastPace = value),
             onMiniQuiz: (value) => setState(() => includeMiniQuiz = value),
-            onGenerate: () => _open(SourceLabView.podcastResult),
+            onGenerate: () => _generate(SourceLabView.podcastResult),
           ),
           SourceLabView.podcastResult => _PodcastResult(
             playing: podcastPlaying,
@@ -323,11 +336,11 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onTogglePlay: () =>
                 setState(() => podcastPlaying = !podcastPlaying),
             onPosition: (value) => setState(() => podcastPosition = value),
-            onSpeed: () => _toast('Hız 1.25x olarak ayarlandı.'),
-            onShare: () => _toast('Podcast paylaşım bağlantısı oluşturuldu.'),
-            onExport: () => _toast('MP3 dışa aktarma hazırlandı.'),
+            onSpeed: () => _toast('Bu özellik henüz hazır değil.'),
+            onShare: () => _toast('Bu özellik henüz hazır değil.'),
+            onExport: () => _toast('Bu özellik henüz hazır değil.'),
             onRegenerate: () => _open(SourceLabView.podcastBuilder),
-            onSave: () => _toast('Podcast kaydedildi.'),
+            onSave: () => _toast('Bu özellik henüz hazır değil.'),
             onSkipBack: () {
               setState(() {
                 podcastPosition = math.max(0, podcastPosition - .08);
@@ -338,7 +351,7 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
                 podcastPosition = math.min(1, podcastPosition + .08);
               });
             },
-            onVolume: () => _toast('Ses kontrolü ayarlandı.'),
+            onVolume: () => _toast('Bu özellik henüz hazır değil.'),
           ),
           SourceLabView.infographicBuilder => _InfographicBuilder(
             selectedSources: selectedSources,
@@ -356,14 +369,14 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onAccent: (value) => setState(() => infographicAccent = value),
             onShowSources: (value) =>
                 setState(() => showInfographicSources = value),
-            onGenerate: () => _open(SourceLabView.infographicResult),
+            onGenerate: () => _generate(SourceLabView.infographicResult),
           ),
           SourceLabView.infographicResult => _InfographicResult(
             onBack: _back,
             onSearch: widget.onSearch,
-            onSave: () => _toast('İnfografik koleksiyona kaydedildi.'),
-            onPng: () => _toast('PNG dışa aktarma hazırlandı.'),
-            onPdf: () => _toast('PDF dışa aktarma hazırlandı.'),
+            onSave: () => _toast('Bu özellik henüz hazır değil.'),
+            onPng: () => _toast('Bu özellik henüz hazır değil.'),
+            onPdf: () => _toast('Bu özellik henüz hazır değil.'),
             onRegenerate: () => _open(SourceLabView.infographicBuilder),
           ),
           SourceLabView.mindMapBuilder => _MindMapBuilder(
@@ -393,12 +406,12 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
               });
             },
             onExpandChildren: (value) => setState(() => expandChildren = value),
-            onGenerate: () => _open(SourceLabView.mindMapResult),
+            onGenerate: () => _generate(SourceLabView.mindMapResult),
           ),
           SourceLabView.mindMapResult => _MindMapResult(
             onBack: _back,
-            onSave: () => _toast('Zihin haritası kaydedildi.'),
-            onExport: () => _toast('Harita PNG/PDF olarak hazırlandı.'),
+            onSave: () => _toast('Bu özellik henüz hazır değil.'),
+            onExport: () => _toast('Bu özellik henüz hazır değil.'),
             onRegenerate: () => _open(SourceLabView.mindMapBuilder),
           ),
         },
@@ -1106,13 +1119,13 @@ class _ClinicalScenarioResult extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _QuestionTitle('Soru yükleniyor...'),
+              const _QuestionTitle('Bu bölüm henüz hazır değil.'),
               const SizedBox(height: 18),
               for (final answer in const [
-                ('A.', '...', false),
-                ('B.', '...', false),
-                ('C.', '...', false),
-                ('D.', '...', false),
+                ('A.', 'Bu bölüm henüz hazır değil.', false),
+                ('B.', 'Bu bölüm henüz hazır değil.', false),
+                ('C.', 'Bu bölüm henüz hazır değil.', false),
+                ('D.', 'Bu bölüm henüz hazır değil.', false),
               ])
                 _AnswerRow(
                   prefix: answer.$1,
@@ -1338,7 +1351,7 @@ class _LearningPlanBuilder extends StatelessWidget {
           number: 3,
           title: 'Odak Konular',
           child: _FocusChips(
-            labels: const [],
+            labels: const ['Bu bölüm hazırlanıyor'],
             selectedLabels: const {},
             onTap: (_) {},
           ),
@@ -1424,13 +1437,13 @@ class _LearningPlanResult extends StatelessWidget {
                   const _MetricCard(
                     icon: Icons.schedule_rounded,
                     title: 'Toplam Çalışma Süresi',
-                    value: '-',
+                    value: '—',
                     color: AppColors.blue,
                   ),
                   const _MetricCard(
                     icon: Icons.view_agenda_outlined,
                     title: 'Toplam Oturum',
-                    value: '-',
+                    value: '—',
                     color: AppColors.green,
                   ),
                   _MetricCard(
@@ -1992,12 +2005,12 @@ class _InfographicResult extends StatelessWidget {
             _InfoStatPanel(
               icon: Icons.bookmark_border_rounded,
               title: 'BÖLÜM SAYISI',
-              value: '-',
+              value: '—',
             ),
             _InfoStatPanel(
               icon: Icons.palette_outlined,
               title: 'GÖRSEL STİL',
-              value: '-',
+              value: '—',
             ),
           ],
         ),
@@ -2144,7 +2157,7 @@ class _MindMapBuilder extends StatelessWidget {
               _SettingRow(
                 label: 'Merkez Konu',
                 helper: true,
-                child: const _InputLike(text: ''),
+                child: const _InputLike(text: 'Konu başlığı girin'),
               ),
               _SwitchSetting(
                 title: 'Alt Düğümleri Açık Başlat',
@@ -2158,7 +2171,7 @@ class _MindMapBuilder extends StatelessWidget {
           number: 3,
           title: 'Dahil Edilecek Başlıklar',
           child: _TopicWrap(
-            labels: const [],
+            labels: topics.toList(),
             selected: topics,
             onTap: onToggleTopic,
           ),
@@ -5195,11 +5208,11 @@ class _PatientVitalsPanel extends StatelessWidget {
             ),
           ),
           for (final vital in const [
-            (Icons.favorite_border_rounded, '-', 'nabız/dk', AppColors.muted),
-            (Icons.water_drop_outlined, '-', 'mmHg', AppColors.muted),
-            (Icons.air_outlined, '-', 'sol/dk', AppColors.muted),
-            (Icons.opacity_rounded, '-', 'SpO₂', AppColors.muted),
-            (Icons.thermostat_outlined, '-', 'Ateş', AppColors.muted),
+            (Icons.favorite_border_rounded, '—', 'nabız/dk', AppColors.muted),
+            (Icons.water_drop_outlined, '—', 'mmHg', AppColors.muted),
+            (Icons.air_outlined, '—', 'sol/dk', AppColors.muted),
+            (Icons.opacity_rounded, '—', 'SpO₂', AppColors.muted),
+            (Icons.thermostat_outlined, '—', 'Ateş', AppColors.muted),
           ])
             Expanded(
               child: Container(
@@ -5396,10 +5409,11 @@ class _LearningPointsStrip extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _InlineHeader(
+        _InlineHeader(
           icon: Icons.school_outlined,
           title: 'Öğrenme Noktaları',
           action: 'Tümünü gör',
+          onAction: () => _showLabSnack(context, 'Bu bölüm henüz hazır değil.'),
         ),
         Wrap(
           spacing: 14,
@@ -5438,7 +5452,7 @@ class _ClinicalScorePanel extends StatelessWidget {
           child: _ScoreBox(
             icon: Icons.emoji_events_outlined,
             title: 'Başarı',
-            value: '-%',
+            value: '—',
             subtitle: 'Karar oranı',
             color: AppColors.green,
           ),
@@ -5566,23 +5580,11 @@ class _PlanPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lines = switch (day) {
-      1 => [
-        'Konu 1',
-        'Konu 2',
-        'Konu 3',
-      ],
-      2 => [
-        'Konu 1',
-        'Konu 2',
-        'Konu 3',
-      ],
-      _ => [
-        'Konu 1',
-        'Konu 2',
-        'Konu 3',
-      ],
-    };
+    final lines = const [
+        'İçerik hazırlanıyor',
+        'İçerik hazırlanıyor',
+        'İçerik hazırlanıyor',
+      ];
     return Container(
       height: 170,
       padding: const EdgeInsets.all(16),
@@ -5780,77 +5782,98 @@ class _ResultHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 250,
-      child: Stack(
-        children: [
-          Positioned(
-            left: 0,
-            top: 36,
-            child: _RoundButton(
-              icon: Icons.arrow_back_rounded,
-              label: 'Geri dön',
-              onTap: onBack,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 680;
+        final backBtn = _RoundButton(
+          icon: Icons.arrow_back_rounded,
+          label: 'Geri dön',
+          onTap: onBack,
+        );
+        final trailBtn = _RoundButton(
+          icon: trailing,
+          label: 'Sayfa işlemi',
+          onTap: onTrailing,
+        );
+        final artWidget = SizedBox(
+          width: 170,
+          height: 160,
+          child: _HeroArt(kind: art),
+        );
+        final textBlock = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              topTitle,
+              style: const TextStyle(
+                color: AppColors.navy,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-          ),
-          Positioned(
-            right: 0,
-            top: 36,
-            child: _RoundButton(
-              icon: trailing,
-              label: 'Sayfa işlemi',
-              onTap: onTrailing,
+            const SizedBox(height: 34),
+            Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.navy,
+                fontSize: 42,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-          ),
-          Positioned(
-            left: 140,
-            top: 24,
-            child: SizedBox(
-              width: 170,
-              height: 160,
-              child: _HeroArt(kind: art),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              style: const TextStyle(color: AppColors.muted, fontSize: 18),
             ),
-          ),
-          Positioned(
-            left: 330,
-            top: 42,
-            right: 90,
+            const SizedBox(height: 14),
+            _InfoPill(
+              label: chip,
+              icon: Icons.track_changes_rounded,
+              tint: AppColors.purple,
+            ),
+          ],
+        );
+
+        if (compact) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  topTitle,
-                  style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [backBtn, trailBtn],
                 ),
-                const SizedBox(height: 34),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 42,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  subtitle,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 18),
-                ),
-                const SizedBox(height: 14),
-                _InfoPill(
-                  label: chip,
-                  icon: Icons.track_changes_rounded,
-                  tint: AppColors.purple,
+                const SizedBox(height: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    artWidget,
+                    const SizedBox(width: 16),
+                    Expanded(child: textBlock),
+                  ],
                 ),
               ],
             ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              backBtn,
+              const SizedBox(width: 16),
+              artWidget,
+              const SizedBox(width: 20),
+              Expanded(child: textBlock),
+              const SizedBox(width: 16),
+              trailBtn,
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -5931,20 +5954,20 @@ class _PlanTimelinePanel extends StatelessWidget {
       (
         '1',
         'Bölüm 1',
-        'İçerik açıklaması...',
-        '-',
+        'İçerik hazırlanıyor',
+        '—',
       ),
       (
         '2',
         'Bölüm 2',
-        'İçerik açıklaması...',
-        '-',
+        'İçerik hazırlanıyor',
+        '—',
       ),
       (
         '3',
         'Bölüm 3',
-        'İçerik açıklaması...',
-        '-',
+        'İçerik hazırlanıyor',
+        '—',
       ),
     ];
     return _LabPanel(
@@ -6080,7 +6103,7 @@ class _TodayGoalCard extends StatelessWidget {
                     ),
                   ),
                   TextSpan(
-                    text: '-  •  -\n',
+                    text: '—  •  —\n',
                     style: TextStyle(
                       color: AppColors.navy,
                       fontWeight: FontWeight.w900,
@@ -6088,7 +6111,7 @@ class _TodayGoalCard extends StatelessWidget {
                   ),
                   TextSpan(
                     text:
-                        'Konu Başlığı\n...',
+                        'Konu Başlığı\nBu bölüm henüz hazır değil.',
                   ),
                 ],
               ),
@@ -6267,9 +6290,9 @@ class _LegendList extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: const [
-        _LegendRow(label: 'Kategori 1', value: '%-', color: AppColors.blue),
-        _LegendRow(label: 'Kategori 2', value: '%-', color: AppColors.green),
-        _LegendRow(label: 'Kategori 3', value: '%-', color: AppColors.purple),
+        _LegendRow(label: 'Kategori 1', value: 'İçerik hazırlanıyor', color: AppColors.blue),
+        _LegendRow(label: 'Kategori 2', value: 'İçerik hazırlanıyor', color: AppColors.green),
+        _LegendRow(label: 'Kategori 3', value: 'İçerik hazırlanıyor', color: AppColors.purple),
       ],
     );
   }
@@ -6865,10 +6888,11 @@ class _PodcastNotesPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _InlineHeader(
+          _InlineHeader(
             icon: Icons.notes_rounded,
             title: 'Notlar',
             action: 'Kritik Noktalar',
+            onAction: () => _showLabSnack(context, 'Bu bölüm henüz hazır değil.'),
           ),
           for (final note in const [
             (

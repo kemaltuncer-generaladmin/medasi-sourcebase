@@ -193,6 +193,19 @@ class SourceBaseAuthBackend {
     return const AuthActionResult.success('Sifren guncellendi.');
   }
 
+  static Future<AuthActionResult> verifyEmailOtp({
+    required String email,
+    required String token,
+  }) async {
+    final auth = _authOrThrow();
+    await auth.verifyOTP(
+      email: email.trim(),
+      token: token.trim(),
+      type: OtpType.signup,
+    );
+    return const AuthActionResult.success('E-posta dogrulamasi tamamlandi.');
+  }
+
   static Future<void> signOut() async {
     final auth = client?.auth;
     if (auth == null) {

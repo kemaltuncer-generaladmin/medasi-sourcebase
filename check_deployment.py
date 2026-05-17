@@ -2,41 +2,47 @@
 """
 SourceBase Deployment Status Checker
 Checks the deployment status on Coolify
+
+Required environment variables:
+  SOURCEBASE_COOLIFY_API_KEY     Coolify API bearer token
+  SOURCEBASE_COOLIFY_APP_UUID    SourceBase application UUID (default: h3qdzmbjy6lofttbejgx666a)
+  SOURCEBASE_COOLIFY_URL         Coolify server URL (default: http://46.225.100.139:8000)
 """
 
+import os
 import urllib.request
 import json
 import sys
 import time
 
-# SourceBase Coolify App UUID (from AGENTS.md)
-SOURCEBASE_APP_UUID = "h3qdzmbjy6lofttbejgx666a"
-DEPLOYMENT_UUID = "k115etvqluyfj89hrwhk91aa"
-COOLIFY_API_KEY = "Qvn8bAtyTsVFO8cijFp5nFw4igpLSNBIbuIrUDrhd9409b34"
-COOLIFY_URL = "http://46.225.100.139:8000"
+SOURCEBASE_APP_UUID = os.environ.get("SOURCEBASE_COOLIFY_APP_UUID", "h3qdzmbjy6lofttbejgx666a")
+COOLIFY_API_KEY = os.environ.get("SOURCEBASE_COOLIFY_API_KEY")
+COOLIFY_URL = os.environ.get("SOURCEBASE_COOLIFY_URL", "http://46.225.100.139:8000")
 
 def check_deployment_status():
     """Check Coolify deployment status"""
-    
+
+    if not COOLIFY_API_KEY:
+        print("❌ SOURCEBASE_COOLIFY_API_KEY environment variable is not set")
+        return 1
+
     print("🔍 Checking SourceBase deployment status...")
     print(f"📦 App UUID: {SOURCEBASE_APP_UUID}")
-    print(f"🆔 Deployment UUID: {DEPLOYMENT_UUID}")
-    
-    # Check application status
+
     url = f"{COOLIFY_URL}/api/v1/applications/{SOURCEBASE_APP_UUID}"
-    
+
     headers = {
         "Authorization": f"Bearer {COOLIFY_API_KEY}",
         "Accept": "application/json"
     }
-    
+
     try:
         req = urllib.request.Request(url, headers=headers, method='GET')
-        
+
         with urllib.request.urlopen(req, timeout=30) as response:
             status_code = response.status
             body = response.read().decode('utf-8')
-            
+
             if status_code == 200:
                 data = json.loads(body)
                 print(f"📊 Application Status: {data.get('status', 'unknown')}")
@@ -47,7 +53,7 @@ def check_deployment_status():
                 print(f"⚠️ Status check returned: {status_code}")
                 print(f"📄 Response: {body}")
                 return 1
-                
+
     except urllib.error.HTTPError as e:
         print(f"❌ HTTP Error: {e.code} - {e.reason}")
         try:
@@ -64,5 +70,5 @@ if __name__ == "__main__":
     print("\n" + "="*60)
     print("SourceBase Deployment Status Check")
     print("="*60 + "\n")
-    
+
     sys.exit(check_deployment_status())

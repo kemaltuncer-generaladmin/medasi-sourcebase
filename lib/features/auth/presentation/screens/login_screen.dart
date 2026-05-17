@@ -71,6 +71,48 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  bool _socialLoading = false;
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _socialLoading = true;
+      errorMessage = null;
+    });
+    try {
+      await SourceBaseAuthBackend.signInWithGoogle();
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => errorMessage = SourceBaseAuthBackend.friendlyError(error),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _socialLoading = false);
+      }
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    setState(() {
+      _socialLoading = true;
+      errorMessage = null;
+    });
+    try {
+      await SourceBaseAuthBackend.signInWithApple();
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => errorMessage = SourceBaseAuthBackend.friendlyError(error),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _socialLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AuthScreenFrame(
@@ -156,7 +198,25 @@ class _LoginScreenState extends State<LoginScreen> {
           loading: loading,
           size: SBButtonSize.large,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 22),
+        const DividerLabel('veya'),
+        const SizedBox(height: 14),
+        SocialAuthButton(
+          label: 'Google ile devam et',
+          icon: const GoogleGlyph(),
+          onPressed: _socialLoading || loading ? null : _signInWithGoogle,
+        ),
+        const SizedBox(height: 12),
+        SocialAuthButton(
+          label: 'Apple ile devam et',
+          icon: const Icon(
+            Icons.apple,
+            size: 26,
+            color: AppColors.navy,
+          ),
+          onPressed: _socialLoading || loading ? null : _signInWithApple,
+        ),
+        const SizedBox(height: 22),
         SBSecondaryButton(
           label: 'Hesap Oluştur',
           onPressed: () => Navigator.pushNamed(context, RegisterScreen.route),

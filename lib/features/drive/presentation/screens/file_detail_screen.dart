@@ -4,7 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../data/drive_models.dart';
 import '../widgets/drive_ui.dart';
 
-class FileDetailScreen extends StatelessWidget {
+class FileDetailScreen extends StatefulWidget {
   const FileDetailScreen({
     required this.file,
     required this.onSearch,
@@ -19,13 +19,35 @@ class FileDetailScreen extends StatelessWidget {
   final ValueChanged<GeneratedKind> onGenerate;
 
   @override
+  State<FileDetailScreen> createState() => _FileDetailScreenState();
+}
+
+class _FileDetailScreenState extends State<FileDetailScreen> {
+  int _previewIndex = 0;
+
+  void _showNotImplemented(String feature) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$feature özelliği yakında aktif olacak.'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final file = widget.file;
+    final generatedCount = file.generated.length;
+    final hasGenerated = generatedCount > 0;
+
     return WorkspaceScroll(
       children: [
         DriveTopBar(
           title: 'Dosya Detayı',
-          onSearch: onSearch,
-          onBack: onBack,
+          onSearch: widget.onSearch,
+          onBack: widget.onBack,
           showBrand: false,
         ),
         GlassPanel(
@@ -89,10 +111,7 @@ class FileDetailScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const StatusPill(
-                    status: DriveItemStatus.completed,
-                    compact: true,
-                  ),
+                  StatusPill(status: file.status, compact: true),
                 ],
               ),
               const Divider(height: 28, color: AppColors.line),
@@ -122,8 +141,6 @@ class FileDetailScreen extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const Spacer(),
-                  const Icon(Icons.more_vert_rounded, color: AppColors.navy),
                 ],
               ),
             ],
@@ -139,30 +156,30 @@ class FileDetailScreen extends StatelessWidget {
             mainAxisSpacing: 18,
             crossAxisSpacing: 18,
             childAspectRatio: 2.5,
-            children: const [
+            children: [
               _SummaryMetric(
                 icon: Icons.description_outlined,
                 color: AppColors.blue,
-                title: '-',
-                subtitle: 'Toplam içerik',
+                title: file.pageLabel,
+                subtitle: 'Sayfa bilgisi',
               ),
               _SummaryMetric(
                 icon: Icons.menu_book_outlined,
                 color: AppColors.purple,
-                title: '-',
-                subtitle: 'Kapsanan başlıklar',
+                title: generatedCount > 0 ? '$generatedCount' : '-',
+                subtitle: 'Üretilen çıktı',
               ),
               _SummaryMetric(
                 icon: Icons.table_chart_outlined,
                 color: AppColors.green,
-                title: '-',
-                subtitle: 'Şekil ve tablo içerir',
+                title: FileKindBadge.kindLabel(file.kind),
+                subtitle: 'Dosya türü',
               ),
               _SummaryMetric(
                 icon: Icons.task_alt_rounded,
                 color: AppColors.blue,
-                title: '-',
-                subtitle: 'Net metin ve yapı',
+                title: _statusShortLabel(file.status),
+                subtitle: 'Durum',
               ),
             ],
           ),
@@ -180,70 +197,98 @@ class FileDetailScreen extends StatelessWidget {
               kind: GeneratedKind.flashcard,
               title: 'Flashcard',
               subtitle: 'Anki uyumlu kartlar',
-              onTap: onGenerate,
+              onTap: widget.onGenerate,
             ),
             _GenerateTile(
               kind: GeneratedKind.question,
               title: 'Soru',
               subtitle: 'Çoktan seçmeli sorular',
-              onTap: onGenerate,
+              onTap: widget.onGenerate,
             ),
             _GenerateTile(
               kind: GeneratedKind.summary,
               title: 'Özet',
               subtitle: 'Kısa ve kapsamlı özet',
-              onTap: onGenerate,
+              onTap: widget.onGenerate,
             ),
             _GenerateTile(
               kind: GeneratedKind.algorithm,
               title: 'Algoritma',
               subtitle: 'Karar algoritmaları',
-              onTap: onGenerate,
+              onTap: widget.onGenerate,
             ),
             _GenerateTile(
               kind: GeneratedKind.comparison,
               title: 'Karşılaştırma',
               subtitle: 'Konuları karşılaştır',
-              onTap: onGenerate,
+              onTap: widget.onGenerate,
             ),
             _GenerateTile(
               kind: GeneratedKind.podcast,
               title: 'Podcast',
               subtitle: 'Sesli anlatım oluştur',
-              onTap: onGenerate,
+              onTap: widget.onGenerate,
             ),
           ],
         ),
         SectionTitle(
           title: 'Üretilenler',
-          actionLabel: 'Tümünü Gör',
-          onAction: () {},
+          actionLabel: hasGenerated ? 'Tümünü Gör' : null,
+          onAction: hasGenerated
+              ? () => _showNotImplemented('Tüm çıktılar')
+              : null,
         ),
         GlassPanel(
           padding: EdgeInsets.zero,
-          child: Column(
-            children: [
-              for (final output in file.generated)
-                _GeneratedRow(output: output),
-            ],
-          ),
+          child: hasGenerated
+              ? Column(
+                  children: [
+                    for (final output in file.generated)
+                      _GeneratedRow(output: output),
+                  ],
+                )
+              : const Padding(
+                  padding: EdgeInsets.all(22),
+                  child: EmptyState(
+                    message: 'Henüz çıktı üretilmedi.',
+                    subMessage:
+                        'Yukarıdaki üretim merkezlerinden birini kullanarak bu dosyadan içerik oluşturabilirsin.',
+                    icon: Icons.auto_awesome_outlined,
+                  ),
+                ),
         ),
-        const SectionTitle(title: 'Önizleme', actionLabel: '1 / 24'),
-        GlassPanel(
-          padding: const EdgeInsets.all(12),
-          child: SizedBox(
-            height: 128,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: 5,
-              separatorBuilder: (_, _) => const SizedBox(width: 10),
-              itemBuilder: (context, index) => _PreviewPage(index: index),
+        if (file.pageLabel != 'İşleniyor') ...[
+          const SectionTitle(title: 'Önizleme'),
+          GlassPanel(
+            padding: const EdgeInsets.all(12),
+            child: SizedBox(
+              height: 128,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: 5,
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
+                itemBuilder: (context, index) => _PreviewPage(
+                  index: index,
+                  selected: index == _previewIndex,
+                  onTap: () => setState(() => _previewIndex = index),
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       ],
     );
+  }
+
+  String _statusShortLabel(DriveItemStatus status) {
+    return switch (status) {
+      DriveItemStatus.completed => 'Hazır',
+      DriveItemStatus.processing => 'İşleniyor',
+      DriveItemStatus.uploading => 'Yükleniyor',
+      DriveItemStatus.failed => 'Hata',
+      DriveItemStatus.draft => 'Taslak',
+    };
   }
 }
 
@@ -445,53 +490,62 @@ class _UpdatedPill extends StatelessWidget {
 }
 
 class _PreviewPage extends StatelessWidget {
-  const _PreviewPage({required this.index});
+  const _PreviewPage({
+    required this.index,
+    required this.selected,
+    required this.onTap,
+  });
 
   final int index;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final selected = index == 0;
-    return Container(
-      width: 96,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: selected ? AppColors.blue : AppColors.line,
-          width: selected ? 1.5 : 1,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 96,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? AppColors.blue : AppColors.line,
+            width: selected ? 1.5 : 1,
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: CustomPaint(
-              painter: _PreviewPainter(index: index),
-              child: const SizedBox.expand(),
-            ),
-          ),
-          Container(
-            width: 26,
-            height: 26,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: selected ? AppColors.blue : AppColors.white,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: selected ? AppColors.blue : AppColors.line,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: CustomPaint(
+                painter: _PreviewPainter(index: index),
+                child: const SizedBox.expand(),
               ),
             ),
-            child: Text(
-              '${index + 1}',
-              style: TextStyle(
-                color: selected ? Colors.white : AppColors.navy,
-                fontWeight: FontWeight.w700,
+            Container(
+              width: 26,
+              height: 26,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: selected ? AppColors.blue : AppColors.white,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: selected ? AppColors.blue : AppColors.line,
+                ),
+              ),
+              child: Text(
+                '${index + 1}',
+                style: TextStyle(
+                  color: selected ? Colors.white : AppColors.navy,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

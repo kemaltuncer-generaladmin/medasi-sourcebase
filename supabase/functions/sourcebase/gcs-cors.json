@@ -1,0 +1,17 @@
+[
+  {
+    "origin": [
+      "https://sourcebase.medasi.com.tr",
+      "http://localhost:7357",
+      "http://127.0.0.1:7357"
+    ],
+    "method": ["GET", "PUT", "HEAD", "OPTIONS"],
+    "responseHeader": [
+      "Content-Type",
+      "Content-Length",
+      "ETag",
+      "x-goog-resumable"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

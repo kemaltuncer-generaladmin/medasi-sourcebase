@@ -23,10 +23,13 @@ export interface VertexConfig {
 }
 
 export function getGcsConfig(): GcsConfig {
-  const bucket = Deno.env.get("SOURCEBASE_GCS_BUCKET")?.trim() ?? "";
+  const bucket = stripWrappingQuotes(
+    Deno.env.get("SOURCEBASE_GCS_BUCKET")?.trim() ?? "",
+  );
   const serviceAccountJson = firstEnv(
     "SOURCEBASE_GCS_SERVICE_ACCOUNT_JSON",
     "GOOGLE_SERVICE_ACCOUNT_JSON",
+    "GOOGLE_SERVICE_ACCOUNT_JSON_BASE64",
   );
 
   if (!bucket || !serviceAccountJson) {
@@ -54,6 +57,7 @@ export function getVertexConfig(): VertexConfig {
   const vertexServiceAccountJson = firstEnv(
     "VERTEX_SERVICE_ACCOUNT_JSON",
     "GOOGLE_SERVICE_ACCOUNT_JSON",
+    "GOOGLE_SERVICE_ACCOUNT_JSON_BASE64",
   );
   const serviceAccount = vertexServiceAccountJson
     ? parseGoogleServiceAccount(
@@ -95,10 +99,12 @@ export function runtimeConfigStatus() {
   const gcsServiceJson = firstEnv(
     "SOURCEBASE_GCS_SERVICE_ACCOUNT_JSON",
     "GOOGLE_SERVICE_ACCOUNT_JSON",
+    "GOOGLE_SERVICE_ACCOUNT_JSON_BASE64",
   );
   const vertexServiceJson = firstEnv(
     "VERTEX_SERVICE_ACCOUNT_JSON",
     "GOOGLE_SERVICE_ACCOUNT_JSON",
+    "GOOGLE_SERVICE_ACCOUNT_JSON_BASE64",
   );
   const vertexAccount = vertexServiceJson
     ? safeParseServiceAccount(vertexServiceJson)
@@ -158,9 +164,37 @@ function safeParseServiceAccount(serviceAccountJson: string) {
 function firstEnv(...names: string[]) {
   for (const name of names) {
     const value = Deno.env.get(name)?.trim();
-    if (value) return value;
+    if (!value) continue;
+    if (name.endsWith("_BASE64")) {
+      const decoded = decodeBase64Env(value);
+      if (decoded) return decoded;
+      continue;
+    }
+    return stripWrappingQuotes(value);
   }
   return "";
+}
+
+function stripWrappingQuotes(value: string) {
+  if (value.length < 2) return value;
+  const first = value.at(0);
+  const last = value.at(-1);
+  if ((first === `"` && last === `"`) || (first === "'" && last === "'")) {
+    return value.slice(1, -1).trim();
+  }
+  return value;
+}
+
+function decodeBase64Env(value: string) {
+  try {
+    return new TextDecoder().decode(
+      Uint8Array.from(atob(stripWrappingQuotes(value)), (char) =>
+        char.charCodeAt(0)
+      ),
+    ).trim();
+  } catch (_error) {
+    return "";
+  }
 }
 
 function normalizePrivateKey(privateKey: string) {

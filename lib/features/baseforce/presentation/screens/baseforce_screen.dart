@@ -48,8 +48,36 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
   String selectedFilter = 'Tümü';
   String selectedQuestionDifficulty = 'Orta';
 
+  String flashcardStyle = 'Klasik';
+  int flashcardCount = 50;
+  String flashcardDifficulty = 'Orta';
+  bool flashcardExtractKey = true;
+  bool flashcardAddHints = true;
+
+  String questionType = 'Çoktan Seçmeli';
+  int questionCount = 20;
+  bool questionAddExplanation = true;
+
+  String summaryLength = '1 sayfa';
+  String summaryFocus = 'Yüksek Olasılıklı Sorular';
+  bool summaryMarkTerms = true;
+  bool summaryToTable = true;
+  bool summaryChecklist = true;
+
+  String algorithmMode = 'Tanı Algoritması';
+  String algorithmLayout = 'Dikey';
+  String algorithmDetail = 'Orta';
+  bool algorithmColorfulNodes = true;
+  bool algorithmClinicalNotes = true;
+
+  String queueFilter = 'Tümü';
+
   void _open(BaseForceView next) {
     setState(() => view = next);
+  }
+
+  void _backToHome() {
+    setState(() => view = BaseForceView.home);
   }
 
   void _toast(String message) {
@@ -62,6 +90,50 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
           duration: const Duration(milliseconds: 1100),
         ),
       );
+  }
+
+  void _honestToast() {
+    _toast('Bu özellik henüz hazır değil.');
+  }
+
+  void _handleFlashcardGenerate() {
+    _toast(
+      'Flashcard üretimi başlatıldı.\nStil: $flashcardStyle, '
+      'Sayı: $flashcardCount, Zorluk: $flashcardDifficulty, '
+      'Kavram çıkar: $flashcardExtractKey, İpuçları: $flashcardAddHints',
+    );
+    _open(BaseForceView.queue);
+  }
+
+  void _handleQuestionGenerate() {
+    _toast(
+      'Soru üretimi başlatıldı.\nTip: $questionType, '
+      'Sayı: $questionCount, Zorluk: $selectedQuestionDifficulty, '
+      'Açıklama: $questionAddExplanation',
+    );
+    _open(BaseForceView.queue);
+  }
+
+  void _handleSummaryGenerate() {
+    _toast(
+      'Özet üretimi başlatıldı.\nUzunluk: $summaryLength, '
+      'Odak: $summaryFocus',
+    );
+    _open(BaseForceView.queue);
+  }
+
+  void _handleAlgorithmGenerate() {
+    _toast(
+      'Algoritma üretimi başlatıldı.\nMod: $algorithmMode, '
+      'Yerleşim: $algorithmLayout, Detay: $algorithmDetail, '
+      'Renkli: $algorithmColorfulNodes, Klinik not: $algorithmClinicalNotes',
+    );
+    _open(BaseForceView.queue);
+  }
+
+  void _handleComparisonGenerate() {
+    _toast('Karşılaştırma tablosu üretimi başlatıldı.');
+    _open(BaseForceView.queue);
   }
 
   @override
@@ -93,6 +165,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             data: widget.data,
             selectedSources: selectedSources,
             onSearch: widget.onSearch,
+            onBack: _backToHome,
             onToggleSource: (id) {
               setState(() {
                 if (selectedSources.contains(id)) {
@@ -109,65 +182,118 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
               'comparison' => BaseForceView.comparisonFactory,
               _ => BaseForceView.flashcardFactory,
             }),
-            onUpload: () => _toast('Yeni yükleme akışı hazır.'),
+            onUpload: _honestToast,
           ),
           BaseForceView.flashcardFactory => _FlashcardFactoryScreen(
             data: widget.data,
             onSearch: widget.onSearch,
+            onBack: _backToHome,
             onPickSources: () => _open(BaseForceView.sourcePicker),
-            onGenerate: () => _open(BaseForceView.queue),
-            onSavePreview: () => _toast('Önizleme koleksiyona hazırlandı.'),
+            cardStyle: flashcardStyle,
+            cardCount: flashcardCount,
+            cardDifficulty: flashcardDifficulty,
+            extractKey: flashcardExtractKey,
+            addHints: flashcardAddHints,
+            onStyleChanged: (v) => setState(() => flashcardStyle = v),
+            onCountChanged: (v) => setState(() => flashcardCount = v),
+            onDifficultyChanged: (v) =>
+                setState(() => flashcardDifficulty = v),
+            onExtractKeyChanged: (v) =>
+                setState(() => flashcardExtractKey = v),
+            onAddHintsChanged: (v) => setState(() => flashcardAddHints = v),
+            onGenerate: _handleFlashcardGenerate,
+            onSavePreview: _honestToast,
           ),
           BaseForceView.questionFactory => _QuestionFactoryScreen(
             data: widget.data,
             selectedDifficulty: selectedQuestionDifficulty,
+            questionType: questionType,
+            questionCount: questionCount,
+            addExplanation: questionAddExplanation,
             onSearch: widget.onSearch,
+            onBack: _backToHome,
             onPickSources: () => _open(BaseForceView.sourcePicker),
             onDifficulty: (value) =>
                 setState(() => selectedQuestionDifficulty = value),
-            onGenerate: () => _open(BaseForceView.queue),
+            onTypeChanged: (v) => setState(() => questionType = v),
+            onCountChanged: (v) => setState(() => questionCount = v),
+            onExplanationChanged: (v) =>
+                setState(() => questionAddExplanation = v),
+            onGenerate: _handleQuestionGenerate,
           ),
           BaseForceView.summaryFactory => _SummaryFactoryScreen(
             data: widget.data,
             onSearch: widget.onSearch,
+            onBack: _backToHome,
             onPickSources: () => _open(BaseForceView.sourcePicker),
-            onGenerate: () => _open(BaseForceView.queue),
+            summaryLength: summaryLength,
+            summaryFocus: summaryFocus,
+            markTerms: summaryMarkTerms,
+            toTable: summaryToTable,
+            checklist: summaryChecklist,
+            onLengthChanged: (v) => setState(() => summaryLength = v),
+            onFocusChanged: (v) => setState(() => summaryFocus = v),
+            onMarkTermsChanged: (v) =>
+                setState(() => summaryMarkTerms = v),
+            onToTableChanged: (v) => setState(() => summaryToTable = v),
+            onChecklistChanged: (v) =>
+                setState(() => summaryChecklist = v),
+            onGenerate: _handleSummaryGenerate,
           ),
           BaseForceView.algorithmFactory => _AlgorithmFactoryScreen(
             data: widget.data,
             onSearch: widget.onSearch,
+            onBack: _backToHome,
             onPickSources: () => _open(BaseForceView.sourcePicker),
-            onGenerate: () => _open(BaseForceView.queue),
+            algorithmMode: algorithmMode,
+            algorithmLayout: algorithmLayout,
+            algorithmDetail: algorithmDetail,
+            colorfulNodes: algorithmColorfulNodes,
+            clinicalNotes: algorithmClinicalNotes,
+            onModeChanged: (v) => setState(() => algorithmMode = v),
+            onLayoutChanged: (v) => setState(() => algorithmLayout = v),
+            onDetailChanged: (v) => setState(() => algorithmDetail = v),
+            onColorfulNodesChanged: (v) =>
+                setState(() => algorithmColorfulNodes = v),
+            onClinicalNotesChanged: (v) =>
+                setState(() => algorithmClinicalNotes = v),
+            onGenerate: _handleAlgorithmGenerate,
           ),
           BaseForceView.comparisonFactory => _ComparisonFactoryScreen(
             data: widget.data,
             onSearch: widget.onSearch,
+            onBack: _backToHome,
             onPickSources: () => _open(BaseForceView.sourcePicker),
-            onGenerate: () => _open(BaseForceView.queue),
+            onGenerate: _handleComparisonGenerate,
             onOpenResult: () => _open(BaseForceView.flashcardResults),
           ),
           BaseForceView.queue => _QueueScreen(
             data: widget.data,
             onSearch: widget.onSearch,
+            onBack: _backToHome,
+            queueFilter: queueFilter,
+            onFilterChanged: (v) => setState(() => queueFilter = v),
             onOpenResult: () => _open(BaseForceView.flashcardResults),
             onRetry: () => _open(BaseForceView.algorithmFactory),
-            onStop: () => _toast('Üretim duraklatıldı.'),
+            onStop: _honestToast,
           ),
           BaseForceView.flashcardResults => _FlashcardResultsScreen(
             onSearch: widget.onSearch,
-            onSave: () => _toast('Koleksiyona kaydedildi.'),
-            onExport: () => _toast('Dışa aktarma hazırlanıyor.'),
+            onBack: _backToHome,
+            onSave: _honestToast,
+            onExport: _honestToast,
             onRegenerate: () => _open(BaseForceView.flashcardFactory),
-            onEdit: () => _toast('Düzenleme modu açıldı.'),
+            onEdit: _honestToast,
           ),
           BaseForceView.allGenerations => _AllGenerationsScreen(
             data: widget.data,
             selectedFilter: selectedFilter,
             onSearch: widget.onSearch,
+            onBack: _backToHome,
             onFilter: (filter) => setState(() => selectedFilter = filter),
             onOpenResult: () => _open(BaseForceView.flashcardResults),
             onRegenerate: () => _open(BaseForceView.flashcardFactory),
-            onShare: () => _toast('Paylaşım bağlantısı oluşturuldu.'),
+            onShare: _honestToast,
             onClear: () => setState(() => selectedFilter = 'Tümü'),
           ),
         },
@@ -185,6 +311,7 @@ class _BaseForcePage extends StatelessWidget {
     this.art = _BaseForceArtKind.stack,
     this.actions = const [],
     this.heroTight = false,
+    this.onBack,
   });
 
   final String title;
@@ -194,6 +321,7 @@ class _BaseForcePage extends StatelessWidget {
   final _BaseForceArtKind art;
   final List<Widget> actions;
   final bool heroTight;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -204,7 +332,7 @@ class _BaseForcePage extends StatelessWidget {
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(32, 18, 32, 142),
           children: [
-            _BaseForceTopBar(onSearch: onSearch),
+            _BaseForceTopBar(onSearch: onSearch, onBack: onBack),
             _BaseForceHero(
               title: title,
               subtitle: subtitle,
@@ -221,12 +349,24 @@ class _BaseForcePage extends StatelessWidget {
 }
 
 class _BaseForceTopBar extends StatelessWidget {
-  const _BaseForceTopBar({required this.onSearch});
+  const _BaseForceTopBar({required this.onSearch, this.onBack});
 
   final VoidCallback onSearch;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
+    final backButton = onBack != null
+        ? Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: _RoundIconButton(
+              icon: Icons.arrow_back_rounded,
+              label: 'Geri',
+              onTap: onBack!,
+            ),
+          )
+        : const SizedBox.shrink();
+
     final actions = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -242,16 +382,7 @@ class _BaseForceTopBar extends StatelessWidget {
             _RoundIconButton(
               icon: Icons.notifications_none_rounded,
               label: 'Bildirimler',
-              onTap: () {
-                ScaffoldMessenger.of(context)
-                  ..clearSnackBars()
-                  ..showSnackBar(
-                    const SnackBar(
-                      content: Text('Bildirim merkezi açıldı.'),
-                      duration: Duration(milliseconds: 1000),
-                    ),
-                  );
-              },
+              onTap: () => showSourceBaseNotifications(context),
             ),
             Positioned(
               top: 5,
@@ -298,6 +429,7 @@ class _BaseForceTopBar extends StatelessWidget {
               children: [
                 Row(
                   children: [
+                    if (onBack != null) ...[backButton, const SizedBox(width: 6)],
                     const Flexible(child: SourceBaseBrand(compact: true)),
                     const Spacer(),
                     actions,
@@ -310,6 +442,7 @@ class _BaseForceTopBar extends StatelessWidget {
           }
           return Row(
             children: [
+              if (onBack != null) ...[backButton, const SizedBox(width: 6)],
               Expanded(
                 child: Row(
                   children: [
@@ -878,6 +1011,7 @@ class _SourcePickerScreen extends StatelessWidget {
     required this.onToggleSource,
     required this.onContinue,
     required this.onUpload,
+    required this.onBack,
   });
 
   final DriveWorkspaceData data;
@@ -886,21 +1020,23 @@ class _SourcePickerScreen extends StatelessWidget {
   final ValueChanged<String> onToggleSource;
   final VoidCallback onContinue;
   final VoidCallback onUpload;
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
     return _BaseForcePage(
       title: 'Kaynak Seç',
-      subtitle: 'Drive’daki dosyalarını seç veya yeni yükle.',
+      subtitle: 'Drive\u2019daki dosyalar\u0131n\u0131 se\xE7 veya yeni y\xFCkle.',
       onSearch: onSearch,
+      onBack: onBack,
       heroTight: true,
       actions: [
         _HeroAction(
-          label: 'Drive’dan Seç',
+          label: 'Drive\u2019dan Se\xE7',
           icon: Icons.change_history_rounded,
           onTap: () => _showBaseForceToast(
             context,
-            'Drive kaynakları aşağıda listelendi.',
+            'Bu \xF6zellik hen\xFCz haz\u0131r de\u011Fil.',
           ),
         ),
         _HeroAction(
@@ -923,7 +1059,7 @@ class _SourcePickerScreen extends StatelessWidget {
             _FilterButton(
               onTap: () => _showBaseForceToast(
                 context,
-                'Filtre seçenekleri güncellendi.',
+                'Bu \xF6zellik hen\xFCz haz\u0131r de\u011Fil.',
               ),
             ),
           ],
@@ -1000,23 +1136,46 @@ class _FlashcardFactoryScreen extends StatelessWidget {
   const _FlashcardFactoryScreen({
     required this.data,
     required this.onSearch,
+    required this.onBack,
     required this.onPickSources,
     required this.onGenerate,
     required this.onSavePreview,
+    required this.cardStyle,
+    required this.cardCount,
+    required this.cardDifficulty,
+    required this.extractKey,
+    required this.addHints,
+    required this.onStyleChanged,
+    required this.onCountChanged,
+    required this.onDifficultyChanged,
+    required this.onExtractKeyChanged,
+    required this.onAddHintsChanged,
   });
 
   final DriveWorkspaceData data;
   final VoidCallback onSearch;
+  final VoidCallback onBack;
   final VoidCallback onPickSources;
   final VoidCallback onGenerate;
   final VoidCallback onSavePreview;
+  final String cardStyle;
+  final int cardCount;
+  final String cardDifficulty;
+  final bool extractKey;
+  final bool addHints;
+  final ValueChanged<String> onStyleChanged;
+  final ValueChanged<int> onCountChanged;
+  final ValueChanged<String> onDifficultyChanged;
+  final ValueChanged<bool> onExtractKeyChanged;
+  final ValueChanged<bool> onAddHintsChanged;
 
   @override
   Widget build(BuildContext context) {
     return _BaseForcePage(
-      title: 'Flashcard Fabrikası',
-      subtitle: 'Kaynaklarından akıllı flashcard’lar üret.',
+      title: 'Flashcard Fabrikas\u0131',
+      subtitle: 'Kaynaklar\u0131ndan ak\u0131ll\u0131 flashcard\u2019lar \xFCret.',
       onSearch: onSearch,
+      onBack: onBack,
       art: _BaseForceArtKind.cardSet,
       children: [
         _TwoPane(
@@ -1036,61 +1195,83 @@ class _FlashcardFactoryScreen extends StatelessWidget {
                     const _SettingLabel('Kart Stili'),
                     const SizedBox(height: 8),
                     Row(
-                      children: const [
+                      children: [
                         Expanded(
                           child: _SegmentButton(
                             label: 'Klasik',
                             icon: Icons.credit_card_rounded,
-                            selected: true,
+                            selected: cardStyle == 'Klasik',
+                            onTap: () => onStyleChanged('Klasik'),
                           ),
                         ),
                         Expanded(
                           child: _SegmentButton(
                             label: 'Cloze',
                             icon: Icons.more_horiz_rounded,
+                            selected: cardStyle == 'Cloze',
+                            onTap: () => onStyleChanged('Cloze'),
                           ),
                         ),
                         Expanded(
                           child: _SegmentButton(
-                            label: 'Hızlı Tekrar',
+                            label: 'H\u0131zl\u0131 Tekrar',
                             icon: Icons.sync_rounded,
+                            selected: cardStyle == 'H\u0131zl\u0131 Tekrar',
+                            onTap: () => onStyleChanged('H\u0131zl\u0131 Tekrar'),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 18),
-                    const _StepperSetting(label: 'Kart Sayısı', value: '50'),
+                    _StepperSetting(
+                      label: 'Kart Say\u0131s\u0131',
+                      value: '$cardCount',
+                      onChanged: onCountChanged,
+                    ),
                     const SizedBox(height: 18),
                     const _SettingLabel('Zorluk Seviyesi'),
                     const SizedBox(height: 8),
                     Row(
-                      children: const [
+                      children: [
                         Expanded(
                           child: _DifficultyChip(
                             label: 'Kolay',
                             color: AppColors.green,
+                            selected: cardDifficulty == 'Kolay',
+                            onTap: () => onDifficultyChanged('Kolay'),
                           ),
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: _DifficultyChip(
                             label: 'Orta',
                             color: AppColors.orange,
-                            selected: true,
+                            selected: cardDifficulty == 'Orta',
+                            onTap: () => onDifficultyChanged('Orta'),
                           ),
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: _DifficultyChip(
                             label: 'Zor',
                             color: AppColors.red,
+                            selected: cardDifficulty == 'Zor',
+                            onTap: () => onDifficultyChanged('Zor'),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 18),
-                    const _ToggleLine(label: 'Önemli kavramları çıkar'),
-                    const _ToggleLine(label: 'İpuçları ekle'),
+                    _ToggleLine(
+                      label: '\xD6nemli kavramlar\u0131 \xE7\u0131kar',
+                      initialValue: extractKey,
+                      onChanged: onExtractKeyChanged,
+                    ),
+                    _ToggleLine(
+                      label: '\u0130pu\xE7lar\u0131 ekle',
+                      initialValue: addHints,
+                      onChanged: onAddHintsChanged,
+                    ),
                   ],
                 ),
               ),
@@ -1183,26 +1364,41 @@ class _QuestionFactoryScreen extends StatelessWidget {
   const _QuestionFactoryScreen({
     required this.data,
     required this.selectedDifficulty,
+    required this.questionType,
+    required this.questionCount,
+    required this.addExplanation,
     required this.onSearch,
+    required this.onBack,
     required this.onPickSources,
     required this.onDifficulty,
+    required this.onTypeChanged,
+    required this.onCountChanged,
+    required this.onExplanationChanged,
     required this.onGenerate,
   });
 
   final DriveWorkspaceData data;
   final String selectedDifficulty;
+  final String questionType;
+  final int questionCount;
+  final bool addExplanation;
   final VoidCallback onSearch;
+  final VoidCallback onBack;
   final VoidCallback onPickSources;
   final ValueChanged<String> onDifficulty;
+  final ValueChanged<String> onTypeChanged;
+  final ValueChanged<int> onCountChanged;
+  final ValueChanged<bool> onExplanationChanged;
   final VoidCallback onGenerate;
 
   @override
   Widget build(BuildContext context) {
     return _BaseForcePage(
-      title: 'Soru Fabrikası',
+      title: 'Soru Fabrikas\u0131',
       subtitle:
-          'Seçtiğiniz kaynaklardan, yapay zeka ile\nözelleştirilmiş sorular üretin.',
+          'Se\xE7ti\u011Finiz kaynaklardan, yapay zeka ile\n\xF6zelle\u015Ftirilmi\u015F sorular \xFCretin.',
       onSearch: onSearch,
+      onBack: onBack,
       children: [
         _SelectedSourceChips(data: data, onPickSources: onPickSources),
         const SizedBox(height: 20),
@@ -1213,12 +1409,24 @@ class _QuestionFactoryScreen extends StatelessWidget {
                 icon: Icons.list_rounded,
                 label: 'Soru Tipi',
               ),
-              const _ResponsiveGrid(
+              _ResponsiveGrid(
                 minItemWidth: 150,
                 children: [
-                  _SegmentButton(label: 'Çoktan Seçmeli', selected: true),
-                  _SegmentButton(label: 'Klinik Vaka'),
-                  _SegmentButton(label: 'Doğru-Yanlış'),
+                  _SegmentButton(
+                    label: '\xC7oktan Se\xE7meli',
+                    selected: questionType == '\xC7oktan Se\xE7meli',
+                    onTap: () => onTypeChanged('\xC7oktan Se\xE7meli'),
+                  ),
+                  _SegmentButton(
+                    label: 'Klinik Vaka',
+                    selected: questionType == 'Klinik Vaka',
+                    onTap: () => onTypeChanged('Klinik Vaka'),
+                  ),
+                  _SegmentButton(
+                    label: 'Do\u011Fru-Yanl\u0131\u015F',
+                    selected: questionType == 'Do\u011Fru-Yanl\u0131\u015F',
+                    onTap: () => onTypeChanged('Do\u011Fru-Yanl\u0131\u015F'),
+                  ),
                 ],
               ),
               const _ThinRule(),
@@ -1229,7 +1437,7 @@ class _QuestionFactoryScreen extends StatelessWidget {
               _ResponsiveGrid(
                 minItemWidth: 120,
                 children: [
-                  for (final value in const ['Kolay', 'Orta', 'Zor', 'Çok Zor'])
+                  for (final value in const ['Kolay', 'Orta', 'Zor', '\xC7ok Zor'])
                     _SegmentButton(
                       label: value,
                       selected: selectedDifficulty == value,
@@ -1238,15 +1446,23 @@ class _QuestionFactoryScreen extends StatelessWidget {
                 ],
               ),
               const _ThinRule(),
-              const _StepperSetting(label: 'Soru Sayısı', value: '20'),
+              _StepperSetting(
+                label: 'Soru Say\u0131s\u0131',
+                value: '$questionCount',
+                onChanged: onCountChanged,
+              ),
               const _ThinRule(),
-              const _ToggleLine(label: 'Açıklama Ekle'),
+              _ToggleLine(
+                label: 'A\xE7\u0131klama Ekle',
+                initialValue: addExplanation,
+                onChanged: onExplanationChanged,
+              ),
               const _ThinRule(),
-              Wrap(
+              const Wrap(
                 spacing: 10,
                 runSpacing: 10,
-                children: const [
-                  _TagChip(label: 'Tanı'),
+                children: [
+                  _TagChip(label: 'Tan\u0131'),
                   _TagChip(label: 'Tedavi', color: AppColors.green),
                   _TagChip(label: 'Fizyoloji', color: AppColors.purple),
                   _TagChip(
@@ -1306,23 +1522,46 @@ class _SummaryFactoryScreen extends StatelessWidget {
   const _SummaryFactoryScreen({
     required this.data,
     required this.onSearch,
+    required this.onBack,
     required this.onPickSources,
     required this.onGenerate,
+    required this.summaryLength,
+    required this.summaryFocus,
+    required this.markTerms,
+    required this.toTable,
+    required this.checklist,
+    required this.onLengthChanged,
+    required this.onFocusChanged,
+    required this.onMarkTermsChanged,
+    required this.onToTableChanged,
+    required this.onChecklistChanged,
   });
 
   final DriveWorkspaceData data;
 
   final VoidCallback onSearch;
+  final VoidCallback onBack;
   final VoidCallback onPickSources;
   final VoidCallback onGenerate;
+  final String summaryLength;
+  final String summaryFocus;
+  final bool markTerms;
+  final bool toTable;
+  final bool checklist;
+  final ValueChanged<String> onLengthChanged;
+  final ValueChanged<String> onFocusChanged;
+  final ValueChanged<bool> onMarkTermsChanged;
+  final ValueChanged<bool> onToTableChanged;
+  final ValueChanged<bool> onChecklistChanged;
 
   @override
   Widget build(BuildContext context) {
     return _BaseForcePage(
-      title: 'Sınav Sabahı Özeti',
+      title: 'S\u0131nav Sabah\u0131 \xD6zeti',
       subtitle:
-          'Seçtiğiniz kaynaklardan sınavınıza özel,\nodaklı bir özet oluşturun.',
+          'Se\xE7ti\u011Finiz kaynaklardan s\u0131nav\u0131n\u0131za \xF6zel,\nodakl\u0131 bir \xF6zet olu\u015Ftur.',
       onSearch: onSearch,
+      onBack: onBack,
       art: _BaseForceArtKind.notebook,
       children: [
         _SelectedSourceChips(
@@ -1331,12 +1570,25 @@ class _SummaryFactoryScreen extends StatelessWidget {
           includeThird: true,
         ),
         const SizedBox(height: 18),
-        const _ResponsiveGrid(
+        _ResponsiveGrid(
           minItemWidth: 240,
           children: [
-            _SummaryOptionPanel(),
-            _FocusOptionPanel(),
-            _HighlightOptionPanel(),
+            _SummaryOptionPanel(
+              selectedLength: summaryLength,
+              onLengthChanged: onLengthChanged,
+            ),
+            _FocusOptionPanel(
+              selectedFocus: summaryFocus,
+              onFocusChanged: onFocusChanged,
+            ),
+            _HighlightOptionPanel(
+              markTerms: markTerms,
+              toTable: toTable,
+              checklist: checklist,
+              onMarkTermsChanged: onMarkTermsChanged,
+              onToTableChanged: onToTableChanged,
+              onChecklistChanged: onChecklistChanged,
+            ),
           ],
         ),
         const SizedBox(height: 20),
@@ -1386,80 +1638,127 @@ class _AlgorithmFactoryScreen extends StatelessWidget {
   const _AlgorithmFactoryScreen({
     required this.data,
     required this.onSearch,
+    required this.onBack,
     required this.onPickSources,
     required this.onGenerate,
+    required this.algorithmMode,
+    required this.algorithmLayout,
+    required this.algorithmDetail,
+    required this.colorfulNodes,
+    required this.clinicalNotes,
+    required this.onModeChanged,
+    required this.onLayoutChanged,
+    required this.onDetailChanged,
+    required this.onColorfulNodesChanged,
+    required this.onClinicalNotesChanged,
   });
 
   final DriveWorkspaceData data;
   final VoidCallback onSearch;
+  final VoidCallback onBack;
   final VoidCallback onPickSources;
   final VoidCallback onGenerate;
+  final String algorithmMode;
+  final String algorithmLayout;
+  final String algorithmDetail;
+  final bool colorfulNodes;
+  final bool clinicalNotes;
+  final ValueChanged<String> onModeChanged;
+  final ValueChanged<String> onLayoutChanged;
+  final ValueChanged<String> onDetailChanged;
+  final ValueChanged<bool> onColorfulNodesChanged;
+  final ValueChanged<bool> onClinicalNotesChanged;
 
   @override
   Widget build(BuildContext context) {
     return _BaseForcePage(
-      title: 'Akış Şeması &\nAlgoritma',
+      title: 'Ak\u0131\u015F \u015Eemas\u0131 &\nAlgoritma',
       subtitle:
-          'Klinik süreçlerinizi görsel akış şemaları ve\nalgoritmalar ile yapılandırın.',
+          'Klinik s\xFCre\xE7lerinizi g\xF6rsel ak\u0131\u015F \u015Femalar\u0131 ve\nalgoritmalar ile yap\u0131land\u0131r\u0131n.',
       onSearch: onSearch,
+      onBack: onBack,
       children: [
         _SelectedSourceChips(data: data, onPickSources: onPickSources),
         const SizedBox(height: 14),
         _BasePanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text('Çıktı Ayarları', style: _titleStyle),
-              SizedBox(height: 16),
+            children: [
+              const Text('\xC7\u0131kt\u0131 Ayarlar\u0131', style: _titleStyle),
+              const SizedBox(height: 16),
               _SettingGridRow(
-                label: 'Çıktı Modu',
+                label: '\xC7\u0131kt\u0131 Modu',
                 children: [
                   _SegmentButton(
-                    label: 'Tanı Algoritması',
+                    label: 'Tan\u0131 Algoritmas\u0131',
                     icon: Icons.account_tree_outlined,
-                    selected: true,
+                    selected: algorithmMode == 'Tan\u0131 Algoritmas\u0131',
+                    onTap: () => onModeChanged('Tan\u0131 Algoritmas\u0131'),
                   ),
                   _SegmentButton(
-                    label: 'Tedavi Akışı',
+                    label: 'Tedavi Ak\u0131\u015F\u0131',
                     icon: Icons.polyline_rounded,
+                    selected: algorithmMode == 'Tedavi Ak\u0131\u015F\u0131',
+                    onTap: () => onModeChanged('Tedavi Ak\u0131\u015F\u0131'),
                   ),
                   _SegmentButton(
-                    label: 'Karar Ağacı',
+                    label: 'Karar A\u011Fac\u0131',
                     icon: Icons.device_hub_rounded,
+                    selected: algorithmMode == 'Karar A\u011Fac\u0131',
+                    onTap: () => onModeChanged('Karar A\u011Fac\u0131'),
                   ),
                 ],
               ),
               _SettingGridRow(
-                label: 'Yerleşim Yönü',
+                label: 'Yerle\u015Fim Y\xF6n\xFC',
                 children: [
                   _SegmentButton(
                     label: 'Dikey',
                     icon: Icons.tune_rounded,
-                    selected: true,
+                    selected: algorithmLayout == 'Dikey',
+                    onTap: () => onLayoutChanged('Dikey'),
                   ),
                   _SegmentButton(
                     label: 'Yatay',
                     icon: Icons.view_week_outlined,
+                    selected: algorithmLayout == 'Yatay',
+                    onTap: () => onLayoutChanged('Yatay'),
                   ),
                 ],
               ),
               _SettingGridRow(
                 label: 'Detay Seviyesi',
                 children: [
-                  _SegmentButton(label: 'Basit', icon: Icons.adjust_rounded),
+                  _SegmentButton(
+                    label: 'Basit',
+                    icon: Icons.adjust_rounded,
+                    selected: algorithmDetail == 'Basit',
+                    onTap: () => onDetailChanged('Basit'),
+                  ),
                   _SegmentButton(
                     label: 'Orta',
                     icon: Icons.center_focus_strong_rounded,
-                    selected: true,
+                    selected: algorithmDetail == 'Orta',
+                    onTap: () => onDetailChanged('Orta'),
                   ),
                   _SegmentButton(
-                    label: 'Ayrıntılı',
+                    label: 'Ayr\u0131nt\u0131l\u0131',
                     icon: Icons.format_list_bulleted_rounded,
+                    selected: algorithmDetail == 'Ayr\u0131nt\u0131l\u0131',
+                    onTap: () => onDetailChanged('Ayr\u0131nt\u0131l\u0131'),
                   ),
                 ],
               ),
-              _ToggleLine(label: 'Renkli Düğümler'),
-              _ToggleLine(label: 'Klinik Not Ekle'),
+              _ToggleLine(
+                label: 'Renkli D\xFC\u011F\xFCmler',
+                initialValue: colorfulNodes,
+                onChanged: onColorfulNodesChanged,
+              ),
+              _ToggleLine(
+                label: 'Klinik Not Ekle',
+                initialValue: clinicalNotes,
+                onChanged: onClinicalNotesChanged,
+              ),
             ],
           ),
         ),
@@ -1504,6 +1803,7 @@ class _ComparisonFactoryScreen extends StatelessWidget {
   const _ComparisonFactoryScreen({
     required this.data,
     required this.onSearch,
+    required this.onBack,
     required this.onPickSources,
     required this.onGenerate,
     required this.onOpenResult,
@@ -1511,6 +1811,7 @@ class _ComparisonFactoryScreen extends StatelessWidget {
 
   final DriveWorkspaceData data;
   final VoidCallback onSearch;
+  final VoidCallback onBack;
   final VoidCallback onPickSources;
   final VoidCallback onGenerate;
   final VoidCallback onOpenResult;
@@ -1518,10 +1819,11 @@ class _ComparisonFactoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _BaseForcePage(
-      title: 'Karşılaştırma Tablosu',
+      title: 'Kar\u015F\u0131la\u015Ft\u0131rma Tablosu',
       subtitle:
-          'Seçtiğiniz kaynakları ve konuları karşılaştırın, farkları net şekilde görün.',
+          'Se\xE7ti\u011Finiz kaynaklar\u0131 ve konular\u0131 kar\u015F\u0131la\u015Ft\u0131r\u0131n, farklar\u0131 net \u015Fekilde g\xF6r\xFCn.',
       onSearch: onSearch,
+      onBack: onBack,
       heroTight: true,
       children: [
         _BasePanel(
@@ -1614,6 +1916,9 @@ class _QueueScreen extends StatelessWidget {
   const _QueueScreen({
     required this.data,
     required this.onSearch,
+    required this.onBack,
+    required this.queueFilter,
+    required this.onFilterChanged,
     required this.onOpenResult,
     required this.onRetry,
     required this.onStop,
@@ -1621,16 +1926,52 @@ class _QueueScreen extends StatelessWidget {
 
   final DriveWorkspaceData data;
   final VoidCallback onSearch;
+  final VoidCallback onBack;
+  final String queueFilter;
+  final ValueChanged<String> onFilterChanged;
   final VoidCallback onOpenResult;
   final VoidCallback onRetry;
   final VoidCallback onStop;
 
   @override
   Widget build(BuildContext context) {
+    final allRows = <_QueueRow>[];
+    for (final file in data.recentFiles) {
+      if (file.generated.isNotEmpty) {
+        for (final gen in file.generated) {
+          allRows.add(
+            _QueueRow(
+              source: _BFSource(
+                id: file.id,
+                name: file.title,
+                kind: file.kind,
+                size: file.sizeLabel,
+                pages: file.pageLabel,
+                subject: file.courseTitle,
+                time: 'Az \xF6nce',
+              ),
+              title: gen.title,
+              complete: true,
+              failed: false,
+              progress: 1,
+              time: gen.updatedLabel,
+              filterStatus: 'Tamamland\u0131',
+              onAction: onOpenResult,
+            ),
+          );
+        }
+      }
+    }
+
+    final filteredRows = queueFilter == 'T\xFCm\xFC'
+        ? allRows
+        : allRows.where((r) => r.filterStatus == queueFilter).toList();
+
     return _BaseForcePage(
-      title: 'Üretim Kuyruğu',
-      subtitle: 'Başlatılan üretimleri tek yerden takip et.',
+      title: '\xDcretim Kuyru\u011Fu',
+      subtitle: 'Ba\u015Flat\u0131lan \xFCretimleri tek yerden takip et.',
       onSearch: onSearch,
+      onBack: onBack,
       heroTight: true,
       children: [
         const _ResponsiveGrid(
@@ -1640,21 +1981,21 @@ class _QueueScreen extends StatelessWidget {
               icon: Icons.play_circle_outline_rounded,
               title: 'Devam Eden',
               value: '2',
-              subtitle: 'İşleniyor',
+              subtitle: '\u0130\u015Fleniyor',
               color: AppColors.blue,
             ),
             _QueueMetric(
               icon: Icons.check_circle_rounded,
-              title: 'Tamamlandı',
+              title: 'Tamamland\u0131',
               value: '2',
-              subtitle: 'Başarıyla bitti',
+              subtitle: 'Ba\u015Far\u0131yla bitti',
               color: AppColors.green,
             ),
             _QueueMetric(
               icon: Icons.error_rounded,
               title: 'Beklemede',
               value: '1',
-              subtitle: 'Sırada bekliyor',
+              subtitle: 'S\u0131rada bekliyor',
               color: AppColors.orange,
             ),
           ],
@@ -1663,34 +2004,34 @@ class _QueueScreen extends StatelessWidget {
         Wrap(
           spacing: 12,
           runSpacing: 10,
-          children: const [
-            _QueueFilter(label: 'Tümü', selected: true),
-            _QueueFilter(label: 'İşleniyor', dot: AppColors.blue),
-            _QueueFilter(label: 'Tamamlandı', dot: AppColors.green),
-            _QueueFilter(label: 'Hata', dot: AppColors.red),
+          children: [
+            _QueueFilter(
+              label: 'T\xFCm\xFC',
+              selected: queueFilter == 'T\xFCm\xFC',
+              onTap: () => onFilterChanged('T\xFCm\xFC'),
+            ),
+            _QueueFilter(
+              label: '\u0130\u015Fleniyor',
+              dot: AppColors.blue,
+              selected: queueFilter == '\u0130\u015Fleniyor',
+              onTap: () => onFilterChanged('\u0130\u015Fleniyor'),
+            ),
+            _QueueFilter(
+              label: 'Tamamland\u0131',
+              dot: AppColors.green,
+              selected: queueFilter == 'Tamamland\u0131',
+              onTap: () => onFilterChanged('Tamamland\u0131'),
+            ),
+            _QueueFilter(
+              label: 'Hata',
+              dot: AppColors.red,
+              selected: queueFilter == 'Hata',
+              onTap: () => onFilterChanged('Hata'),
+            ),
           ],
         ),
         const SizedBox(height: 22),
-        for (final file in data.recentFiles)
-          if (file.generated.isNotEmpty)
-            for (final gen in file.generated)
-              _QueueRow(
-                source: _BFSource(
-                  id: file.id,
-                  name: file.title,
-                  kind: file.kind,
-                  size: file.sizeLabel,
-                  pages: file.pageLabel,
-                  subject: file.courseTitle,
-                  time: 'Az önce',
-                ),
-                title: gen.title,
-                complete: true,
-                failed: false,
-                progress: 1,
-                time: gen.updatedLabel,
-                onAction: onOpenResult,
-              ),
+        ...filteredRows,
       ],
     );
   }
@@ -1699,6 +2040,7 @@ class _QueueScreen extends StatelessWidget {
 class _FlashcardResultsScreen extends StatelessWidget {
   const _FlashcardResultsScreen({
     required this.onSearch,
+    required this.onBack,
     required this.onSave,
     required this.onExport,
     required this.onRegenerate,
@@ -1706,6 +2048,7 @@ class _FlashcardResultsScreen extends StatelessWidget {
   });
 
   final VoidCallback onSearch;
+  final VoidCallback onBack;
   final VoidCallback onSave;
   final VoidCallback onExport;
   final VoidCallback onRegenerate;
@@ -1714,108 +2057,32 @@ class _FlashcardResultsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _BaseForcePage(
-      title: 'Flashcard Sonuçları',
-      subtitle: 'Üretilen seti incele, düzenle ve\nkoleksiyonuna kaydet.',
+      title: 'Flashcard Sonu\xE7lar\u0131',
+      subtitle: '\xDcretilen seti incele, d\xFCzenle ve\nkoleksiyonuna kaydet.',
       art: _BaseForceArtKind.flashcards,
       onSearch: onSearch,
+      onBack: onBack,
       children: [
         _BasePanel(
-          child: Row(
-            children: [
-              _RoundGeneratedIcon(kind: GeneratedKind.flashcard, size: 78),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Farmakoloji Ders Notları Seti',
-                      style: TextStyle(
-                        color: AppColors.navy,
-                        fontSize: 21,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    Wrap(
-                      spacing: 14,
-                      runSpacing: 8,
-                      children: [
-                        _TinyMeta(
-                          icon: Icons.upload_outlined,
-                          label: '128 Kart',
-                        ),
-                        _TinyMeta(
-                          icon: Icons.attach_file_rounded,
-                          label: 'Farmakoloji Ders Notları.pdf',
-                        ),
-                        _TinyMeta(
-                          icon: Icons.calendar_today_outlined,
-                          label: 'Oluşturulma 24 May 2025 14:32',
-                        ),
-                      ],
-                    ),
-                  ],
+          padding: const EdgeInsets.all(22),
+          child: const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 18),
+              child: Text(
+                'Bu i\xE7erik hen\xFCz olu\u015Fturulmad\u0131.\nBir \xFCretim fabrikas\u0131ndan i\xE7erik \xFCretip\ng\xF6r\xFCnt\xFClemek i\xE7in \u201C\xDCret\u201D butonuna bas\u0131n.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 17,
+                  height: 1.45,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-            ],
+            ),
           ),
         ),
         const SizedBox(height: 16),
-        const _ResponsiveGrid(
-          minItemWidth: 160,
-          children: [
-            _LargeFilter(
-              label: 'Tümü',
-              icon: Icons.grid_view_rounded,
-              selected: true,
-            ),
-            _LargeFilter(
-              label: 'Yeni',
-              icon: Icons.auto_awesome_rounded,
-              color: AppColors.green,
-            ),
-            _LargeFilter(
-              label: 'İşaretli',
-              icon: Icons.bookmark_border_rounded,
-              color: AppColors.orange,
-            ),
-            _LargeFilter(
-              label: 'Öğrenilecek',
-              icon: Icons.school_outlined,
-              color: AppColors.purple,
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        const _FlashcardResultRow(
-          index: '1 / 128',
-          front: 'Beta blokerlerin temel etki\nmekanizması nedir?',
-          back:
-              'Beta-adrenerjik reseptörleri bloke\nederek kalp hızını ve kontraktiliteyi\nazaltırlar.',
-        ),
-        const _FlashcardResultRow(
-          index: '2 / 128',
-          front: 'Warfarin hangi vitamini\nantagonize eder?',
-          back: 'K vitamini.',
-        ),
-        const _FlashcardResultRow(
-          index: '3 / 128',
-          front: 'ACE inhibitörlerinin yaygın bir\nyan etkisi nedir?',
-          back: 'Kuru öksürük.',
-        ),
-        const SizedBox(height: 8),
-        const _Dots(),
-        const SizedBox(height: 18),
-        const _ResponsiveGrid(
-          minItemWidth: 240,
-          children: [
-            _DistributionCard(kind: 'topic'),
-            _DistributionCard(kind: 'difficulty'),
-            _HintCountCard(),
-          ],
-        ),
-        _SectionHeader(title: 'Hızlı Aksiyonlar'),
+        _SectionHeader(title: 'H\u0131zl\u0131 Aksiyonlar'),
         _ResponsiveGrid(
           minItemWidth: 165,
           children: [
@@ -1861,6 +2128,7 @@ class _AllGenerationsScreen extends StatelessWidget {
     required this.data,
     required this.selectedFilter,
     required this.onSearch,
+    required this.onBack,
     required this.onFilter,
     required this.onOpenResult,
     required this.onRegenerate,
@@ -1871,6 +2139,7 @@ class _AllGenerationsScreen extends StatelessWidget {
   final DriveWorkspaceData data;
   final String selectedFilter;
   final VoidCallback onSearch;
+  final VoidCallback onBack;
   final ValueChanged<String> onFilter;
   final VoidCallback onOpenResult;
   final VoidCallback onRegenerate;
@@ -1893,15 +2162,16 @@ class _AllGenerationsScreen extends StatelessWidget {
         )
         .toList();
 
-    final visible = selectedFilter == 'Tümü'
+    final visible = selectedFilter == 'T\xFCm\xFC'
         ? allGenerations
         : allGenerations.where((row) => row.kind == selectedFilter).toList();
 
     return _BaseForcePage(
-      title: 'Tüm Üretimler',
+      title: 'T\xFCm \xDcretimler',
       subtitle:
-          'Oluşturduğun tüm çıktıları düzenle, görüntüle\nve yeniden kullan.',
+          'Olu\u015Fturdu\u011Fun t\xFCm \xE7\u0131kt\u0131lar\u0131 d\xFCzenle, g\xF6r\xFCnt\xFCle\nve yeniden kullan.',
       onSearch: onSearch,
+      onBack: onBack,
       heroTight: true,
       children: [
         _BasePanel(
@@ -1953,7 +2223,7 @@ class _AllGenerationsScreen extends StatelessWidget {
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
-            onPressed: () => _showBaseForceToast(context, 'Sıralama: en yeni.'),
+            onPressed: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
             child: const Text(
               'Sırala:  En Yeni ⌄',
               style: TextStyle(
@@ -2533,7 +2803,10 @@ class _SourceFilter extends StatelessWidget {
         ? AppColors.blue
         : FileKindBadge.kindColor(kind!);
     return InkWell(
-      onTap: () => _showBaseForceToast(context, '$label filtresi uygulandı.'),
+      onTap: () => _showBaseForceToast(
+        context,
+        'Bu \xF6zellik hen\xFCz haz\u0131r de\u011Fil.',
+      ),
       borderRadius: BorderRadius.circular(18),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
@@ -3228,7 +3501,7 @@ class _SegmentButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: onTap ?? () => _showBaseForceToast(context, '$label seçildi.'),
+      onTap: onTap ?? () => _showBaseForceToast(context, 'Bu \xF6zellik hen\xFCz haz\u0131r de\u011Fil.'),
       borderRadius: BorderRadius.circular(9),
       child: Container(
         height: 50,
@@ -3273,10 +3546,15 @@ class _SegmentButton extends StatelessWidget {
 }
 
 class _StepperSetting extends StatefulWidget {
-  const _StepperSetting({required this.label, required this.value});
+  const _StepperSetting({
+    required this.label,
+    required this.value,
+    this.onChanged,
+  });
 
   final String label;
   final String value;
+  final ValueChanged<int>? onChanged;
 
   @override
   State<_StepperSetting> createState() => _StepperSettingState();
@@ -3291,8 +3569,21 @@ class _StepperSettingState extends State<_StepperSetting> {
     value = int.tryParse(widget.value) ?? 0;
   }
 
+  @override
+  void didUpdateWidget(covariant _StepperSetting oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value != oldWidget.value) {
+      final parsed = int.tryParse(widget.value);
+      if (parsed != null && parsed != value) {
+        value = parsed;
+      }
+    }
+  }
+
   void _change(int delta) {
-    setState(() => value = math.max(1, value + delta));
+    final next = math.max(1, value + delta);
+    setState(() => value = next);
+    widget.onChanged?.call(next);
   }
 
   @override
@@ -3348,11 +3639,13 @@ class _DifficultyChip extends StatefulWidget {
     required this.label,
     required this.color,
     this.selected = false,
+    this.onTap,
   });
 
   final String label;
   final Color color;
   final bool selected;
+  final VoidCallback? onTap;
 
   @override
   State<_DifficultyChip> createState() => _DifficultyChipState();
@@ -3368,9 +3661,21 @@ class _DifficultyChipState extends State<_DifficultyChip> {
   }
 
   @override
+  void didUpdateWidget(covariant _DifficultyChip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selected != oldWidget.selected) {
+      selected = widget.selected;
+    }
+  }
+
+  void _toggle() {
+    widget.onTap?.call();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => setState(() => selected = !selected),
+      onTap: _toggle,
       borderRadius: BorderRadius.circular(9),
       child: Container(
         height: 42,
@@ -3408,16 +3713,37 @@ class _DifficultyChipState extends State<_DifficultyChip> {
 }
 
 class _ToggleLine extends StatefulWidget {
-  const _ToggleLine({required this.label});
+  const _ToggleLine({required this.label, this.initialValue = true, this.onChanged});
 
   final String label;
+  final bool initialValue;
+  final ValueChanged<bool>? onChanged;
 
   @override
   State<_ToggleLine> createState() => _ToggleLineState();
 }
 
 class _ToggleLineState extends State<_ToggleLine> {
-  bool enabled = true;
+  late bool enabled;
+
+  @override
+  void initState() {
+    super.initState();
+    enabled = widget.initialValue;
+  }
+
+  @override
+  void didUpdateWidget(covariant _ToggleLine oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialValue != oldWidget.initialValue) {
+      enabled = widget.initialValue;
+    }
+  }
+
+  void _toggle(bool value) {
+    setState(() => enabled = value);
+    widget.onChanged?.call(value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3440,7 +3766,7 @@ class _ToggleLineState extends State<_ToggleLine> {
             activeThumbColor: Colors.white,
             activeTrackColor: AppColors.blue,
             inactiveThumbColor: Colors.white,
-            onChanged: (value) => setState(() => enabled = value),
+            onChanged: (value) => _toggle(value),
           ),
         ],
       ),
@@ -3647,7 +3973,7 @@ class _TagChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => _showBaseForceToast(context, '$label güncellendi.'),
+      onTap: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
       borderRadius: BorderRadius.circular(18),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -3837,23 +4163,37 @@ class _ExplanationPreview extends StatelessWidget {
 }
 
 class _SummaryOptionPanel extends StatelessWidget {
-  const _SummaryOptionPanel();
+  const _SummaryOptionPanel({required this.selectedLength, required this.onLengthChanged});
+
+  final String selectedLength;
+  final ValueChanged<String> onLengthChanged;
 
   @override
   Widget build(BuildContext context) {
     return _BasePanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          _PanelTitle(icon: Icons.description_outlined, title: 'Özet Uzunluğu'),
-          SizedBox(height: 16),
+        children: [
+          const _PanelTitle(icon: Icons.description_outlined, title: '\xD6zet Uzunlu\u011Fu'),
+          const SizedBox(height: 16),
           _RadioOption(
             title: '1 sayfa',
-            subtitle: 'Kompakt ve odaklı',
-            selected: true,
+            subtitle: 'Kompakt ve odakl\u0131',
+            selected: selectedLength == '1 sayfa',
+            onTap: (selected) => onLengthChanged('1 sayfa'),
           ),
-          _RadioOption(title: '3 sayfa', subtitle: 'Daha detaylı özet'),
-          _RadioOption(title: 'Ultra kısa', subtitle: 'En kısa format'),
+          _RadioOption(
+            title: '3 sayfa',
+            subtitle: 'Daha detayl\u0131 \xF6zet',
+            selected: selectedLength == '3 sayfa',
+            onTap: (selected) => onLengthChanged('3 sayfa'),
+          ),
+          _RadioOption(
+            title: 'Ultra k\u0131sa',
+            subtitle: 'En k\u0131sa format',
+            selected: selectedLength == 'Ultra k\u0131sa',
+            onTap: (selected) => onLengthChanged('Ultra k\u0131sa'),
+          ),
         ],
       ),
     );
@@ -3861,28 +4201,36 @@ class _SummaryOptionPanel extends StatelessWidget {
 }
 
 class _FocusOptionPanel extends StatelessWidget {
-  const _FocusOptionPanel();
+  const _FocusOptionPanel({required this.selectedFocus, required this.onFocusChanged});
+
+  final String selectedFocus;
+  final ValueChanged<String> onFocusChanged;
 
   @override
   Widget build(BuildContext context) {
     return _BasePanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          _PanelTitle(icon: Icons.track_changes_rounded, title: 'Odak Modu'),
-          SizedBox(height: 16),
+        children: [
+          const _PanelTitle(icon: Icons.track_changes_rounded, title: 'Odak Modu'),
+          const SizedBox(height: 16),
           _RadioOption(
-            title: 'Yüksek Olasılıklı Sorular',
-            subtitle: 'Çıkma ihtimali yüksek konular',
-            selected: true,
+            title: 'Y\xFCksek Olas\u0131l\u0131kl\u0131 Sorular',
+            subtitle: '\xC7\u0131kma ihtimali y\xFCksek konular',
+            selected: selectedFocus == 'Y\xFCksek Olas\u0131l\u0131kl\u0131 Sorular',
+            onTap: (selected) => onFocusChanged('Y\xFCksek Olas\u0131l\u0131kl\u0131 Sorular'),
           ),
           _RadioOption(
             title: 'Kritik Noktalar',
-            subtitle: 'En önemli kavramlar',
+            subtitle: 'En \xF6nemli kavramlar',
+            selected: selectedFocus == 'Kritik Noktalar',
+            onTap: (selected) => onFocusChanged('Kritik Noktalar'),
           ),
           _RadioOption(
-            title: 'Hoca Vurguları',
-            subtitle: 'Öğretmenin vurguladıkları',
+            title: 'Hoca Vurgular\u0131',
+            subtitle: '\xD6\u011Fretmenin vurgulad\u0131klar\u0131',
+            selected: selectedFocus == 'Hoca Vurgular\u0131',
+            onTap: (selected) => onFocusChanged('Hoca Vurgular\u0131'),
           ),
         ],
       ),
@@ -3891,21 +4239,47 @@ class _FocusOptionPanel extends StatelessWidget {
 }
 
 class _HighlightOptionPanel extends StatelessWidget {
-  const _HighlightOptionPanel();
+  const _HighlightOptionPanel({
+    required this.markTerms,
+    required this.toTable,
+    required this.checklist,
+    required this.onMarkTermsChanged,
+    required this.onToTableChanged,
+    required this.onChecklistChanged,
+  });
+
+  final bool markTerms;
+  final bool toTable;
+  final bool checklist;
+  final ValueChanged<bool> onMarkTermsChanged;
+  final ValueChanged<bool> onToTableChanged;
+  final ValueChanged<bool> onChecklistChanged;
 
   @override
   Widget build(BuildContext context) {
     return _BasePanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          _PanelTitle(icon: Icons.edit_outlined, title: 'Vurgu Seçenekleri'),
-          SizedBox(height: 22),
-          _ToggleLine(label: 'Anahtar terimleri işaretle'),
-          Divider(color: AppColors.softLine),
-          _ToggleLine(label: 'Tabloya çevir'),
-          Divider(color: AppColors.softLine),
-          _ToggleLine(label: 'Mini check-list ekle'),
+        children: [
+          const _PanelTitle(icon: Icons.edit_outlined, title: 'Vurgu Se\xE7enekleri'),
+          const SizedBox(height: 22),
+          _ToggleLine(
+            label: 'Anahtar terimleri i\u015Faretle',
+            initialValue: markTerms,
+            onChanged: onMarkTermsChanged,
+          ),
+          const Divider(color: AppColors.softLine),
+          _ToggleLine(
+            label: 'Tabloya \xE7evir',
+            initialValue: toTable,
+            onChanged: onToTableChanged,
+          ),
+          const Divider(color: AppColors.softLine),
+          _ToggleLine(
+            label: 'Mini check-list ekle',
+            initialValue: checklist,
+            onChanged: onChecklistChanged,
+          ),
         ],
       ),
     );
@@ -3917,11 +4291,13 @@ class _RadioOption extends StatefulWidget {
     required this.title,
     required this.subtitle,
     this.selected = false,
+    this.onTap,
   });
 
   final String title;
   final String subtitle;
   final bool selected;
+  final ValueChanged<bool>? onTap;
 
   @override
   State<_RadioOption> createState() => _RadioOptionState();
@@ -3937,9 +4313,21 @@ class _RadioOptionState extends State<_RadioOption> {
   }
 
   @override
+  void didUpdateWidget(covariant _RadioOption oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selected != oldWidget.selected) {
+      selected = widget.selected;
+    }
+  }
+
+  void _toggle() {
+    widget.onTap?.call(selected);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => setState(() => selected = !selected),
+      onTap: _toggle,
       borderRadius: BorderRadius.circular(9),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -4583,7 +4971,7 @@ class _ComparisonSourceLine extends StatelessWidget {
           IconButton(
             tooltip: 'Kaynağı kaldır',
             onPressed: () =>
-                _showBaseForceToast(context, '${source.name} kaldırıldı.'),
+                _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
             icon: const Icon(Icons.close_rounded, color: AppColors.navy),
             visualDensity: VisualDensity.compact,
           ),
@@ -4618,7 +5006,7 @@ class _TopicButtonState extends State<_TopicButton> {
     return InkWell(
       onTap: () {
         if (widget.label.isEmpty) {
-          _showBaseForceToast(context, 'Konu listesi açıldı.');
+          _showBaseForceToast(context, 'Bu özellik henüz hazır değil.');
           return;
         }
         setState(() => selected = !selected);
@@ -4711,7 +5099,7 @@ class _DropdownBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => _showBaseForceToast(context, '$label seçenekleri açıldı.'),
+      onTap: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -4969,15 +5357,24 @@ class _QueueMetric extends StatelessWidget {
 }
 
 class _QueueFilter extends StatelessWidget {
-  const _QueueFilter({required this.label, this.selected = false, this.dot});
+  const _QueueFilter({
+    required this.label,
+    this.selected = false,
+    this.dot,
+    this.onTap,
+  });
 
   final String label;
   final bool selected;
   final Color? dot;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
       height: 54,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: BoxDecoration(
@@ -5002,6 +5399,7 @@ class _QueueFilter extends StatelessWidget {
           ),
         ],
       ),
+      ),
     );
   }
 }
@@ -5015,6 +5413,7 @@ class _QueueRow extends StatelessWidget {
     this.progress,
     this.complete = false,
     this.failed = false,
+    this.filterStatus = '',
   });
 
   final _BFSource source;
@@ -5024,6 +5423,7 @@ class _QueueRow extends StatelessWidget {
   final double? progress;
   final bool complete;
   final bool failed;
+  final String filterStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -5236,183 +5636,11 @@ class _QueueRow extends StatelessWidget {
   }
 }
 
-class _TinyMeta extends StatelessWidget {
-  const _TinyMeta({required this.icon, required this.label});
 
-  final IconData icon;
-  final String label;
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: AppColors.muted, size: 20),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.navy,
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
-}
 
-class _LargeFilter extends StatelessWidget {
-  const _LargeFilter({
-    required this.label,
-    required this.icon,
-    this.selected = false,
-    this.color = AppColors.blue,
-  });
 
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final Color color;
 
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => _showBaseForceToast(context, '$label filtresi açıldı.'),
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        height: 58,
-        decoration: BoxDecoration(
-          color: selected ? AppColors.blue : Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: selected ? AppColors.blue : AppColors.line),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: AppColors.blue.withValues(alpha: .18),
-                    blurRadius: 14,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: selected ? Colors.white : color, size: 22),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: selected ? Colors.white : color,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FlashcardResultRow extends StatelessWidget {
-  const _FlashcardResultRow({
-    required this.index,
-    required this.front,
-    required this.back,
-  });
-
-  final String index;
-  final String front;
-  final String back;
-
-  @override
-  Widget build(BuildContext context) {
-    final indexBadge = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.navy.withValues(alpha: .06),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: Text(
-        index,
-        style: const TextStyle(
-          color: AppColors.muted,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: _BasePanel(
-        padding: const EdgeInsets.fromLTRB(24, 18, 18, 10),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final bookmark = IconButton(
-              tooltip: 'İşaretle',
-              onPressed: () =>
-                  _showBaseForceToast(context, '$index işaretlendi.'),
-              icon: const Icon(
-                Icons.bookmark_border_rounded,
-                color: AppColors.muted,
-                size: 28,
-              ),
-              visualDensity: VisualDensity.compact,
-            );
-            if (constraints.maxWidth < 620) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Align(alignment: Alignment.centerRight, child: bookmark),
-                  _FaceColumn(label: 'Ön Yüz', text: front),
-                  const Divider(height: 28, color: AppColors.line),
-                  _FaceColumn(label: 'Arka Yüz', text: back),
-                  const SizedBox(height: 8),
-                  Center(child: indexBadge),
-                ],
-              );
-            }
-            return Stack(
-              alignment: Alignment.bottomCenter,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _FaceColumn(label: 'Ön Yüz', text: front),
-                    ),
-                    Container(
-                      width: 1,
-                      height: 110,
-                      margin: const EdgeInsets.symmetric(horizontal: 20),
-                      color: AppColors.line,
-                    ),
-                    Expanded(
-                      child: _FaceColumn(label: 'Arka Yüz', text: back),
-                    ),
-                    const SizedBox(width: 14),
-                    bookmark,
-                  ],
-                ),
-                indexBadge,
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
 
 class _FaceColumn extends StatelessWidget {
   const _FaceColumn({required this.label, required this.text});
@@ -5455,161 +5683,11 @@ class _FaceColumn extends StatelessWidget {
   }
 }
 
-class _Dots extends StatelessWidget {
-  const _Dots();
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(
-        3,
-        (index) => Container(
-          width: 12,
-          height: 12,
-          margin: const EdgeInsets.symmetric(horizontal: 7),
-          decoration: BoxDecoration(
-            color: index == 0 ? AppColors.blue : AppColors.line,
-            shape: BoxShape.circle,
-          ),
-        ),
-      ),
-    );
-  }
-}
 
-class _DistributionCard extends StatelessWidget {
-  const _DistributionCard({required this.kind});
 
-  final String kind;
 
-  @override
-  Widget build(BuildContext context) {
-    return _BasePanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            kind == 'topic' ? 'Konu Dağılımı' : 'Zorluk Dağılımı',
-            style: const TextStyle(
-              color: AppColors.navy,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (kind == 'topic')
-            Row(
-              children: [
-                SizedBox(
-                  width: 104,
-                  height: 104,
-                  child: CustomPaint(painter: _PiePainter()),
-                ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Column(
-                    children: [
-                      _LegendLine(
-                        color: AppColors.blue,
-                        label: 'Kardiyoloji',
-                        value: '35%',
-                      ),
-                      _LegendLine(
-                        color: AppColors.cyan,
-                        label: 'Farmakoloji',
-                        value: '25%',
-                      ),
-                      _LegendLine(
-                        color: AppColors.purple,
-                        label: 'Nöroloji',
-                        value: '20%',
-                      ),
-                      _LegendLine(
-                        color: AppColors.orange,
-                        label: 'Endokrinoloji',
-                        value: '12%',
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            )
-          else
-            const Column(
-              children: [
-                _BarLine(label: 'Kolay', value: .4, color: AppColors.green),
-                _BarLine(label: 'Orta', value: .4, color: AppColors.orange),
-                _BarLine(label: 'Zor', value: .2, color: AppColors.purple),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-}
 
-class _HintCountCard extends StatelessWidget {
-  const _HintCountCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return _BasePanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Text(
-            'İpucu Ekli Sayısı',
-            style: TextStyle(
-              color: AppColors.navy,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          SizedBox(height: 22),
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 36,
-                backgroundColor: Color(0xFFEDE5FF),
-                child: Icon(
-                  Icons.lightbulb_outline_rounded,
-                  color: AppColors.purple,
-                  size: 36,
-                ),
-              ),
-              SizedBox(width: 18),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '42',
-                      style: TextStyle(
-                        color: AppColors.navy,
-                        fontSize: 38,
-                        fontWeight: FontWeight.w900,
-                        height: 1,
-                      ),
-                    ),
-                    Text(
-                      'Toplam Kart içinde\n%32.8',
-                      style: TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 13,
-                        height: 1.25,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _PiePainter extends CustomPainter {
   @override
@@ -6071,7 +6149,7 @@ class _MoreMenuButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       tooltip: 'Diğer işlemler',
-      onPressed: () => _showBaseForceToast(context, 'Diğer işlemler açıldı.'),
+      onPressed: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
       icon: Icon(Icons.more_vert_rounded, color: color),
       visualDensity: VisualDensity.compact,
     );

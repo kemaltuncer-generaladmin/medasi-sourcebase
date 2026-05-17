@@ -4,7 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../data/drive_models.dart';
 import '../widgets/drive_ui.dart';
 
-class FolderScreen extends StatelessWidget {
+class FolderScreen extends StatefulWidget {
   const FolderScreen({
     required this.course,
     required this.section,
@@ -25,10 +25,54 @@ class FolderScreen extends StatelessWidget {
   final VoidCallback onOpenCollections;
 
   @override
+  State<FolderScreen> createState() => _FolderScreenState();
+}
+
+class _FolderScreenState extends State<FolderScreen> {
+  final Set<String> _selectedIds = {};
+
+  bool get _hasSelection => _selectedIds.isNotEmpty;
+
+  void _toggleSelect(DriveFile file) {
+    setState(() {
+      if (_selectedIds.contains(file.id)) {
+        _selectedIds.remove(file.id);
+      } else {
+        _selectedIds.add(file.id);
+      }
+    });
+  }
+
+  void _selectAll() {
+    setState(() {
+      if (_selectedIds.length == widget.section.files.length) {
+        _selectedIds.clear();
+      } else {
+        _selectedIds.addAll(widget.section.files.map((f) => f.id));
+      }
+    });
+  }
+
+  void _clearSelection() {
+    setState(() => _selectedIds.clear());
+  }
+
+  void _showNotImplemented(String feature) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$feature özelliği yakında aktif olacak.'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return WorkspaceScroll(
       children: [
-        DriveTopBar(title: 'Drive', onSearch: onSearch),
+        DriveTopBar(title: 'Drive', onSearch: widget.onSearch),
         Row(
           children: [
             Container(
@@ -41,7 +85,7 @@ class FolderScreen extends StatelessWidget {
               ),
               child: IconButton(
                 padding: EdgeInsets.zero,
-                onPressed: onBack,
+                onPressed: widget.onBack,
                 icon: const Icon(Icons.chevron_left_rounded, size: 30),
                 color: AppColors.navy,
               ),
@@ -52,7 +96,7 @@ class FolderScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    section.title,
+                    widget.section.title,
                     style: const TextStyle(
                       color: AppColors.navy,
                       fontSize: 32,
@@ -60,7 +104,7 @@ class FolderScreen extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${course.title}  ›  Bölüm',
+                    '${widget.course.title}  ›  Bölüm',
                     style: const TextStyle(
                       color: AppColors.muted,
                       fontSize: 17,
@@ -80,7 +124,7 @@ class FolderScreen extends StatelessWidget {
               child: SBPrimaryButton(
                 label: 'Dosya Yükle',
                 icon: Icons.add_rounded,
-                onPressed: onOpenUploads,
+                onPressed: widget.onOpenUploads,
                 size: SBButtonSize.medium,
                 fullWidth: false,
               ),
@@ -89,9 +133,11 @@ class FolderScreen extends StatelessWidget {
             SizedBox(
               width: 95,
               child: SBSecondaryButton(
-                label: 'Seç',
-                icon: Icons.select_all_rounded,
-                onPressed: () {},
+                label: _hasSelection ? 'Seçimi Kaldır' : 'Tümünü Seç',
+                icon: _hasSelection
+                    ? Icons.deselect_rounded
+                    : Icons.select_all_rounded,
+                onPressed: _selectAll,
                 size: SBButtonSize.medium,
                 fullWidth: false,
               ),
@@ -99,11 +145,14 @@ class FolderScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 18),
-        _Toolbar(),
+        _Toolbar(
+          onFilter: () => _showNotImplemented('Filtreleme'),
+          onSort: () => _showNotImplemented('Sıralama'),
+        ),
         const SizedBox(height: 18),
         _HeaderRow(),
         const SizedBox(height: 10),
-        if (section.files.isEmpty)
+        if (widget.section.files.isEmpty)
           const GlassPanel(
             child: EmptyState(
               message: 'Bu bölümde henüz dosya yok.',
@@ -111,33 +160,47 @@ class FolderScreen extends StatelessWidget {
             ),
           )
         else
-          for (final file in section.files) ...[
-            _FileListRow(file: file, onTap: () => onOpenFile(file)),
+          for (final file in widget.section.files) ...[
+            _FileListRow(
+              file: file,
+              selected: _selectedIds.contains(file.id),
+              onTap: () => widget.onOpenFile(file),
+              onToggleSelect: () => _toggleSelect(file),
+            ),
             const SizedBox(height: 12),
           ],
-        _SelectionTray(onOpenCollections: onOpenCollections),
+        if (_hasSelection)
+          _SelectionTray(
+            selectedCount: _selectedIds.length,
+            onOpenCollections: widget.onOpenCollections,
+            onMove: () => _showNotImplemented('Taşıma'),
+            onDelete: () => _showNotImplemented('Silme'),
+            onClear: _clearSelection,
+          ),
         SectionTitle(
           title: 'Akıllı Öneriler',
-          actionLabel: 'Tümünü Gör',
-          onAction: () {},
+          actionLabel: null,
+          onAction: null,
         ),
         GlassPanel(
           padding: const EdgeInsets.all(12),
           child: Column(
-            children: const [
+            children: [
               _SuggestionRow(
                 icon: Icons.description_outlined,
                 color: AppColors.purple,
                 title: 'Bu bölüm için sınav sabahı özeti üret',
                 subtitle:
                     'Önemli noktaları çıkarıp hızlı bir özet hazırlayabilirsin.',
+                onTap: () => _showNotImplemented('Özet üretimi'),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               _SuggestionRow(
                 icon: Icons.style_outlined,
                 color: Color(0xFF21C56B),
                 title: 'Yüklediğin PDF dosyalarından flashcard üret',
                 subtitle: 'Ders çalışma verimliliğini artırmak için uygundur.',
+                onTap: () => _showNotImplemented('Flashcard üretimi'),
               ),
             ],
           ),
@@ -148,14 +211,19 @@ class FolderScreen extends StatelessWidget {
 }
 
 class _Toolbar extends StatelessWidget {
+  const _Toolbar({required this.onFilter, required this.onSort});
+
+  final VoidCallback onFilter;
+  final VoidCallback onSort;
+
   @override
   Widget build(BuildContext context) {
     return GlassPanel(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       radius: 12,
-      child: const SingleChildScrollView(
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        physics: BouncingScrollPhysics(),
+        physics: const BouncingScrollPhysics(),
         child: Row(
           children: [
             _ToolbarItem(
@@ -163,15 +231,69 @@ class _Toolbar extends StatelessWidget {
               label: 'Liste',
               active: true,
             ),
-            SizedBox(width: 16),
-            _ToolbarItem(icon: Icons.grid_view_rounded, label: 'Grid'),
-            _Divider(),
-            _ToolbarItem(icon: Icons.filter_alt_outlined, label: 'Filtrele'),
-            _Divider(),
-            _ToolbarItem(icon: Icons.swap_vert_rounded, label: 'Sırala'),
-            Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.navy),
+            const SizedBox(width: 16),
+            _ToolbarItem(
+              icon: Icons.grid_view_rounded,
+              label: 'Grid',
+              onTap: () => _showGridNotImplemented(context),
+            ),
+            const _Divider(),
+            InkWell(
+              onTap: onFilter,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.filter_alt_outlined, color: AppColors.navy, size: 24),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Filtrele',
+                      style: TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const _Divider(),
+            InkWell(
+              onTap: onSort,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.swap_vert_rounded, color: AppColors.navy, size: 24),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Sırala',
+                      style: TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.navy),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showGridNotImplemented(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Grid görünümü yakında aktif olacak.'),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
       ),
     );
   }
@@ -182,15 +304,17 @@ class _ToolbarItem extends StatelessWidget {
     required this.icon,
     required this.label,
     this.active = false,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final bool active;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final child = Row(
       children: [
         Icon(icon, color: active ? AppColors.blue : AppColors.navy, size: 24),
         const SizedBox(width: 8),
@@ -203,6 +327,15 @@ class _ToolbarItem extends StatelessWidget {
           ),
         ),
       ],
+    );
+    if (onTap == null) return child;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: child,
+      ),
     );
   }
 }
@@ -253,10 +386,17 @@ class _HeaderRow extends StatelessWidget {
 }
 
 class _FileListRow extends StatelessWidget {
-  const _FileListRow({required this.file, required this.onTap});
+  const _FileListRow({
+    required this.file,
+    required this.selected,
+    required this.onTap,
+    required this.onToggleSelect,
+  });
 
   final DriveFile file;
+  final bool selected;
   final VoidCallback onTap;
+  final VoidCallback onToggleSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -273,10 +413,14 @@ class _FileListRow extends StatelessWidget {
               8,
               compact ? 12 : 14,
             ),
-            borderColor: file.selected ? const Color(0xFFB9D5FF) : null,
+            borderColor: selected ? const Color(0xFFB9D5FF) : null,
             child: Row(
               children: [
-                _SelectBox(selected: file.selected, compact: compact),
+                InkWell(
+                  onTap: onToggleSelect,
+                  borderRadius: BorderRadius.circular(6),
+                  child: _SelectBox(selected: selected, compact: compact),
+                ),
                 SizedBox(width: compact ? 8 : 14),
                 FileKindBadge(kind: file.kind, compact: compact),
                 SizedBox(width: compact ? 10 : 16),
@@ -429,9 +573,19 @@ class _MiniTag extends StatelessWidget {
 }
 
 class _SelectionTray extends StatelessWidget {
-  const _SelectionTray({required this.onOpenCollections});
+  const _SelectionTray({
+    required this.selectedCount,
+    required this.onOpenCollections,
+    required this.onMove,
+    required this.onDelete,
+    required this.onClear,
+  });
 
+  final int selectedCount;
   final VoidCallback onOpenCollections;
+  final VoidCallback onMove;
+  final VoidCallback onDelete;
+  final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
@@ -441,21 +595,21 @@ class _SelectionTray extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 430;
-          final summary = const Column(
+          final summary = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '- öğe seçildi',
-                style: TextStyle(
+                '$selectedCount öğe seçildi',
+                style: const TextStyle(
                   color: AppColors.navy,
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              SizedBox(height: 6),
-              Text(
-                'Toplam - MB',
-                style: TextStyle(color: AppColors.navy, fontSize: 16),
+              const SizedBox(height: 6),
+              const Text(
+                'Seçili dosyalar üzerinde işlem yapabilirsiniz.',
+                style: TextStyle(color: AppColors.muted, fontSize: 14),
               ),
             ],
           );
@@ -464,13 +618,13 @@ class _SelectionTray extends StatelessWidget {
               icon: Icons.drive_file_move_outline,
               label: 'Taşı',
               color: AppColors.navy,
-              onTap: () {},
+              onTap: onMove,
             ),
             _TrayAction(
               icon: Icons.delete_outline_rounded,
               label: 'Sil',
               color: AppColors.red,
-              onTap: () {},
+              onTap: onDelete,
             ),
             _TrayAction(
               icon: Icons.layers_outlined,
@@ -479,10 +633,10 @@ class _SelectionTray extends StatelessWidget {
               onTap: onOpenCollections,
             ),
             _TrayAction(
-              icon: Icons.more_vert_rounded,
-              label: 'Daha fazla',
-              color: AppColors.navy,
-              onTap: () {},
+              icon: Icons.close_rounded,
+              label: 'Temizle',
+              color: AppColors.muted,
+              onTap: onClear,
             ),
           ];
           if (compact) {
@@ -553,12 +707,14 @@ class _SuggestionRow extends StatelessWidget {
     required this.color,
     required this.title,
     required this.subtitle,
+    required this.onTap,
   });
 
   final IconData icon;
   final Color color;
   final String title;
   final String subtitle;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -605,7 +761,7 @@ class _SuggestionRow extends StatelessWidget {
             ),
           ),
           OutlinedButton.icon(
-            onPressed: () {},
+            onPressed: onTap,
             icon: const Icon(Icons.auto_awesome_rounded, size: 18),
             label: const Text('Oluştur'),
             style: OutlinedButton.styleFrom(

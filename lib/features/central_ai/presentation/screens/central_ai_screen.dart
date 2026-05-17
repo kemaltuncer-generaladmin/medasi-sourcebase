@@ -228,6 +228,16 @@ class _AiInputArea extends StatelessWidget {
   final Future<void> Function() onSend;
   final bool sending;
 
+  void _showAttachmentNotImplemented(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Dosya ekleme özelliği yakında aktif olacak.'),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -249,7 +259,8 @@ class _AiInputArea extends StatelessWidget {
         child: Row(
           children: [
             IconButton(
-              onPressed: () {},
+              onPressed: () => _showAttachmentNotImplemented(context),
+              tooltip: 'Dosya ekle',
               icon: const Icon(
                 Icons.add_circle_outline_rounded,
                 color: AppColors.blue,
@@ -259,7 +270,7 @@ class _AiInputArea extends StatelessWidget {
               child: TextField(
                 controller: controller,
                 decoration: const InputDecoration(
-                  hintText: 'SourceBase AI’ya bir şey sor...',
+                  hintText: "SourceBase AI'ya bir sey sor...",
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(horizontal: 12),
                 ),

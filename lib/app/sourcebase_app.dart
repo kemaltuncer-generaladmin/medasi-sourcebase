@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:responsive_builder/responsive_builder.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/theme/app_theme.dart';
 import '../features/auth/data/sourcebase_auth_backend.dart';
@@ -11,8 +12,35 @@ import '../features/auth/presentation/screens/register_screen.dart';
 import '../features/auth/presentation/screens/verify_email_screen.dart';
 import '../features/drive/presentation/screens/drive_workspace_screen.dart';
 
-class SourceBaseApp extends StatelessWidget {
+class SourceBaseApp extends StatefulWidget {
   const SourceBaseApp({super.key});
+
+  @override
+  State<SourceBaseApp> createState() => _SourceBaseAppState();
+}
+
+class _SourceBaseAppState extends State<SourceBaseApp> {
+  @override
+  void initState() {
+    super.initState();
+    _listenAuthChanges();
+  }
+
+  void _listenAuthChanges() {
+    final client = SourceBaseAuthBackend.client;
+    if (client == null) return;
+    client.auth.onAuthStateChange.listen((event) {
+      final isSignedOut = event.event == AuthChangeEvent.signedOut;
+      final tokenExpired = event.event == AuthChangeEvent.tokenRefreshed &&
+          event.session == null;
+      if ((isSignedOut || tokenExpired) && mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          LoginScreen.route,
+          (_) => false,
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,6 +57,7 @@ class SourceBaseApp extends StatelessWidget {
                   child: child ?? const SizedBox.shrink(),
                 );
               },
+              navigatorKey: _rootNavigatorKey,
               initialRoute: _initialRoute,
               routes: {
                 LoginScreen.route: (_) => const LoginScreen(),
@@ -41,6 +70,8 @@ class SourceBaseApp extends StatelessWidget {
               },
             ));
   }
+
+  static final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
   String get _initialRoute {
     if (!SourceBaseAuthBackend.isConfigured) {

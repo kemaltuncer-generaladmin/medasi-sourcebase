@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -19,6 +21,93 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   bool loading = false;
   String? message;
   String? errorMessage;
+  final List<TextEditingController> _otpControllers = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
+  int _remainingSeconds = 120;
+  late Timer _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        if (_remainingSeconds > 0) {
+          _remainingSeconds--;
+        } else {
+          timer.cancel();
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    for (final controller in _otpControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  String get _timerLabel {
+    final minutes = _remainingSeconds ~/ 60;
+    final seconds = _remainingSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  bool get _canResend => _remainingSeconds == 0;
+
+  String get _enteredCode => _otpControllers.map((c) => c.text).join();
+
+  Future<void> _verify(String email) async {
+    if (loading) return;
+    final code = _enteredCode;
+    if (code.length != 6) {
+      setState(() => errorMessage = 'Lutfen 6 haneli dogrulama kodunu girin.');
+      return;
+    }
+    if (!SourceBaseAuthBackend.isConfigured) {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        DriveWorkspaceScreen.route,
+        (_) => false,
+      );
+      return;
+    }
+    setState(() {
+      loading = true;
+      message = null;
+      errorMessage = null;
+    });
+    try {
+      await SourceBaseAuthBackend.verifyEmailOtp(
+        email: email,
+        token: code,
+      );
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        DriveWorkspaceScreen.route,
+        (_) => false,
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => errorMessage = SourceBaseAuthBackend.friendlyError(error),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
+  }
 
   Future<void> _resend(String email) async {
     if (!SourceBaseAuthBackend.isConfigured) {
@@ -70,7 +159,49 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           ),
         ),
         const SizedBox(height: 24),
-        const _OtpRow(digits: ['4', '7', '2', '9', '1', '3']),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(
+            6,
+            (index) => SizedBox(
+              width: 50,
+              height: 64,
+              child: TextField(
+                controller: _otpControllers[index],
+                textAlign: TextAlign.center,
+                keyboardType: TextInputType.number,
+                maxLength: 1,
+                style: const TextStyle(
+                  color: AppColors.blue,
+                  fontSize: 27,
+                  fontWeight: FontWeight.w800,
+                ),
+                decoration: InputDecoration(
+                  counterText: '',
+                  filled: true,
+                  fillColor: AppColors.white.withValues(alpha: .96),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.line),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.line),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.blue, width: 2),
+                  ),
+                ),
+                onChanged: (value) {
+                  if (value.isNotEmpty && index < 5) {
+                    FocusScope.of(context).nextFocus();
+                  }
+                },
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: 30),
         Container(
           height: 58,
@@ -88,7 +219,10 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
               ),
               const Spacer(),
               TextButton(
-                onPressed: loading ? () {} : () => _resend(email),
+                onPressed:
+                    loading || !_canResend
+                        ? null
+                        : () => _resend(email),
                 style: TextButton.styleFrom(foregroundColor: AppColors.blue),
                 child: Text(
                   loading ? 'Gönderiliyor...' : 'Tekrar gönder',
@@ -100,9 +234,13 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
               ),
               Container(width: 1, height: 24, color: AppColors.line),
               const SizedBox(width: 16),
-              const Text(
-                '00:42',
-                style: TextStyle(color: AppColors.muted, fontSize: 18),
+              Text(
+                _timerLabel,
+                style: TextStyle(
+                  color: _canResend ? AppColors.blue : AppColors.muted,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
@@ -116,12 +254,8 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         ],
         const SizedBox(height: 38),
         GradientActionButton(
-          label: 'Doğrula',
-          onPressed: () => Navigator.pushNamedAndRemoveUntil(
-            context,
-            DriveWorkspaceScreen.route,
-            (_) => false,
-          ),
+          label: loading ? 'Doğrulanıyor...' : 'Doğrula',
+          onPressed: () => _verify(email),
         ),
         const SizedBox(height: 22),
         Center(
@@ -135,48 +269,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _OtpRow extends StatelessWidget {
-  const _OtpRow({required this.digits});
-
-  final List<String> digits;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: digits
-          .map(
-            (digit) => Container(
-              width: 50,
-              height: 64,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.white.withValues(alpha: .96),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.line),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF244E94).withValues(alpha: .06),
-                    blurRadius: 14,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Text(
-                digit,
-                style: const TextStyle(
-                  color: AppColors.blue,
-                  fontSize: 27,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          )
-          .toList(),
     );
   }
 }
