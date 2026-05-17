@@ -7,26 +7,29 @@ class SourceBaseNavRail extends StatelessWidget {
     super.key,
     required this.selectedIndex,
     required this.onChanged,
+    this.extended = false,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onChanged;
+  final bool extended;
 
   @override
   Widget build(BuildContext context) {
     return NavigationRail(
       selectedIndex: selectedIndex,
       onDestinationSelected: onChanged,
-      labelType: NavigationRailLabelType.all,
-      backgroundColor: AppColors.scaffold,
+      extended: extended,
+      labelType: extended
+          ? NavigationRailLabelType.none
+          : NavigationRailLabelType.all,
+      backgroundColor: AppColors.page,
       indicatorColor: AppColors.selectedBlue,
       selectedLabelTextStyle: const TextStyle(
         color: AppColors.blue,
         fontWeight: FontWeight.bold,
       ),
-      unselectedLabelTextStyle: const TextStyle(
-        color: AppColors.muted,
-      ),
+      unselectedLabelTextStyle: const TextStyle(color: AppColors.muted),
       destinations: const [
         NavigationRailDestination(
           icon: Icon(Icons.psychology_outlined),

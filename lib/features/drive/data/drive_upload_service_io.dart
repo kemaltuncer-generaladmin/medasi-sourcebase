@@ -8,7 +8,7 @@ class DriveUploadService {
   const DriveUploadService();
 
   Future<PickedDriveFile?> pickFile() async {
-    final result = await FilePicker.pickFiles(
+    final result = await FilePicker.platform.pickFiles(
       allowMultiple: false,
       type: FileType.custom,
       allowedExtensions: const ['pdf', 'ppt', 'pptx', 'doc', 'docx', 'zip'],

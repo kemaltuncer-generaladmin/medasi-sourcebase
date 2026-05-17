@@ -507,9 +507,9 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
 
   Widget _buildScreen() {
     final workspace = _workspaceData;
-    final course = workspace.primaryCourse;
-    final section = workspace.primarySection;
-    final file = workspace.primaryFile;
+    final course = _primaryCourse;
+    final section = _primarySection;
+    final file = _primaryFile;
 
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 180),
@@ -589,7 +589,6 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
                   onSearch: _openGlobalFileSearch,
                 ),
                 WorkspaceRouteKey.centralAi => CentralAiScreen(
-                  data: workspace,
                   onSearch: _openGlobalFileSearch,
                 ),
                 WorkspaceRouteKey.sourceLab => SourceLabScreen(
