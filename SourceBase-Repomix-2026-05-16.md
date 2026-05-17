@@ -13074,7 +13074,7 @@ Checks the deployment status on Coolify
 # SourceBase Coolify App UUID (from AGENTS.md)
 SOURCEBASE_APP_UUID = "h3qdzmbjy6lofttbejgx666a"
 DEPLOYMENT_UUID = "k115etvqluyfj89hrwhk91aa"
-COOLIFY_API_KEY = "Qvn8bAtyTsVFO8cijFp5nFw4igpLSNBIbuIrUDrhd9409b34"
+COOLIFY_API_KEY = os.environ.get("SOURCEBASE_COOLIFY_API_KEY", "<redacted>")
 COOLIFY_URL = "http://46.225.100.139:8000"
 ⋮----
 def check_deployment_status()
@@ -13106,7 +13106,7 @@ Triggers deployment for SourceBase application only
 ⋮----
 # SourceBase Coolify App UUID (from AGENTS.md)
 SOURCEBASE_APP_UUID = "h3qdzmbjy6lofttbejgx666a"
-COOLIFY_API_KEY = "Qvn8bAtyTsVFO8cijFp5nFw4igpLSNBIbuIrUDrhd9409b34"
+COOLIFY_API_KEY = os.environ.get("SOURCEBASE_COOLIFY_API_KEY", "<redacted>")
 COOLIFY_URL = "http://46.225.100.139:8000"
 ⋮----
 def trigger_deployment()

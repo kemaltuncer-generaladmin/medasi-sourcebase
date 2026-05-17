@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
@@ -16,7 +17,7 @@ class CentralAiScreen extends StatefulWidget {
 class _CentralAiScreenState extends State<CentralAiScreen> {
   final SourceBaseDriveApi _api = const SourceBaseDriveApi();
   final TextEditingController _controller = TextEditingController();
-  final List<_ChatMessage> _messages = [
+  static final List<_ChatMessage> _sessionMessages = [
     const _ChatMessage(
       text: 'Merhaba! Ben SourceBase AI. Bugün size nasıl yardımcı olabilirim?',
       isAi: true,
@@ -29,7 +30,7 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
     if (prompt.isEmpty || _isSending) return;
     setState(() {
       _isSending = true;
-      _messages.add(_ChatMessage(text: prompt, isAi: false));
+      _sessionMessages.add(_ChatMessage(text: prompt, isAi: false));
       _controller.clear();
     });
 
@@ -41,7 +42,7 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
           : '';
       if (!mounted) return;
       setState(() {
-        _messages.add(
+        _sessionMessages.add(
           _ChatMessage(
             text: answer.isEmpty
                 ? 'Cevap üretildi ama içerik boş döndü. Lütfen tekrar dene.'
@@ -53,7 +54,7 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _messages.add(
+        _sessionMessages.add(
           _ChatMessage(
             text: error.toString().replaceFirst('Bad state: ', ''),
             isAi: true,
@@ -65,6 +66,15 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
         setState(() => _isSending = false);
       }
     }
+  }
+
+  void _onFileAttached(String fileName) {
+    setState(() {
+      _sessionMessages.add(_ChatMessage(
+        text: 'Dosya eklendi: $fileName',
+        isAi: false,
+      ));
+    });
   }
 
   @override
@@ -110,9 +120,9 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
                   vertical: 20,
                 ),
                 reverse: true,
-                itemCount: _messages.length,
+                itemCount: _sessionMessages.length,
                 itemBuilder: (context, index) {
-                  final message = _messages[_messages.length - 1 - index];
+                  final message = _sessionMessages[_sessionMessages.length - 1 - index];
                   return _ChatBubble(message: message);
                 },
               ),
@@ -121,6 +131,7 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
               controller: _controller,
               onSend: _sendMessage,
               sending: _isSending,
+              onFileAttached: _onFileAttached,
             ),
           ],
         ),
@@ -223,19 +234,30 @@ class _AiInputArea extends StatelessWidget {
     required this.controller,
     required this.onSend,
     required this.sending,
+    required this.onFileAttached,
   });
   final TextEditingController controller;
   final Future<void> Function() onSend;
   final bool sending;
+  final void Function(String fileName)? onFileAttached;
 
-  void _showAttachmentNotImplemented(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Dosya ekleme özelliği yakında aktif olacak.'),
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 2),
-      ),
-    );
+  Future<void> _pickFile(BuildContext context) async {
+    try {
+      final result = await FilePicker.platform.pickFiles();
+      if (result != null && result.files.isNotEmpty) {
+        onFileAttached?.call(result.files.first.name);
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Dosya seçilemedi.'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -259,7 +281,7 @@ class _AiInputArea extends StatelessWidget {
         child: Row(
           children: [
             IconButton(
-              onPressed: () => _showAttachmentNotImplemented(context),
+              onPressed: () => _pickFile(context),
               tooltip: 'Dosya ekle',
               icon: const Icon(
                 Icons.add_circle_outline_rounded,

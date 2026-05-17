@@ -277,6 +277,15 @@ class _WalletPanel extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (balance.error != null)
+                          Text(
+                            balance.error!,
+                            style: const TextStyle(
+                              color: AppColors.red,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -304,9 +313,10 @@ class _WalletPanel extends StatelessWidget {
 }
 
 class _MedasiWalletBalance {
-  const _MedasiWalletBalance(this.amount);
+  const _MedasiWalletBalance(this.amount, {this.error});
 
   final double amount;
+  final String? error;
 
   String get label => '${_formatAmount(amount)} MC';
 
@@ -325,7 +335,7 @@ class _MedasiWalletBalance {
           .maybeSingle();
       return _MedasiWalletBalance(_parse(row?['wallet_balance']) ?? 0);
     } catch (_) {
-      return const _MedasiWalletBalance(0);
+      return _MedasiWalletBalance(0, error: 'Bakiye yüklenemedi.');
     }
   }
 

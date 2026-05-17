@@ -198,37 +198,53 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
                       style: TextStyle(color: AppColors.muted, fontSize: 15),
                     ),
                     const SizedBox(height: 18),
-                    Flexible(
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemBuilder: (context, index) {
-                          final source = pool[index];
-                          final selected = selectedIds.contains(source.id);
-                          return _SourcePickerRow(
-                            source: source,
-                            selected: selected,
-                            onTap: () => toggle(source),
-                          );
-                        },
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemCount: pool.length,
+                    if (pool.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 48),
+                        child: Center(
+                          child: Text(
+                            'Drive\'da henüz dosya yok.',
+                            style: TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      )
+                    else ...[
+                      Flexible(
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemBuilder: (context, index) {
+                            final source = pool[index];
+                            final selected = selectedIds.contains(source.id);
+                            return _SourcePickerRow(
+                              source: source,
+                              selected: selected,
+                              onTap: () => toggle(source),
+                            );
+                          },
+                          separatorBuilder: (_, _) => const SizedBox(height: 10),
+                          itemCount: pool.length,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 18),
-                    _PrimaryLabButton(
-                      label: 'Seçimi Kullan',
-                      icon: Icons.check_rounded,
-                      onTap: () {
-                        setState(() {
-                          selectedSources = pool
-                              .where(
-                                (source) => selectedIds.contains(source.id),
-                              )
-                              .toList();
-                        });
-                        Navigator.of(context).pop();
-                      },
-                    ),
+                      const SizedBox(height: 18),
+                      _PrimaryLabButton(
+                        label: 'Seçimi Kullan',
+                        icon: Icons.check_rounded,
+                        onTap: () {
+                          setState(() {
+                            selectedSources = pool
+                                .where(
+                                  (source) => selectedIds.contains(source.id),
+                                )
+                                .toList();
+                          });
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -418,6 +434,18 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
           ),
         },
       ),
+    ),
+        if (_isLoading)
+          Container(
+            color: Colors.white.withValues(alpha: .85),
+            child: const Center(
+              child: CircularProgressIndicator(
+                color: AppColors.blue,
+                strokeWidth: 3,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

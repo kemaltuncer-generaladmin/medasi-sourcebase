@@ -45,6 +45,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() => errorMessage = 'Şifreler birbiriyle eşleşmiyor.');
       return;
     }
+    final email = emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => errorMessage = 'Geçerli bir e-posta adresi girin.');
+      return;
+    }
+    if (passwordController.text.length < 6) {
+      setState(() => errorMessage = 'Şifre en az 6 karakter olmalıdır.');
+      return;
+    }
     if (!SourceBaseAuthBackend.isConfigured) {
       Navigator.pushNamed(
         context,

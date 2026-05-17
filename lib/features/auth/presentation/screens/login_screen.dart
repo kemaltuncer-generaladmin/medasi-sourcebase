@@ -41,6 +41,16 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       return;
     }
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => errorMessage = 'E-posta ve şifre alanları boş bırakılamaz.');
+      return;
+    }
+    if (!email.contains('@')) {
+      setState(() => errorMessage = 'Geçerli bir e-posta adresi girin.');
+      return;
+    }
     setState(() {
       loading = true;
       errorMessage = null;
@@ -204,7 +214,7 @@ class _LoginScreenState extends State<LoginScreen> {
         SocialAuthButton(
           label: 'Google ile devam et',
           icon: const GoogleGlyph(),
-          onPressed: _socialLoading || loading ? null : _signInWithGoogle,
+          onPressed: () { if (!_socialLoading && !loading) _signInWithGoogle(); },
         ),
         const SizedBox(height: 12),
         SocialAuthButton(
@@ -214,7 +224,7 @@ class _LoginScreenState extends State<LoginScreen> {
             size: 26,
             color: AppColors.navy,
           ),
-          onPressed: _socialLoading || loading ? null : _signInWithApple,
+          onPressed: () { if (!_socialLoading && !loading) _signInWithApple(); },
         ),
         const SizedBox(height: 22),
         SBSecondaryButton(

@@ -1098,25 +1098,42 @@ class _SourcePickerScreen extends StatelessWidget {
         ),
         _BasePanel(
           padding: EdgeInsets.zero,
-          child: Column(
-            children: [
-              for (final file in data.recentFiles)
-                _SourceSelectRow(
-                  source: _BFSource(
-                    id: file.id,
-                    name: file.title,
-                    kind: file.kind,
-                    size: file.sizeLabel,
-                    pages: file.pageLabel,
-                    subject: file.courseTitle,
-                    time: 'Az önce',
-                    warning: false,
+          child: data.recentFiles.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 48),
+                  child: Center(
+                    child: Text(
+                      'Drive\u2019da hen\u00FCz dosya yok. \u00D6nce Drive '
+                      'ekran\u0131ndan bir dosya y\u00FCkleyin.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 16,
+                        height: 1.45,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
-                  selected: selectedSources.contains(file.id),
-                  onTap: () => onToggleSource(file.id),
+                )
+              : Column(
+                  children: [
+                    for (final file in data.recentFiles)
+                      _SourceSelectRow(
+                        source: _BFSource(
+                          id: file.id,
+                          name: file.title,
+                          kind: file.kind,
+                          size: file.sizeLabel,
+                          pages: file.pageLabel,
+                          subject: file.courseTitle,
+                          time: 'Az önce',
+                          warning: false,
+                        ),
+                        selected: selectedSources.contains(file.id),
+                        onTap: () => onToggleSource(file.id),
+                      ),
+                  ],
                 ),
-            ],
-          ),
         ),
         const SizedBox(height: 18),
         _UploadDropZone(onTap: onUpload),
@@ -1912,7 +1929,7 @@ class _ComparisonFactoryScreen extends StatelessWidget {
   }
 }
 
-class _QueueScreen extends StatelessWidget {
+class _QueueScreen extends StatefulWidget {
   const _QueueScreen({
     required this.data,
     required this.onSearch,
@@ -1934,9 +1951,38 @@ class _QueueScreen extends StatelessWidget {
   final VoidCallback onStop;
 
   @override
+  State<_QueueScreen> createState() => _QueueScreenState();
+}
+
+class _QueueScreenState extends State<_QueueScreen> {
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) setState(() => _loading = false);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return _BaseForcePage(
+        title: '\xDcretim Kuyru\u011Fu',
+        subtitle: 'Ba\u015Flat\u0131lan \xFCretimleri tek yerden takip et.',
+        onSearch: widget.onSearch,
+        onBack: widget.onBack,
+        heroTight: true,
+        children: const [
+          SizedBox(height: 80),
+          Center(child: CircularProgressIndicator()),
+        ],
+      );
+    }
+
     final allRows = <_QueueRow>[];
-    for (final file in data.recentFiles) {
+    for (final file in widget.data.recentFiles) {
       if (file.generated.isNotEmpty) {
         for (final gen in file.generated) {
           allRows.add(
@@ -1956,22 +2002,22 @@ class _QueueScreen extends StatelessWidget {
               progress: 1,
               time: gen.updatedLabel,
               filterStatus: 'Tamamland\u0131',
-              onAction: onOpenResult,
+              onAction: widget.onOpenResult,
             ),
           );
         }
       }
     }
 
-    final filteredRows = queueFilter == 'T\xFCm\xFC'
+    final filteredRows = widget.queueFilter == 'T\xFCm\xFC'
         ? allRows
-        : allRows.where((r) => r.filterStatus == queueFilter).toList();
+        : allRows.where((r) => r.filterStatus == widget.queueFilter).toList();
 
     return _BaseForcePage(
       title: '\xDcretim Kuyru\u011Fu',
       subtitle: 'Ba\u015Flat\u0131lan \xFCretimleri tek yerden takip et.',
-      onSearch: onSearch,
-      onBack: onBack,
+      onSearch: widget.onSearch,
+      onBack: widget.onBack,
       heroTight: true,
       children: [
         const _ResponsiveGrid(
@@ -2007,26 +2053,26 @@ class _QueueScreen extends StatelessWidget {
           children: [
             _QueueFilter(
               label: 'T\xFCm\xFC',
-              selected: queueFilter == 'T\xFCm\xFC',
-              onTap: () => onFilterChanged('T\xFCm\xFC'),
+              selected: widget.queueFilter == 'T\xFCm\xFC',
+              onTap: () => widget.onFilterChanged('T\xFCm\xFC'),
             ),
             _QueueFilter(
               label: '\u0130\u015Fleniyor',
               dot: AppColors.blue,
-              selected: queueFilter == '\u0130\u015Fleniyor',
-              onTap: () => onFilterChanged('\u0130\u015Fleniyor'),
+              selected: widget.queueFilter == '\u0130\u015Fleniyor',
+              onTap: () => widget.onFilterChanged('\u0130\u015Fleniyor'),
             ),
             _QueueFilter(
               label: 'Tamamland\u0131',
               dot: AppColors.green,
-              selected: queueFilter == 'Tamamland\u0131',
-              onTap: () => onFilterChanged('Tamamland\u0131'),
+              selected: widget.queueFilter == 'Tamamland\u0131',
+              onTap: () => widget.onFilterChanged('Tamamland\u0131'),
             ),
             _QueueFilter(
               label: 'Hata',
               dot: AppColors.red,
-              selected: queueFilter == 'Hata',
-              onTap: () => onFilterChanged('Hata'),
+              selected: widget.queueFilter == 'Hata',
+              onTap: () => widget.onFilterChanged('Hata'),
             ),
           ],
         ),
@@ -4180,19 +4226,19 @@ class _SummaryOptionPanel extends StatelessWidget {
             title: '1 sayfa',
             subtitle: 'Kompakt ve odakl\u0131',
             selected: selectedLength == '1 sayfa',
-            onTap: (selected) => onLengthChanged('1 sayfa'),
+            onTap: () => onLengthChanged('1 sayfa'),
           ),
           _RadioOption(
             title: '3 sayfa',
             subtitle: 'Daha detayl\u0131 \xF6zet',
             selected: selectedLength == '3 sayfa',
-            onTap: (selected) => onLengthChanged('3 sayfa'),
+            onTap: () => onLengthChanged('3 sayfa'),
           ),
           _RadioOption(
             title: 'Ultra k\u0131sa',
             subtitle: 'En k\u0131sa format',
             selected: selectedLength == 'Ultra k\u0131sa',
-            onTap: (selected) => onLengthChanged('Ultra k\u0131sa'),
+            onTap: () => onLengthChanged('Ultra k\u0131sa'),
           ),
         ],
       ),
@@ -4218,19 +4264,19 @@ class _FocusOptionPanel extends StatelessWidget {
             title: 'Y\xFCksek Olas\u0131l\u0131kl\u0131 Sorular',
             subtitle: '\xC7\u0131kma ihtimali y\xFCksek konular',
             selected: selectedFocus == 'Y\xFCksek Olas\u0131l\u0131kl\u0131 Sorular',
-            onTap: (selected) => onFocusChanged('Y\xFCksek Olas\u0131l\u0131kl\u0131 Sorular'),
+            onTap: () => onFocusChanged('Y\xFCksek Olas\u0131l\u0131kl\u0131 Sorular'),
           ),
           _RadioOption(
             title: 'Kritik Noktalar',
             subtitle: 'En \xF6nemli kavramlar',
             selected: selectedFocus == 'Kritik Noktalar',
-            onTap: (selected) => onFocusChanged('Kritik Noktalar'),
+            onTap: () => onFocusChanged('Kritik Noktalar'),
           ),
           _RadioOption(
             title: 'Hoca Vurgular\u0131',
             subtitle: '\xD6\u011Fretmenin vurgulad\u0131klar\u0131',
             selected: selectedFocus == 'Hoca Vurgular\u0131',
-            onTap: (selected) => onFocusChanged('Hoca Vurgular\u0131'),
+            onTap: () => onFocusChanged('Hoca Vurgular\u0131'),
           ),
         ],
       ),
@@ -4286,7 +4332,7 @@ class _HighlightOptionPanel extends StatelessWidget {
   }
 }
 
-class _RadioOption extends StatefulWidget {
+class _RadioOption extends StatelessWidget {
   const _RadioOption({
     required this.title,
     required this.subtitle,
@@ -4297,37 +4343,12 @@ class _RadioOption extends StatefulWidget {
   final String title;
   final String subtitle;
   final bool selected;
-  final ValueChanged<bool>? onTap;
-
-  @override
-  State<_RadioOption> createState() => _RadioOptionState();
-}
-
-class _RadioOptionState extends State<_RadioOption> {
-  late bool selected;
-
-  @override
-  void initState() {
-    super.initState();
-    selected = widget.selected;
-  }
-
-  @override
-  void didUpdateWidget(covariant _RadioOption oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.selected != oldWidget.selected) {
-      selected = widget.selected;
-    }
-  }
-
-  void _toggle() {
-    widget.onTap?.call(selected);
-  }
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: _toggle,
+      onTap: onTap,
       borderRadius: BorderRadius.circular(9),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -4351,7 +4372,7 @@ class _RadioOptionState extends State<_RadioOption> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.title,
+                    title,
                     style: const TextStyle(
                       color: AppColors.navy,
                       fontSize: 16,
@@ -4360,7 +4381,7 @@ class _RadioOptionState extends State<_RadioOption> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    widget.subtitle,
+                    subtitle,
                     style: const TextStyle(
                       color: AppColors.muted,
                       fontSize: 13,
@@ -5631,170 +5652,6 @@ class _QueueRow extends StatelessWidget {
             );
           },
         ),
-      ),
-    );
-  }
-}
-
-
-
-
-
-
-
-class _FaceColumn extends StatelessWidget {
-  const _FaceColumn({required this.label, required this.text});
-
-  final String label;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: AppColors.selectedBlue,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.blue,
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          text,
-          style: const TextStyle(
-            color: AppColors.navy,
-            fontSize: 18,
-            height: 1.35,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-
-
-
-
-
-
-class _PiePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final colors = [
-      AppColors.blue,
-      AppColors.cyan,
-      AppColors.purple,
-      AppColors.orange,
-      AppColors.green,
-    ];
-    final values = [.35, .25, .20, .12, .08];
-    var start = -math.pi / 2;
-    for (var i = 0; i < values.length; i++) {
-      final sweep = values[i] * math.pi * 2;
-      canvas.drawArc(rect, start, sweep, true, Paint()..color = colors[i]);
-      start += sweep;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _LegendLine extends StatelessWidget {
-  const _LegendLine({
-    required this.color,
-    required this.label,
-    required this.value,
-  });
-
-  final Color color;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 5),
-      child: Row(
-        children: [
-          CircleAvatar(radius: 4, backgroundColor: color),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: AppColors.navy, fontSize: 11.5),
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(color: AppColors.navy, fontSize: 11.5),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BarLine extends StatelessWidget {
-  const _BarLine({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final String label;
-  final double value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 52,
-            child: Text(
-              label,
-              style: const TextStyle(color: AppColors.navy, fontSize: 13.5),
-            ),
-          ),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: value,
-                minHeight: 9,
-                backgroundColor: AppColors.softLine,
-                valueColor: AlwaysStoppedAnimation(color),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '${(value * 100).round()}%',
-            style: const TextStyle(
-              color: AppColors.navy,
-              fontSize: 13.5,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
       ),
     );
   }
