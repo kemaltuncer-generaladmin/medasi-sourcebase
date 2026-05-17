@@ -7,6 +7,7 @@
 
 import { getVertexConfig } from "../config.ts";
 import {
+  GenerationJob,
   GenerationType,
   isRecord,
   requireString,
@@ -246,7 +247,7 @@ export async function createGenerationJob(
   const processor = createJobProcessor();
   await assertJobCapacity(processor, userId, fileId, jobType);
 
-  const job = await processor.createJob({
+  const jobInput = {
     userId,
     sourceFileId: fileId,
     jobType,
@@ -256,7 +257,9 @@ export async function createGenerationJob(
       temperature,
       maxTokens,
     },
-  });
+  };
+  const job = await processor.createQueuedJob(jobInput);
+  scheduleJobProcessing(processor, job, jobInput);
 
   return {
     jobId: job.id,
@@ -557,4 +560,31 @@ async function buildOwnedFileContext(
     0,
     MAX_CHAT_CONTEXT_CHARS,
   );
+}
+
+function scheduleJobProcessing(
+  processor: JobProcessor,
+  job: GenerationJob,
+  input: {
+    jobType: GenerationType;
+    sourceText: string;
+    options?: {
+      count?: number;
+      temperature?: number;
+      maxTokens?: number;
+    };
+  },
+) {
+  const task = processor.processJob(job, input).catch((error) => {
+    const safeCode = error instanceof SafeError
+      ? error.code
+      : "BACKGROUND_JOB_FAILED";
+    console.error("AI job background processing failed:", safeCode);
+  });
+  const edgeRuntime = (globalThis as {
+    EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void };
+  }).EdgeRuntime;
+  if (edgeRuntime?.waitUntil) {
+    edgeRuntime.waitUntil(task);
+  }
 }

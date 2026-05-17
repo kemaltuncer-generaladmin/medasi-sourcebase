@@ -56,7 +56,7 @@ BEGIN
        AND NOT EXISTS (
           SELECT 1 FROM pg_trigger
           WHERE tgname = 'on_source_change'
-            AND tgrelid = 'sourcebase.sources'::regclass
+            AND tgrelid = to_regclass('sourcebase.sources')
        ) THEN
         CREATE TRIGGER on_source_change
         AFTER INSERT OR UPDATE ON sourcebase.sources
@@ -68,7 +68,7 @@ BEGIN
        AND NOT EXISTS (
           SELECT 1 FROM pg_trigger
           WHERE tgname = 'on_card_change'
-            AND tgrelid = 'sourcebase.cards'::regclass
+            AND tgrelid = to_regclass('sourcebase.cards')
        ) THEN
         CREATE TRIGGER on_card_change
         AFTER INSERT OR UPDATE ON sourcebase.cards

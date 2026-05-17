@@ -58,10 +58,11 @@ const GENERATED_OUTPUT_TYPES = new Set([
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": Deno.env.get("SOURCEBASE_ALLOWED_ORIGIN") ??
-    "*",
+    "https://sourcebase.medasi.com.tr",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Vary": "Origin",
 };
 
 Deno.serve(async (request) => {
@@ -732,19 +733,21 @@ async function createGeneratedOutput(userId: string, payload: JsonMap) {
   const kind = normalizeGeneratedOutputKind(
     requireString(payload.kind, "kind"),
   );
+  const jobId = optionalString(payload.jobId);
+  await ensureStorageRoots(userId);
+  await assertOwned(userId, "drive_files", fileId);
+  const job = jobId
+    ? await assertCompletedJobForFile(userId, jobId, fileId)
+    : await findLatestCompletedJobForOutput(userId, fileId, kind);
+  const jobMetadata = job && isRecord(job.metadata) ? job.metadata : {};
+  const content = jobMetadata.content;
   const itemCount = boundedNumber(
     payload.itemCount,
-    generatedCount(kind),
+    countGeneratedItems(content) ?? generatedCount(kind),
     1,
     500,
     "itemCount",
   );
-  const jobId = optionalString(payload.jobId);
-  await ensureStorageRoots(userId);
-  await assertOwned(userId, "drive_files", fileId);
-  if (jobId) {
-    await assertCompletedJobForFile(userId, jobId, fileId);
-  }
   const [row] = await dbInsert("generated_outputs", [{
     owner_user_id: userId,
     source_file_id: fileId,
@@ -752,7 +755,11 @@ async function createGeneratedOutput(userId: string, payload: JsonMap) {
     title: generatedTitle(kind),
     item_count: itemCount,
     status: "ready",
-    metadata: { mode: "manual_request", jobId: jobId ?? null },
+    metadata: {
+      mode: job ? "ai_generation" : "manual_request",
+      jobId: job?.id ?? jobId ?? null,
+      content: content ?? null,
+    },
   }]);
   await audit(userId, "create_generated_output", "generated_output", row.id, {
     fileId,
@@ -804,7 +811,7 @@ async function assertCompletedJobForFile(
   fileId: string,
 ) {
   const rows = await dbSelect(
-    `generated_jobs?id=eq.${jobId}&owner_user_id=eq.${userId}&source_file_id=eq.${fileId}&select=id,status&limit=1`,
+    `generated_jobs?id=eq.${jobId}&owner_user_id=eq.${userId}&source_file_id=eq.${fileId}&select=*&limit=1`,
   );
   if (rows.length === 0) {
     throw new SafeError("JOB_NOT_FOUND", "İş bulunamadı veya yetkin yok.", 404);
@@ -816,6 +823,20 @@ async function assertCompletedJobForFile(
       400,
     );
   }
+  return rows[0];
+}
+
+async function findLatestCompletedJobForOutput(
+  userId: string,
+  fileId: string,
+  kind: string,
+) {
+  const jobType = outputKindToJobType(kind);
+  if (!jobType) return null;
+  const rows = await dbSelect(
+    `generated_jobs?owner_user_id=eq.${userId}&source_file_id=eq.${fileId}&job_type=eq.${jobType}&status=eq.completed&select=*&order=updated_at.desc&limit=1`,
+  );
+  return rows[0] ?? null;
 }
 
 async function dbSelect(path: string): Promise<JsonMap[]> {
@@ -1292,6 +1313,44 @@ function normalizeGeneratedOutputKind(kind: string) {
     );
   }
   return outputType;
+}
+
+function outputKindToJobType(kind: string) {
+  const mapping: Record<string, string> = {
+    flashcard: "flashcard",
+    question: "quiz",
+    summary: "summary",
+    algorithm: "algorithm",
+    comparison: "comparison",
+    clinical_scenario: "clinical_scenario",
+    learning_plan: "learning_plan",
+    podcast: "podcast",
+    infographic: "infographic",
+    mindMap: "mind_map",
+  };
+  return mapping[kind];
+}
+
+function countGeneratedItems(content: unknown): number | undefined {
+  if (Array.isArray(content)) return content.length || undefined;
+  if (!isRecord(content)) return undefined;
+  const candidateKeys = [
+    "bulletPoints",
+    "steps",
+    "rows",
+    "segments",
+    "questions",
+    "teachingPoints",
+    "objectives",
+    "sessions",
+    "sections",
+    "branches",
+  ];
+  for (const key of candidateKeys) {
+    const value = content[key];
+    if (Array.isArray(value) && value.length > 0) return value.length;
+  }
+  return 1;
 }
 
 function generatedTitle(kind: string) {

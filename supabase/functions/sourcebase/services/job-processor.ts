@@ -226,6 +226,21 @@ export class JobProcessor {
       maxTokens?: number;
     };
   }): Promise<GenerationJob> {
+    const job = await this.createQueuedJob(input);
+    return await this.processJob(job, input);
+  }
+
+  async createQueuedJob(input: {
+    userId: string;
+    sourceFileId?: string;
+    jobType: GenerationType;
+    sourceText: string;
+    options?: {
+      count?: number;
+      temperature?: number;
+      maxTokens?: number;
+    };
+  }): Promise<GenerationJob> {
     const job = await createJob(
       this.config.supabaseUrl,
       this.config.serviceRoleKey,
@@ -238,6 +253,21 @@ export class JobProcessor {
       },
     );
 
+    return job;
+  }
+
+  async processJob(
+    job: GenerationJob,
+    input: {
+      jobType: GenerationType;
+      sourceText: string;
+      options?: {
+        count?: number;
+        temperature?: number;
+        maxTokens?: number;
+      };
+    },
+  ): Promise<GenerationJob> {
     await updateJob(
       this.config.supabaseUrl,
       this.config.serviceRoleKey,
