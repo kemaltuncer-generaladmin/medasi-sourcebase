@@ -5,13 +5,19 @@ class SourceBaseAuthConfig {
 
   static const appCode = 'sourcebase';
   static const supabaseUrl = String.fromEnvironment('SOURCEBASE_SUPABASE_URL');
-  static const supabaseAnonKey = String.fromEnvironment(
+  static const _supabaseAnonKey = String.fromEnvironment(
     'SOURCEBASE_SUPABASE_ANON_KEY',
+  );
+  static const _supabasePublicToken = String.fromEnvironment(
+    'SOURCEBASE_SUPABASE_PUBLIC_TOKEN',
   );
   static const publicUrl = String.fromEnvironment(
     'SOURCEBASE_PUBLIC_URL',
     defaultValue: 'http://localhost:8088',
   );
+
+  static String get supabaseAnonKey =>
+      _supabaseAnonKey.isNotEmpty ? _supabaseAnonKey : _supabasePublicToken;
 
   static bool get isConfigured =>
       supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
