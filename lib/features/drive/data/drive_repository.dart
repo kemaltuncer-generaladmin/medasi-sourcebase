@@ -412,9 +412,9 @@ String? _jobTypeForGeneratedKind(GeneratedKind kind) {
     GeneratedKind.question => 'quiz',
     GeneratedKind.summary => 'summary',
     GeneratedKind.algorithm => 'algorithm',
-    GeneratedKind.comparison => 'comparison',
+    GeneratedKind.comparison || GeneratedKind.table => 'comparison',
     GeneratedKind.podcast => 'podcast',
-    GeneratedKind.table || GeneratedKind.mindMap => null,
+    GeneratedKind.mindMap => null,
   };
 }
 

@@ -138,7 +138,14 @@ class SourceBaseDriveApi {
     return invoke('get_generated_content', payload: {'jobId': jobId});
   }
 
-  Future<Map<String, dynamic>> centralAiChat(String message) {
-    return invoke('central_ai_chat', payload: {'message': message});
+  Future<Map<String, dynamic>> centralAiChat(
+    String message, {
+    String? context,
+  }) {
+    final payload = <String, dynamic>{'message': message};
+    if (context != null && context.trim().isNotEmpty) {
+      payload['context'] = context.trim();
+    }
+    return invoke('central_ai_chat', payload: payload);
   }
 }
