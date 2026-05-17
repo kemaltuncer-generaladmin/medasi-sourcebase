@@ -139,6 +139,7 @@ async function authenticate(
 }
 
 async function driveBootstrap(userId: string) {
+  const storageRoots = await ensureStorageRoots(userId);
   const [courses, sections, files, generatedOutputs] = await Promise.all([
     dbSelect(
       `courses?owner_user_id=eq.${userId}&select=*&order=created_at.asc`,
@@ -157,6 +158,7 @@ async function driveBootstrap(userId: string) {
   return {
     storage: {
       ...configStatus.gcs,
+      roots: storageRoots,
     },
     ai: configStatus.vertex,
     courses,
@@ -164,6 +166,69 @@ async function driveBootstrap(userId: string) {
     files,
     generatedOutputs,
   };
+}
+
+async function ensureStorageRoots(userId: string) {
+  const definitions = storageRootDefinitions(userId);
+  const existing = await dbSelect(
+    `storage_roots?owner_user_id=eq.${userId}&select=*`,
+  );
+  const existingKeys = new Set(
+    existing.map((row) => String(row.root_key ?? "")).filter(Boolean),
+  );
+  const missing = definitions.filter((root) =>
+    !existingKeys.has(root.root_key)
+  );
+  if (missing.length > 0) {
+    await dbInsert(
+      "storage_roots",
+      missing.map((root) => ({
+        owner_user_id: userId,
+        root_key: root.root_key,
+        title: root.title,
+        gcs_prefix: root.gcs_prefix,
+        status: "active",
+        metadata: root.metadata,
+      })),
+    );
+    await audit(userId, "ensure_storage_roots", "storage_root", null, {
+      rootKeys: missing.map((root) => root.root_key),
+    });
+    return await dbSelect(
+      `storage_roots?owner_user_id=eq.${userId}&select=*&order=created_at.asc`,
+    );
+  }
+  return existing;
+}
+
+function storageRootDefinitions(userId: string) {
+  const base = `user/${userId}`;
+  return [
+    {
+      root_key: "drive",
+      title: "Drive",
+      gcs_prefix: `${base}/drive/`,
+      metadata: { purpose: "course_sources" },
+    },
+    {
+      root_key: "uploads",
+      title: "Yüklemeler",
+      gcs_prefix: `${base}/drive/uploads/`,
+      metadata: { purpose: "incoming_files" },
+    },
+    {
+      root_key: "collections",
+      title: "Koleksiyonlar",
+      gcs_prefix: `${base}/collections/`,
+      metadata: { purpose: "grouped_learning_assets" },
+    },
+    {
+      root_key: "generated",
+      title: "Üretilen İçerikler",
+      gcs_prefix: `${base}/generated/`,
+      metadata: { purpose: "ai_outputs" },
+    },
+  ];
 }
 
 async function createCourse(userId: string, payload: JsonMap) {
@@ -290,11 +355,12 @@ async function createUploadSession(userId: string, payload: JsonMap) {
     );
   }
 
+  await ensureStorageRoots(userId);
   const gcs = getGcsConfig();
 
   const safeName = sanitizeFileName(fileName);
   const sourceId = crypto.randomUUID();
-  const objectName = `user/${userId}/sources/${sourceId}/${safeName}`;
+  const objectName = `user/${userId}/drive/uploads/${sourceId}/${safeName}`;
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
   const uploadUrl = await createGcsV4SignedPutUrl({
     bucket: gcs.bucket,
@@ -321,7 +387,7 @@ async function completeUpload(userId: string, payload: JsonMap) {
   const fileName = requireString(payload.fileName, "fileName");
   const contentType = requireString(payload.contentType, "contentType");
   const sizeBytes = Number(payload.sizeBytes ?? 0);
-  if (!objectName.startsWith(`user/${userId}/sources/`)) {
+  if (!objectName.startsWith(`user/${userId}/drive/uploads/`)) {
     throw new SafeError("FORBIDDEN_OBJECT", "Dosya yolu yetkili değil.", 403);
   }
   await assertOwned(userId, "courses", courseId);
@@ -519,6 +585,7 @@ async function createGeneratedOutput(userId: string, payload: JsonMap) {
   const fileId = requireString(payload.fileId, "fileId");
   const kind = requireString(payload.kind, "kind");
   const itemCount = Number(payload.itemCount ?? generatedCount(kind));
+  await ensureStorageRoots(userId);
   await assertOwned(userId, "drive_files", fileId);
   const [row] = await dbInsert("generated_outputs", [{
     owner_user_id: userId,

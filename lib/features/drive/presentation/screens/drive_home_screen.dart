@@ -45,8 +45,6 @@ class DriveHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasCourses = data.courses.isNotEmpty;
-    final hasRecent = data.recentFiles.isNotEmpty;
-    final hasCollections = data.collections.isNotEmpty;
 
     return WorkspaceScroll(
       onRefresh: onRefresh,
@@ -105,7 +103,7 @@ class DriveHomeScreen extends StatelessWidget {
         SectionTitle(
           title: 'Derslerim',
           actionLabel: 'Tümünü Gör',
-          onAction: () {},
+          onAction: hasCourses ? () {} : onCreateCourse,
         ),
         GlassPanel(
           padding: EdgeInsets.zero,
@@ -121,56 +119,19 @@ class DriveHomeScreen extends StatelessWidget {
                       ),
                   ],
                 )
-              : const EmptyState(
-                  message: 'Henüz bir ders eklenmemiş.',
-                  subMessage: 'Yeni bir ders alanı oluşturarak başlayın.',
-                ),
+              : _CourseEmptyPanel(onCreateCourse: onCreateCourse),
         ),
         SectionTitle(
           title: 'Son Yüklemeler',
           actionLabel: 'Tümünü Gör',
           onAction: onOpenUploadsPage,
         ),
-        if (hasCollections)
-          GlassPanel(
-            padding: const EdgeInsets.all(12),
-            child: SizedBox(
-              height: 200,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: data.collections.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 12),
-                itemBuilder: (context, index) =>
-                    _CollectionCard(bundle: data.collections[index]),
-              ),
-            ),
-          )
-        else
-          const GlassPanel(
-            padding: EdgeInsets.all(22),
-            child: EmptyState(
-              message: 'Henüz bir koleksiyonunuz yok.',
-              subMessage:
-                  'Dosyalarınızdan flashcard veya özet üreterek başlayın.',
-            ),
-          ),
-        GlassPanel(
-          padding: EdgeInsets.zero,
-          child: hasRecent
-              ? Column(
-                  children: [
-                    for (final file in data.recentFiles)
-                      _RecentUploadRow(
-                        file: file,
-                        onTap: () => onOpenFile(file),
-                      ),
-                  ],
-                )
-              : const EmptyState(
-                  message: 'Henüz yüklenmiş dosya yok.',
-                  subMessage: 'Dosyalarınızı buraya yükleyip AI ile işleyin.',
-                ),
+        _HomeStorageOverview(
+          recentFiles: data.recentFiles,
+          collections: data.collections,
+          onOpenFile: onOpenFile,
+          onOpenUploads: onOpenUploads,
+          onOpenCollections: onOpenCollections,
         ),
         const SizedBox(height: 22),
         const TrustStrip(),
@@ -190,55 +151,289 @@ class _HeroPanel extends StatelessWidget {
       container: true,
       explicitChildNodes: true,
       label: 'Kaynak Üssün tanıtım paneli',
-      child: GlassPanel(
-        padding: const EdgeInsets.fromLTRB(20, 24, 18, 20),
-        child: Stack(
-          children: [
-            const Positioned(
-              right: 0,
-              top: 14,
-              child: SizedBox(width: 148, height: 150, child: _StackHeroArt()),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 118),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Kaynak Üssün',
-                      maxLines: 1,
-                      style: TextStyle(
-                        color: AppColors.navy,
-                        fontSize: 31,
-                        fontWeight: FontWeight.w800,
-                        height: 1.05,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 680;
+          return GlassPanel(
+            padding: EdgeInsets.fromLTRB(28, 28, 22, compact ? 22 : 26),
+            radius: 20,
+            child: Stack(
+              children: [
+                if (!compact)
+                  const Positioned(
+                    right: 10,
+                    top: 8,
+                    bottom: 0,
+                    child: SizedBox(width: 280, child: _StackHeroArt()),
+                  ),
+                Padding(
+                  padding: EdgeInsets.only(right: compact ? 0 : 250),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.blue.withValues(alpha: .08),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Text(
+                          'Drive',
+                          style: TextStyle(
+                            color: AppColors.deepBlue,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 20),
+                      const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Kaynak Üssün',
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: AppColors.navy,
+                            fontSize: 46,
+                            fontWeight: FontWeight.w900,
+                            height: 1.05,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Derslerini oluştur, bölümler ekle ve\nmateryallerini öğrenme araçlarına dönüştür.',
+                        style: TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 20,
+                          height: 1.42,
+                        ),
+                      ),
+                      if (compact) ...[
+                        const SizedBox(height: 12),
+                        const Align(
+                          alignment: Alignment.centerRight,
+                          child: SizedBox(
+                            width: 180,
+                            height: 112,
+                            child: _StackHeroArt(),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 28),
+                      SizedBox(
+                        width: 218,
+                        child: SBPrimaryButton(
+                          label: 'Kaynak Oluştur',
+                          icon: Icons.add_rounded,
+                          onPressed: onUpload,
+                          size: SBButtonSize.large,
+                          fullWidth: false,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Derslerini oluştur,\nbölümler ekle ve\nmateryallerini öğrenme\naraçlarına dönüştür.',
-                    style: TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 16.5,
-                      height: 1.28,
-                    ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CourseEmptyPanel extends StatelessWidget {
+  const _CourseEmptyPanel({required this.onCreateCourse});
+
+  final VoidCallback onCreateCourse;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 34),
+      child: Column(
+        children: [
+          const SizedBox(width: 112, height: 96, child: _DriveEmptyArt()),
+          const SizedBox(height: 18),
+          const Text(
+            'Henüz ders oluşturulmadı.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.navy,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: 420),
+            child: const Text(
+              'İlk dersini oluşturarak içeriklerini düzenlemeye ve öğrencilerinle paylaşmaya başlayabilirsin.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.muted,
+                fontSize: 16,
+                height: 1.42,
+              ),
+            ),
+          ),
+          const SizedBox(height: 22),
+          SizedBox(
+            width: 180,
+            child: SBSecondaryButton(
+              label: 'Ders Oluştur',
+              icon: Icons.add_rounded,
+              onPressed: onCreateCourse,
+              size: SBButtonSize.medium,
+              fullWidth: false,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeStorageOverview extends StatelessWidget {
+  const _HomeStorageOverview({
+    required this.recentFiles,
+    required this.collections,
+    required this.onOpenFile,
+    required this.onOpenUploads,
+    required this.onOpenCollections,
+  });
+
+  final List<DriveFile> recentFiles;
+  final List<CollectionBundle> collections;
+  final ValueChanged<DriveFile> onOpenFile;
+  final VoidCallback onOpenUploads;
+  final VoidCallback onOpenCollections;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 720;
+        final uploads = GlassPanel(
+          padding: EdgeInsets.zero,
+          child: recentFiles.isEmpty
+              ? _StorageSummaryCard(
+                  icon: Icons.folder_open_rounded,
+                  message: 'Henüz yüklenmiş dosya yok.',
+                  subMessage:
+                      'Dosyalarını buraya yükleyip AI ile işleyebilirsin.',
+                  onTap: onOpenUploads,
+                )
+              : Column(
+                  children: [
+                    for (final file in recentFiles)
+                      _RecentUploadRow(
+                        file: file,
+                        onTap: () => onOpenFile(file),
+                      ),
+                  ],
+                ),
+        );
+        final collectionPanel = GlassPanel(
+          padding: EdgeInsets.zero,
+          child: collections.isEmpty
+              ? _StorageSummaryCard(
+                  icon: Icons.layers_rounded,
+                  message: 'Henüz koleksiyon yok.',
+                  subMessage:
+                      'Dosyalarını gruplandırarak koleksiyonlar oluşturabilirsin.',
+                  onTap: onOpenCollections,
+                )
+              : SizedBox(
+                  height: 222,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(12),
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: collections.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) =>
+                        _CollectionCard(bundle: collections[index]),
                   ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: 180,
-                    child: SBPrimaryButton(
-                      label: 'Kaynak Yükle',
-                      icon: Icons.add_rounded,
-                      onPressed: onUpload,
-                      size: SBButtonSize.medium,
-                      fullWidth: false,
-                    ),
-                  ),
-                ],
+                ),
+        );
+
+        if (compact) {
+          return Column(
+            children: [uploads, const SizedBox(height: 12), collectionPanel],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: uploads),
+            const SizedBox(width: 14),
+            Expanded(child: collectionPanel),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _StorageSummaryCard extends StatelessWidget {
+  const _StorageSummaryCard({
+    required this.icon,
+    required this.message,
+    required this.subMessage,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String message;
+  final String subMessage;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 34),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                color: AppColors.blue.withValues(alpha: .07),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: AppColors.blue.withValues(alpha: .46),
+                size: 38,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.navy,
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              subMessage,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontSize: 15,
+                height: 1.42,
               ),
             ),
           ],
@@ -246,6 +441,65 @@ class _HeroPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DriveEmptyArt extends StatelessWidget {
+  const _DriveEmptyArt();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(painter: _DriveEmptyPainter());
+  }
+}
+
+class _DriveEmptyPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final bg = Paint()..color = AppColors.blue.withValues(alpha: .07);
+    final cap = Paint()
+      ..shader = const LinearGradient(
+        colors: [Color(0xFF8CB8FF), Color(0xFF1E68FF)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(Offset.zero & size);
+    canvas.drawCircle(center, 44, bg);
+    final path = Path()
+      ..moveTo(center.dx - 44, center.dy - 8)
+      ..lineTo(center.dx, center.dy - 28)
+      ..lineTo(center.dx + 44, center.dy - 8)
+      ..lineTo(center.dx, center.dy + 12)
+      ..close();
+    canvas.drawPath(path, cap);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: Offset(center.dx, center.dy + 14),
+          width: 54,
+          height: 28,
+        ),
+        const Radius.circular(8),
+      ),
+      Paint()..color = const Color(0xFFCFE0FF),
+    );
+    final tassel = Paint()
+      ..color = AppColors.blue
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(center.dx + 32, center.dy - 3),
+      Offset(center.dx + 32, center.dy + 34),
+      tassel,
+    );
+    canvas.drawCircle(
+      Offset(center.dx + 32, center.dy + 37),
+      4,
+      Paint()..color = AppColors.blue,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _StackHeroArt extends StatelessWidget {
@@ -265,36 +519,80 @@ class _StackHeroPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final shadow = Paint()
-      ..color = AppColors.blue.withValues(alpha: .10)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14);
-    final fill = Paint()
-      ..color = const Color(0xFFDCEBFF).withValues(alpha: .82);
-    final line = Paint()
+      ..color = AppColors.blue.withValues(alpha: .13)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
+    final paper = Paint()..color = Colors.white.withValues(alpha: .86);
+    final folder = Paint()
+      ..shader = const LinearGradient(
+        colors: [Color(0xFFBFD7FF), Color(0xFF0B63FF)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(Offset.zero & size);
+    final cloud = Paint()
+      ..shader = const LinearGradient(
+        colors: [Color(0xFFA8C9FF), Color(0xFF0D65FF)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(Offset.zero & size);
+
+    final back = RRect.fromRectAndRadius(
+      Rect.fromLTWH(size.width * .33, 12, size.width * .48, size.height * .62),
+      const Radius.circular(18),
+    );
+    canvas.drawRRect(back.shift(const Offset(14, 18)), shadow);
+    canvas.drawRRect(back, paper);
+    for (var i = 0; i < 4; i++) {
+      final y = 38.0 + i * 28;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(size.width * .39, y, size.width * .36, 13),
+          const Radius.circular(6),
+        ),
+        Paint()..color = const Color(0xFFA994F7).withValues(alpha: .64),
+      );
+    }
+
+    final folderRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(size.width * .45, size.height * .48, size.width * .43, 68),
+      const Radius.circular(16),
+    );
+    canvas.drawRRect(folderRect.shift(const Offset(0, 12)), shadow);
+    canvas.drawRRect(folderRect, folder);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * .45,
+          size.height * .43,
+          size.width * .21,
+          28,
+        ),
+        const Radius.circular(8),
+      ),
+      Paint()..color = const Color(0xFF6FA2FF),
+    );
+
+    final card = RRect.fromRectAndRadius(
+      Rect.fromLTWH(size.width * .08, size.height * .52, 96, 96),
+      const Radius.circular(22),
+    );
+    canvas.drawRRect(card.shift(const Offset(8, 14)), shadow);
+    canvas.drawRRect(card, paper);
+    canvas.drawCircle(Offset(size.width * .24, size.height * .74), 25, cloud);
+    final arrow = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4;
-    for (var i = 0; i < 3; i++) {
-      final rect = RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: Offset(size.width * .55, 48 + i * 36),
-          width: 118,
-          height: 66,
-        ),
-        const Radius.circular(16),
-      );
-      canvas.drawRRect(rect.shift(const Offset(0, 9)), shadow);
-      canvas.drawRRect(rect, fill);
-      canvas.drawRRect(rect, line);
-    }
-    final dot = Paint()..color = const Color(0xFFBBD8FF);
-    for (final offset in const [
-      Offset(18, 100),
-      Offset(40, 86),
-      Offset(55, 112),
-      Offset(24, 132),
-    ]) {
-      canvas.drawCircle(offset, 5, dot);
-    }
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round;
+    final cx = size.width * .24;
+    final cy = size.height * .74;
+    canvas.drawLine(Offset(cx, cy + 14), Offset(cx, cy - 14), arrow);
+    canvas.drawLine(Offset(cx, cy - 14), Offset(cx - 10, cy - 3), arrow);
+    canvas.drawLine(Offset(cx, cy - 14), Offset(cx + 10, cy - 3), arrow);
+
+    final dot = Paint()..color = AppColors.blue.withValues(alpha: .72);
+    canvas.drawCircle(Offset(size.width * .10, size.height * .38), 6, dot);
+    canvas.drawCircle(Offset(size.width * .24, size.height * .18), 7, dot);
+    canvas.drawCircle(Offset(size.width * .92, size.height * .15), 5, dot);
   }
 
   @override
@@ -321,28 +619,36 @@ class _QuickAction extends StatelessWidget {
       label: label,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(18),
         child: ExcludeSemantics(
           child: GlassPanel(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 14),
-            radius: 14,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            radius: 18,
+            child: Row(
               children: [
-                Icon(icon, color: color, size: 31),
-                const SizedBox(height: 9),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: .10),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 34),
+                ),
+                const SizedBox(width: 20),
+                Expanded(
                   child: Text(
                     label,
                     maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.navy,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.navy),
               ],
             ),
           ),
