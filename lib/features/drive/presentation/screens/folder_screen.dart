@@ -549,13 +549,20 @@ class _FolderChoiceSheet<T> extends StatelessWidget {
               ],
             ),
           ),
-          for (final option in options)
-            RadioListTile<T>(
-              value: option.value,
-              groupValue: value,
-              onChanged: (selected) => Navigator.of(context).pop(selected),
-              title: Text(option.label),
+          RadioGroup<T>(
+            groupValue: value,
+            onChanged: (selected) => Navigator.of(context).pop(selected),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final option in options)
+                  RadioListTile<T>(
+                    value: option.value,
+                    title: Text(option.label),
+                  ),
+              ],
             ),
+          ),
           const SizedBox(height: 10),
         ],
       ),
