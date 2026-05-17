@@ -41,7 +41,11 @@ export type GenerationType =
   | "summary"
   | "algorithm"
   | "comparison"
-  | "podcast";
+  | "podcast"
+  | "clinical_scenario"
+  | "learning_plan"
+  | "infographic"
+  | "mind_map";
 
 // AI Provider Types
 export type AIProvider = "vertex" | "openai";
@@ -119,6 +123,47 @@ export interface PodcastScript {
     speaker: string;
     text: string;
     timestamp?: string;
+  }>;
+}
+
+export interface ClinicalScenario {
+  title: string;
+  caseStem: string;
+  findings: string[];
+  questions: Array<{
+    question: string;
+    answer: string;
+    explanation?: string;
+  }>;
+  teachingPoints: string[];
+}
+
+export interface LearningPlan {
+  title: string;
+  objectives: string[];
+  sessions: Array<{
+    title: string;
+    activities: string[];
+    estimatedMinutes?: number;
+  }>;
+  checkpoints: string[];
+}
+
+export interface InfographicPlan {
+  title: string;
+  sections: Array<{
+    heading: string;
+    bullets: string[];
+  }>;
+  visualNotes: string[];
+}
+
+export interface MindMap {
+  title: string;
+  centralTopic: string;
+  branches: Array<{
+    label: string;
+    children: string[];
   }>;
 }
 

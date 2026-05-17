@@ -227,29 +227,12 @@ order by sort_order;
 -- Should use sourcebase_cards_deck_sort_idx
 
 -- ============================================================================
--- PART 6: Cleanup (for test environments only)
+-- PART 6: Safety Note
 -- ============================================================================
 
--- WARNING: Only run this on test databases!
--- This will remove all tables created by the migration
-
-/*
-drop table if exists sourcebase.study_progress cascade;
-drop table if exists sourcebase.study_sessions cascade;
-drop table if exists sourcebase.entitlements cascade;
-drop table if exists sourcebase.purchases cascade;
-drop table if exists sourcebase.product_decks cascade;
-drop table if exists sourcebase.products cascade;
-drop table if exists sourcebase.generated_jobs cascade;
-drop table if exists sourcebase.cards cascade;
-drop table if exists sourcebase.decks cascade;
-drop table if exists sourcebase.sources cascade;
-drop table if exists sourcebase.app_memberships cascade;
-
-drop function if exists sourcebase.is_admin(uuid);
-drop function if exists sourcebase.has_deck_entitlement(uuid, uuid);
-drop function if exists sourcebase.update_updated_at_column();
-*/
+-- This validation file is intentionally non-destructive.
+-- Do not add DROP/TRUNCATE/DELETE cleanup statements here; use disposable test
+-- databases for destructive migration rehearsal.
 
 -- ============================================================================
 -- VALIDATION SUMMARY

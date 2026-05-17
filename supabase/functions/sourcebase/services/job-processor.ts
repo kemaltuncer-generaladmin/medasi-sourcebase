@@ -101,7 +101,7 @@ export async function updateJob(
   );
 
   if (!response.ok) {
-    console.error("Job update failed:", await response.text());
+    console.error("Job update failed:", response.status);
   }
 }
 
@@ -287,7 +287,9 @@ export class JobProcessor {
         job.id,
         {
           status: "failed",
-          error_message: error instanceof Error ? error.message : "Job failed.",
+          error_message: error instanceof SafeError
+            ? error.message
+            : "AI üretimi tamamlanamadı.",
         },
       );
       throw error;
@@ -375,6 +377,14 @@ export class JobProcessor {
         return this.vertex.generateComparison(sourceText, options);
       case "podcast":
         return this.vertex.generatePodcast(sourceText, options);
+      case "clinical_scenario":
+        return this.vertex.generateClinicalScenario(sourceText, options);
+      case "learning_plan":
+        return this.vertex.generateLearningPlan(sourceText, options);
+      case "infographic":
+        return this.vertex.generateInfographic(sourceText, options);
+      case "mind_map":
+        return this.vertex.generateMindMap(sourceText, options);
     }
   }
 }

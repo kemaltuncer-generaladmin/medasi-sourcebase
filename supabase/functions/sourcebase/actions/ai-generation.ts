@@ -5,7 +5,13 @@
  * AGENTS.md Kural 11: OpenAI API key sadece server-side kullanılır.
  */
 
-import { isRecord, requireString, SafeError } from "../types.ts";
+import { getVertexConfig } from "../config.ts";
+import {
+  GenerationType,
+  isRecord,
+  requireString,
+  SafeError,
+} from "../types.ts";
 import { JobProcessor } from "../services/job-processor.ts";
 import { VertexAIClient } from "../services/vertex-ai.ts";
 import {
@@ -14,7 +20,33 @@ import {
   extractDocx,
   extractPdf,
   extractPptx,
+  sanitizeSourceText,
 } from "../services/extraction.ts";
+
+const MAX_EXPLICIT_SOURCE_CHARS = 120_000;
+const MAX_CHAT_MESSAGE_CHARS = 4_000;
+const MAX_CHAT_CONTEXT_CHARS = 12_000;
+const MAX_CONTEXT_FILES = 5;
+const MAX_ACTIVE_USER_JOBS = 3;
+
+const JOB_TYPE_ALIASES: Record<string, GenerationType> = {
+  flashcard: "flashcard",
+  flashcards: "flashcard",
+  quiz: "quiz",
+  question: "quiz",
+  questions: "quiz",
+  summary: "summary",
+  algorithm: "algorithm",
+  comparison: "comparison",
+  podcast: "podcast",
+  clinical_scenario: "clinical_scenario",
+  clinicalScenario: "clinical_scenario",
+  learning_plan: "learning_plan",
+  learningPlan: "learning_plan",
+  infographic: "infographic",
+  mind_map: "mind_map",
+  mindMap: "mind_map",
+};
 
 /**
  * Process file extraction
@@ -73,6 +105,13 @@ async function extractTextFromDriveFile(userId: string, fileId: string) {
   const bucket = String(file.gcs_bucket ?? "");
   const objectName = String(file.gcs_object_name ?? "");
   const fileType = String(file.file_type ?? "");
+  if (!bucket || !objectName || !objectName.startsWith(`user/${userId}/`)) {
+    throw new SafeError(
+      "FILE_STORAGE_INVALID",
+      "Dosya depolama bilgisi doğrulanamadı.",
+      400,
+    );
+  }
 
   const serviceAccountJson = Deno.env.get(
     "SOURCEBASE_GCS_SERVICE_ACCOUNT_JSON",
@@ -106,7 +145,15 @@ async function extractTextFromDriveFile(userId: string, fileId: string) {
       );
   }
 
-  await fetch(
+  if (!extractionResult.text.trim()) {
+    throw new SafeError(
+      "EXTRACTION_EMPTY",
+      "Dosyadan okunabilir metin çıkarılamadı.",
+      400,
+    );
+  }
+
+  const updateResponse = await fetch(
     `${supabaseUrl}/rest/v1/drive_files?id=eq.${fileId}`,
     {
       method: "PATCH",
@@ -131,6 +178,13 @@ async function extractTextFromDriveFile(userId: string, fileId: string) {
       }),
     },
   );
+  if (!updateResponse.ok) {
+    throw new SafeError(
+      "FILE_UPDATE_FAILED",
+      "Dosya işleme durumu güncellenemedi.",
+      500,
+    );
+  }
 
   return extractionResult;
 }
@@ -143,9 +197,18 @@ export async function createGenerationJob(
   userId: string,
   payload: Record<string, unknown>,
 ): Promise<unknown> {
-  const fileId = payload.fileId ? String(payload.fileId) : undefined;
-  const jobType = requireString(payload.jobType, "jobType");
-  const explicitSourceText = payload.sourceText?.toString().trim() ?? "";
+  const fileId = payload.fileId?.toString().trim() || undefined;
+  const jobType = normalizeJobType(requireString(payload.jobType, "jobType"));
+  const explicitSourceText = sanitizeSourceText(
+    payload.sourceText?.toString() ?? "",
+  );
+  if (explicitSourceText.length > MAX_EXPLICIT_SOURCE_CHARS) {
+    throw new SafeError(
+      "SOURCE_TEXT_TOO_LARGE",
+      "Kaynak metin çok uzun.",
+      400,
+    );
+  }
   const sourceText = explicitSourceText ||
     (fileId ? (await extractTextFromDriveFile(userId, fileId)).text : "");
   if (!sourceText.trim()) {
@@ -155,21 +218,38 @@ export async function createGenerationJob(
       400,
     );
   }
+  if (sourceText.length > MAX_EXPLICIT_SOURCE_CHARS) {
+    throw new SafeError(
+      "SOURCE_TEXT_TOO_LARGE",
+      "Kaynak metin AI üretimi için çok uzun.",
+      400,
+    );
+  }
 
-  const count = payload.count ? Number(payload.count) : undefined;
-  const temperature = payload.temperature
-    ? Number(payload.temperature)
-    : undefined;
-  const maxTokens = payload.maxTokens ? Number(payload.maxTokens) : undefined;
+  const count = boundedNumber(payload.count, undefined, 1, 100, "count", true);
+  const temperature = boundedNumber(
+    payload.temperature,
+    undefined,
+    0,
+    1,
+    "temperature",
+  );
+  const maxTokens = boundedNumber(
+    payload.maxTokens,
+    undefined,
+    256,
+    8192,
+    "maxTokens",
+    true,
+  );
 
-  // Job processor oluştur
   const processor = createJobProcessor();
+  await assertJobCapacity(processor, userId, fileId, jobType);
 
-  // Job başlat
   const job = await processor.createJob({
     userId,
     sourceFileId: fileId,
-    jobType: jobType as any,
+    jobType,
     sourceText,
     options: {
       count,
@@ -234,7 +314,7 @@ export async function getGeneratedContent(
   }
 
   const metadata = isRecord(job.metadata) ? job.metadata : {};
-  const content = metadata.content;
+  const content = metadata.content ?? null;
 
   return {
     jobId: job.id,
@@ -254,7 +334,7 @@ export async function listUserJobs(
   userId: string,
   payload: Record<string, unknown>,
 ): Promise<unknown> {
-  const limit = payload.limit ? Number(payload.limit) : 50;
+  const limit = boundedNumber(payload.limit, 50, 1, 100, "limit") ?? 50;
 
   const processor = createJobProcessor();
   const jobs = await processor.listUserJobs(userId, limit);
@@ -304,6 +384,19 @@ export async function retryJob(
   const jobId = requireString(payload.jobId, "jobId");
 
   const processor = createJobProcessor();
+  const oldJob = await processor.getJobStatus(userId, jobId);
+  if (oldJob.source_file_id) {
+    const retryResult = await createGenerationJob(userId, {
+      fileId: oldJob.source_file_id,
+      jobType: oldJob.job_type,
+    });
+    const retry = isRecord(retryResult) ? retryResult : {};
+    return {
+      oldJobId: jobId,
+      newJobId: retry.jobId,
+      status: retry.status,
+    };
+  }
   const newJob = await processor.retryJob(userId, jobId);
 
   return {
@@ -318,11 +411,21 @@ export async function retryJob(
  * Merkezi AI ekranı için doğrudan yanıt üretir.
  */
 export async function centralAiChat(
-  _userId: string,
+  userId: string,
   payload: Record<string, unknown>,
 ): Promise<unknown> {
-  const message = requireString(payload.message, "message");
-  const context = payload.context?.toString().trim() ?? "";
+  const message = validateLength(
+    requireString(payload.message, "message"),
+    MAX_CHAT_MESSAGE_CHARS,
+    "message",
+  );
+  const rawContext = sanitizeSourceText(payload.context?.toString() ?? "");
+  const fileContext = await buildOwnedFileContext(userId, payload);
+  const context = validateLength(
+    [rawContext, fileContext].filter(Boolean).join("\n\n").trim(),
+    MAX_CHAT_CONTEXT_CHARS,
+    "context",
+  );
   const config = createVertexConfig();
   const vertex = new VertexAIClient({
     projectId: config.vertexProjectId,
@@ -348,32 +451,110 @@ function createJobProcessor(): JobProcessor {
 }
 
 function createVertexConfig() {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const vertexProjectId = Deno.env.get("VERTEX_PROJECT_ID");
-  const vertexLocation = Deno.env.get("VERTEX_LOCATION") ?? "us-central1";
-  const vertexModel = Deno.env.get("VERTEX_MODEL") ?? "gemini-1.5-pro";
-  const vertexServiceAccountJson = Deno.env.get(
-    "VERTEX_SERVICE_ACCOUNT_JSON",
-  );
-
-  if (
-    !supabaseUrl || !serviceRoleKey || !vertexProjectId ||
-    !vertexServiceAccountJson
-  ) {
+  try {
+    return getVertexConfig();
+  } catch (_error) {
     throw new SafeError(
       "CONFIG_ERROR",
       "AI üretim yapılandırması eksik.",
       500,
     );
   }
+}
 
-  return {
-    supabaseUrl,
-    serviceRoleKey,
-    vertexProjectId,
-    vertexLocation,
-    vertexModel,
-    vertexServiceAccountJson,
-  };
+function normalizeJobType(jobType: string): GenerationType {
+  const normalized = JOB_TYPE_ALIASES[jobType.trim()];
+  if (!normalized) {
+    throw new SafeError(
+      "UNSUPPORTED_JOB_TYPE",
+      "Bu üretim türü desteklenmiyor.",
+      400,
+    );
+  }
+  return normalized;
+}
+
+function boundedNumber(
+  value: unknown,
+  fallback: number | undefined,
+  min: number,
+  max: number,
+  name: string,
+  integer = false,
+) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const numberValue = Number(value);
+  if (
+    !Number.isFinite(numberValue) || numberValue < min || numberValue > max ||
+    (integer && !Number.isInteger(numberValue))
+  ) {
+    throw new SafeError("INVALID_PAYLOAD", `${name} geçersiz.`, 400);
+  }
+  return numberValue;
+}
+
+function validateLength(text: string, maxLength: number, name: string) {
+  if (text.length > maxLength) {
+    throw new SafeError("INVALID_PAYLOAD", `${name} çok uzun.`, 400);
+  }
+  return text;
+}
+
+async function assertJobCapacity(
+  processor: JobProcessor,
+  userId: string,
+  fileId: string | undefined,
+  jobType: GenerationType,
+) {
+  const jobs = await processor.listUserJobs(userId, 50);
+  const activeJobs = jobs.filter((job) =>
+    job.status === "queued" || job.status === "processing"
+  );
+  if (activeJobs.length >= MAX_ACTIVE_USER_JOBS) {
+    throw new SafeError(
+      "TOO_MANY_ACTIVE_JOBS",
+      "Devam eden çok fazla AI işi var.",
+      429,
+    );
+  }
+  if (
+    fileId &&
+    activeJobs.some((job) =>
+      job.source_file_id === fileId && job.job_type === jobType
+    )
+  ) {
+    throw new SafeError(
+      "JOB_ALREADY_RUNNING",
+      "Bu dosya için aynı türde bir üretim işi zaten devam ediyor.",
+      409,
+    );
+  }
+}
+
+async function buildOwnedFileContext(
+  userId: string,
+  payload: Record<string, unknown>,
+) {
+  const rawIds = Array.isArray(payload.fileIds)
+    ? payload.fileIds
+    : Array.isArray(payload.contextFileIds)
+    ? payload.contextFileIds
+    : [];
+  const fileIds = rawIds
+    .map((item) => item?.toString().trim() ?? "")
+    .filter(Boolean)
+    .slice(0, MAX_CONTEXT_FILES);
+  if (fileIds.length === 0) return "";
+
+  const chunks: string[] = [];
+  for (const fileId of fileIds) {
+    const result = await extractTextFromDriveFile(userId, fileId);
+    if (result.text.trim()) {
+      chunks.push(result.text);
+    }
+  }
+  return sanitizeSourceText(chunks.join("\n\n")).slice(
+    0,
+    MAX_CHAT_CONTEXT_CHARS,
+  );
 }
