@@ -143,16 +143,7 @@ class DriveTopBar extends StatelessWidget {
                 clipBehavior: Clip.none,
                 children: [
                   IconButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context)
-                        ..clearSnackBars()
-                        ..showSnackBar(
-                          const SnackBar(
-                            content: Text('Bildirim merkezi açıldı.'),
-                            duration: Duration(milliseconds: 1000),
-                          ),
-                        );
-                    },
+                    onPressed: () => showSourceBaseNotifications(context),
                     tooltip: 'Bildirimler',
                     icon: const Icon(
                       Icons.notifications_none_rounded,
@@ -245,6 +236,342 @@ class DriveTopBar extends StatelessWidget {
     );
   }
 }
+
+Future<void> showSourceBaseNotifications(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => const _NotificationPanel(),
+  );
+}
+
+class _NotificationPanel extends StatefulWidget {
+  const _NotificationPanel();
+
+  @override
+  State<_NotificationPanel> createState() => _NotificationPanelState();
+}
+
+class _NotificationPanelState extends State<_NotificationPanel> {
+  bool _onlyUnread = false;
+  late List<_SourceBaseNotification> _items = _seedNotifications;
+
+  List<_SourceBaseNotification> get _visibleItems =>
+      _onlyUnread ? _items.where((item) => !item.read).toList() : _items;
+
+  int get _unreadCount => _items.where((item) => !item.read).length;
+
+  void _markAllRead() {
+    setState(() {
+      _items = [for (final item in _items) item.copyWith(read: true)];
+    });
+  }
+
+  void _toggleRead(_SourceBaseNotification target) {
+    setState(() {
+      _items = [
+        for (final item in _items)
+          item.id == target.id ? item.copyWith(read: !item.read) : item,
+      ];
+    });
+  }
+
+  void _remove(_SourceBaseNotification target) {
+    setState(() {
+      _items = [
+        for (final item in _items)
+          if (item.id != target.id) item,
+      ];
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final height = MediaQuery.sizeOf(context).height * .86;
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: height, maxWidth: 720),
+          child: Container(
+            margin: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.page,
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.navy.withValues(alpha: .16),
+                  blurRadius: 28,
+                  offset: const Offset(0, 14),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 12, 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Bildirimler',
+                              style: TextStyle(
+                                color: AppColors.navy,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _unreadCount == 0
+                                  ? 'Yeni bildiriminiz yok'
+                                  : '$_unreadCount okunmamış bildirim',
+                              style: const TextStyle(color: AppColors.muted),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Tümünü okundu işaretle',
+                        onPressed: _unreadCount == 0 ? null : _markAllRead,
+                        icon: const Icon(Icons.done_all_rounded),
+                      ),
+                      IconButton(
+                        tooltip: 'Kapat',
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Tümü'),
+                        selected: !_onlyUnread,
+                        onSelected: (_) => setState(() => _onlyUnread = false),
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('Okunmamış'),
+                        selected: _onlyUnread,
+                        onSelected: (_) => setState(() => _onlyUnread = true),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Flexible(
+                  child: _visibleItems.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.fromLTRB(22, 28, 22, 36),
+                          child: EmptyState(
+                            message: 'Burada gösterilecek bildirim yok.',
+                            subMessage:
+                                'Yeni işlem ve üretim durumları burada görünür.',
+                          ),
+                        )
+                      : ListView.separated(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.fromLTRB(14, 0, 14, 18),
+                          itemCount: _visibleItems.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final item = _visibleItems[index];
+                            return _NotificationTile(
+                              item: item,
+                              onToggleRead: () => _toggleRead(item),
+                              onRemove: () => _remove(item),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationTile extends StatelessWidget {
+  const _NotificationTile({
+    required this.item,
+    required this.onToggleRead,
+    required this.onRemove,
+  });
+
+  final _SourceBaseNotification item;
+  final VoidCallback onToggleRead;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: item.read ? Colors.white : AppColors.selectedBlue,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onToggleRead,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: item.color.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(item.icon, color: item.color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.navy,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                        if (!item.read)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AppColors.blue,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      item.body,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 9),
+                    Row(
+                      children: [
+                        Text(
+                          item.timeLabel,
+                          style: const TextStyle(
+                            color: AppColors.softText,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: onToggleRead,
+                          child: Text(item.read ? 'Okunmadı yap' : 'Okundu'),
+                        ),
+                        IconButton(
+                          tooltip: 'Sil',
+                          onPressed: onRemove,
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SourceBaseNotification {
+  const _SourceBaseNotification({
+    required this.id,
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.body,
+    required this.timeLabel,
+    required this.read,
+  });
+
+  final String id;
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String body;
+  final String timeLabel;
+  final bool read;
+
+  _SourceBaseNotification copyWith({bool? read}) {
+    return _SourceBaseNotification(
+      id: id,
+      icon: icon,
+      color: color,
+      title: title,
+      body: body,
+      timeLabel: timeLabel,
+      read: read ?? this.read,
+    );
+  }
+}
+
+const _seedNotifications = [
+  _SourceBaseNotification(
+    id: 'upload-complete',
+    icon: Icons.cloud_done_rounded,
+    color: AppColors.green,
+    title: 'Yükleme tamamlandı',
+    body:
+        'Son Drive dosyanız işlenmeye hazır. BaseForce ile içerik üretebilirsiniz.',
+    timeLabel: '2 dk önce',
+    read: false,
+  ),
+  _SourceBaseNotification(
+    id: 'generation-ready',
+    icon: Icons.auto_awesome_rounded,
+    color: AppColors.blue,
+    title: 'Flashcard seti hazır',
+    body:
+        'Aritmiler Final.pdf için oluşturulan kartlar koleksiyonlara eklendi.',
+    timeLabel: '18 dk önce',
+    read: false,
+  ),
+  _SourceBaseNotification(
+    id: 'storage-warning',
+    icon: Icons.folder_copy_outlined,
+    color: AppColors.orange,
+    title: 'Drive düzenleme önerisi',
+    body:
+        'Kardiyoloji klasöründe etiketsiz 3 dosya var. Aramada daha kolay bulmak için bölüm ekleyin.',
+    timeLabel: 'Bugün',
+    read: true,
+  ),
+];
 
 class GlassPanel extends StatelessWidget {
   const GlassPanel({
