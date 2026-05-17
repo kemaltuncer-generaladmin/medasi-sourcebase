@@ -225,7 +225,7 @@ class GradientActionButton extends StatelessWidget {
   });
 
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final double height;
 
   @override
@@ -251,6 +251,7 @@ class GradientActionButton extends StatelessWidget {
             elevation: 0,
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
+            disabledForegroundColor: AppColors.muted,
             foregroundColor: AppColors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
@@ -280,7 +281,7 @@ class OutlineActionButton extends StatelessWidget {
   });
 
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final double height;
 
   @override
@@ -321,7 +322,7 @@ class SocialAuthButton extends StatelessWidget {
 
   final String label;
   final Widget icon;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -356,17 +357,23 @@ class SocialAuthButton extends StatelessWidget {
 }
 
 class AuthCheck extends StatelessWidget {
-  const AuthCheck({required this.value, required this.onTap, super.key});
+  const AuthCheck({
+    required this.value,
+    required this.onTap,
+    this.label,
+    super.key,
+  });
 
   final bool value;
   final VoidCallback onTap;
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
       toggled: value,
-      label: 'Beni hatırla',
+      label: label ?? 'Beni hatırla',
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
