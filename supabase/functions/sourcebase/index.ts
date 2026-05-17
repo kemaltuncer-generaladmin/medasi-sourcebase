@@ -17,6 +17,45 @@ import {
 
 type JsonMap = Record<string, unknown>;
 
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_TITLE_LENGTH = 120;
+const MAX_SECTION_TITLE_LENGTH = 120;
+const MAX_INITIAL_SECTIONS = 25;
+const MAX_BATCH_FILE_IDS = 100;
+
+const SUPPORTED_UPLOAD_TYPES: Record<
+  string,
+  { fileType: string; mimeTypes: string[] }
+> = {
+  pdf: { fileType: "pdf", mimeTypes: ["application/pdf"] },
+  docx: {
+    fileType: "docx",
+    mimeTypes: [
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ],
+  },
+  pptx: {
+    fileType: "pptx",
+    mimeTypes: [
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ],
+  },
+};
+
+const GENERATED_OUTPUT_TYPES = new Set([
+  "flashcard",
+  "question",
+  "summary",
+  "algorithm",
+  "comparison",
+  "clinical_scenario",
+  "learning_plan",
+  "podcast",
+  "infographic",
+  "mindMap",
+  "table",
+]);
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": Deno.env.get("SOURCEBASE_ALLOWED_ORIGIN") ??
     "*",
@@ -35,7 +74,8 @@ Deno.serve(async (request) => {
       return failure("METHOD_NOT_ALLOWED", "Bu işlem desteklenmiyor.", 405);
     }
 
-    const body = await request.json().catch(() => ({}));
+    const rawBody = await request.json().catch(() => ({}));
+    const body = isRecord(rawBody) ? rawBody : {};
     const action = String(body.action ?? "");
     const payload = isRecord(body.payload) ? body.payload : {};
     const user = await authenticate(request);
@@ -264,12 +304,24 @@ function storageRootDefinitions(userId: string) {
 }
 
 async function createCourse(userId: string, payload: JsonMap) {
-  const title = requireString(payload.title, "title");
+  const title = validateDisplayText(
+    requireString(payload.title, "title"),
+    "title",
+    MAX_TITLE_LENGTH,
+  );
   const description = optionalString(payload.description);
   const category = optionalString(payload.category);
   const iconName = optionalString(payload.iconName) ?? "book";
   const colorHex = optionalString(payload.colorHex);
-  const initialSections = stringList(payload.initialSections);
+  const initialSections = stringList(payload.initialSections)
+    .slice(0, MAX_INITIAL_SECTIONS)
+    .map((sectionTitle) =>
+      validateDisplayText(
+        sectionTitle,
+        "initialSections",
+        MAX_SECTION_TITLE_LENGTH,
+      )
+    );
   const [row] = await dbInsert("courses", [{
     owner_user_id: userId,
     title,
@@ -301,7 +353,11 @@ async function createCourse(userId: string, payload: JsonMap) {
 
 async function createSection(userId: string, payload: JsonMap) {
   const courseId = requireString(payload.courseId, "courseId");
-  const title = requireString(payload.title, "title");
+  const title = validateDisplayText(
+    requireString(payload.title, "title"),
+    "title",
+    MAX_SECTION_TITLE_LENGTH,
+  );
   await assertOwned(userId, "courses", courseId);
   const [row] = await dbInsert("sections", [{
     owner_user_id: userId,
@@ -315,7 +371,11 @@ async function createSection(userId: string, payload: JsonMap) {
 
 async function renameCourse(userId: string, payload: JsonMap) {
   const courseId = requireString(payload.courseId, "courseId");
-  const title = requireString(payload.title, "title");
+  const title = validateDisplayText(
+    requireString(payload.title, "title"),
+    "title",
+    MAX_TITLE_LENGTH,
+  );
   await assertOwned(userId, "courses", courseId);
   const [row] = await dbPatchReturning(
     "courses",
@@ -328,7 +388,11 @@ async function renameCourse(userId: string, payload: JsonMap) {
 
 async function renameSection(userId: string, payload: JsonMap) {
   const sectionId = requireString(payload.sectionId, "sectionId");
-  const title = requireString(payload.title, "title");
+  const title = validateDisplayText(
+    requireString(payload.title, "title"),
+    "title",
+    MAX_SECTION_TITLE_LENGTH,
+  );
   await assertOwned(userId, "sections", sectionId);
   const [row] = await dbPatchReturning(
     "sections",
@@ -376,28 +440,22 @@ async function createUploadSession(userId: string, payload: JsonMap) {
   const sectionId = requireString(payload.sectionId, "sectionId");
   const sizeBytes = Number(payload.sizeBytes ?? 0);
 
-  if (
-    !Number.isFinite(sizeBytes) || sizeBytes <= 0 ||
-    sizeBytes > 100 * 1024 * 1024
-  ) {
-    throw new SafeError(
-      "INVALID_FILE_SIZE",
-      "Dosya boyutu SourceBase yükleme sınırları dışında.",
-      400,
-    );
-  }
+  const fileInfo = validateUploadFile(fileName, contentType, sizeBytes);
+  await assertOwned(userId, "courses", courseId);
+  await assertOwned(userId, "sections", sectionId);
+  await assertSectionInCourse(userId, sectionId, courseId);
 
   await ensureStorageRoots(userId);
   const gcs = getGcsConfig();
 
-  const safeName = sanitizeFileName(fileName);
+  const safeName = sanitizeFileName(fileInfo.fileName);
   const sourceId = crypto.randomUUID();
   const objectName = `user/${userId}/drive/uploads/${sourceId}/${safeName}`;
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
   const uploadUrl = await createGcsV4SignedPutUrl({
     bucket: gcs.bucket,
     objectName,
-    contentType,
+    contentType: fileInfo.contentType,
     serviceAccountJson: gcs.serviceAccountJson,
     expiresInSeconds: 900,
   });
@@ -407,8 +465,14 @@ async function createUploadSession(userId: string, payload: JsonMap) {
     objectName,
     bucket: gcs.bucket,
     expiresAt: expiresAt.toISOString(),
-    headers: { "Content-Type": contentType },
-    metadata: { sourceId, courseId, sectionId },
+    headers: { "Content-Type": fileInfo.contentType },
+    metadata: {
+      sourceId,
+      courseId,
+      sectionId,
+      fileType: fileInfo.fileType,
+      maxSizeBytes: MAX_UPLOAD_BYTES,
+    },
   };
 }
 
@@ -419,28 +483,76 @@ async function completeUpload(userId: string, payload: JsonMap) {
   const fileName = requireString(payload.fileName, "fileName");
   const contentType = requireString(payload.contentType, "contentType");
   const sizeBytes = Number(payload.sizeBytes ?? 0);
-  if (!objectName.startsWith(`user/${userId}/drive/uploads/`)) {
-    throw new SafeError("FORBIDDEN_OBJECT", "Dosya yolu yetkili değil.", 403);
-  }
+  const fileInfo = validateUploadFile(fileName, contentType, sizeBytes);
+  assertUploadObjectName(
+    userId,
+    objectName,
+    sanitizeFileName(fileInfo.fileName),
+  );
   await assertOwned(userId, "courses", courseId);
   await assertOwned(userId, "sections", sectionId);
   await assertSectionInCourse(userId, sectionId, courseId);
   const gcs = getGcsConfig();
+
+  const [existingRow] = await dbSelect(
+    `drive_files?owner_user_id=eq.${userId}&gcs_object_name=eq.${
+      encodeRestValue(objectName)
+    }&select=*&limit=1`,
+  );
+  if (existingRow) {
+    return {
+      row: existingRow,
+      objectName,
+      status: String(existingRow.ai_status ?? existingRow.status ?? "uploaded"),
+      nextAction: existingRow.ai_status === "ready"
+        ? "generate"
+        : "retry_file_processing",
+    };
+  }
+
+  const objectMetadata = await getGcsObjectMetadata({
+    bucket: gcs.bucket,
+    objectName,
+    serviceAccountJson: gcs.serviceAccountJson,
+  });
+  if (objectMetadata.contentLength !== sizeBytes) {
+    throw new SafeError(
+      "UPLOAD_SIZE_MISMATCH",
+      "Yüklenen dosya boyutu doğrulanamadı.",
+      400,
+    );
+  }
+  if (
+    objectMetadata.contentType &&
+    !isAllowedMimeForFileType(fileInfo.fileType, objectMetadata.contentType)
+  ) {
+    throw new SafeError(
+      "UPLOAD_TYPE_MISMATCH",
+      "Yüklenen dosya türü doğrulanamadı.",
+      400,
+    );
+  }
+
   const [row] = await dbInsert("drive_files", [{
     owner_user_id: userId,
     course_id: courseId,
     section_id: sectionId,
-    title: fileName,
-    file_type: fileKind(fileName),
-    original_filename: fileName,
+    title: fileInfo.fileName,
+    file_type: fileInfo.fileType,
+    original_filename: fileInfo.fileName,
     gcs_bucket: gcs.bucket,
     gcs_object_name: objectName,
-    mime_type: contentType,
-    size_bytes: Number.isFinite(sizeBytes) ? sizeBytes : null,
+    mime_type: fileInfo.contentType,
+    size_bytes: objectMetadata.contentLength,
     page_count: null,
     status: "uploaded",
     ai_status: "processing",
-    metadata: {},
+    metadata: {
+      upload: {
+        contentType: objectMetadata.contentType || fileInfo.contentType,
+        completedAt: new Date().toISOString(),
+      },
+    },
   }]);
   await audit(userId, "complete_upload", "drive_file", row.id, {
     courseId,
@@ -451,12 +563,14 @@ async function completeUpload(userId: string, payload: JsonMap) {
   try {
     await processFileExtraction(userId, { fileId: row.id });
   } catch (error) {
+    const metadata = isRecord(row.metadata) ? row.metadata : {};
     await dbPatch(
       "drive_files",
       `id=eq.${row.id}&owner_user_id=eq.${userId}`,
       {
         ai_status: "failed",
         metadata: {
+          ...metadata,
           extractionError: error instanceof SafeError
             ? error.message
             : "Dosya metni çıkarılamadı.",
@@ -615,18 +729,30 @@ async function addToCollection(userId: string, payload: JsonMap) {
 
 async function createGeneratedOutput(userId: string, payload: JsonMap) {
   const fileId = requireString(payload.fileId, "fileId");
-  const kind = requireString(payload.kind, "kind");
-  const itemCount = Number(payload.itemCount ?? generatedCount(kind));
+  const kind = normalizeGeneratedOutputKind(
+    requireString(payload.kind, "kind"),
+  );
+  const itemCount = boundedNumber(
+    payload.itemCount,
+    generatedCount(kind),
+    1,
+    500,
+    "itemCount",
+  );
+  const jobId = optionalString(payload.jobId);
   await ensureStorageRoots(userId);
   await assertOwned(userId, "drive_files", fileId);
+  if (jobId) {
+    await assertCompletedJobForFile(userId, jobId, fileId);
+  }
   const [row] = await dbInsert("generated_outputs", [{
     owner_user_id: userId,
     source_file_id: fileId,
     output_type: kind,
     title: generatedTitle(kind),
-    item_count: Number.isFinite(itemCount) ? itemCount : generatedCount(kind),
+    item_count: itemCount,
     status: "ready",
-    metadata: { mode: "manual_request" },
+    metadata: { mode: "manual_request", jobId: jobId ?? null },
   }]);
   await audit(userId, "create_generated_output", "generated_output", row.id, {
     fileId,
@@ -672,6 +798,26 @@ async function assertSectionInCourse(
   }
 }
 
+async function assertCompletedJobForFile(
+  userId: string,
+  jobId: string,
+  fileId: string,
+) {
+  const rows = await dbSelect(
+    `generated_jobs?id=eq.${jobId}&owner_user_id=eq.${userId}&source_file_id=eq.${fileId}&select=id,status&limit=1`,
+  );
+  if (rows.length === 0) {
+    throw new SafeError("JOB_NOT_FOUND", "İş bulunamadı veya yetkin yok.", 404);
+  }
+  if (rows[0].status !== "completed") {
+    throw new SafeError(
+      "JOB_NOT_COMPLETED",
+      "Üretim işi tamamlanmadan içerik kaydı oluşturulamaz.",
+      400,
+    );
+  }
+}
+
 async function dbSelect(path: string): Promise<JsonMap[]> {
   const response = await supabaseRest(path, { method: "GET" });
   const data = await response.json();
@@ -686,9 +832,10 @@ async function dbInsert(table: string, rows: JsonMap[]): Promise<JsonMap[]> {
   });
   const data = await response.json();
   if (Array.isArray(data)) {
-    return data.filter(isRecord);
+    const rows = data.filter(isRecord);
+    if (rows.length > 0) return rows;
   }
-  return [];
+  throw new SafeError("DATABASE_ERROR", "SourceBase verisi işlenemedi.", 500);
 }
 
 async function dbPatch(
@@ -788,16 +935,17 @@ async function createGcsV4SignedPutUrl(input: {
     "X-Goog-Credential": credential,
     "X-Goog-Date": timestamp,
     "X-Goog-Expires": String(input.expiresInSeconds),
-    "X-Goog-SignedHeaders": "host",
+    "X-Goog-SignedHeaders": "content-type;host",
   };
   const canonicalQuery = canonicalQueryString(query);
-  const canonicalHeaders = "host:storage.googleapis.com\n";
+  const canonicalHeaders =
+    `content-type:${input.contentType.toLowerCase()}\nhost:storage.googleapis.com\n`;
   const canonicalRequest = [
     "PUT",
     canonicalUri,
     canonicalQuery,
     canonicalHeaders,
-    "host",
+    "content-type;host",
     "UNSIGNED-PAYLOAD",
   ].join("\n");
   const stringToSign = [
@@ -827,6 +975,90 @@ async function deleteGcsObject(input: {
       500,
     );
   }
+}
+
+async function getGcsObjectMetadata(input: {
+  bucket: string;
+  objectName: string;
+  serviceAccountJson: string;
+}) {
+  const url = await createGcsV4SignedHeadUrl({
+    ...input,
+    expiresInSeconds: 300,
+  });
+  const response = await fetch(url, { method: "HEAD" });
+  if (response.status === 404) {
+    throw new SafeError(
+      "UPLOAD_NOT_FOUND",
+      "Yüklenen dosya depolama alanında bulunamadı.",
+      400,
+    );
+  }
+  if (!response.ok) {
+    throw new SafeError(
+      "UPLOAD_VERIFY_FAILED",
+      "Yüklenen dosya doğrulanamadı.",
+      500,
+    );
+  }
+  const contentLength = Number(response.headers.get("content-length") ?? 0);
+  if (!Number.isFinite(contentLength) || contentLength <= 0) {
+    throw new SafeError(
+      "UPLOAD_EMPTY",
+      "Yüklenen dosya boş görünüyor.",
+      400,
+    );
+  }
+  return {
+    contentLength,
+    contentType: response.headers.get("content-type")?.toLowerCase().trim() ??
+      "",
+  };
+}
+
+async function createGcsV4SignedHeadUrl(input: {
+  bucket: string;
+  objectName: string;
+  serviceAccountJson: string;
+  expiresInSeconds: number;
+}) {
+  const serviceAccount = parseGoogleServiceAccount(
+    input.serviceAccountJson,
+    "GCS_SERVICE_ACCOUNT_INVALID",
+  );
+  const now = new Date();
+  const date = formatDate(now);
+  const timestamp = `${date}T${formatTime(now)}Z`;
+  const scope = `${date}/auto/storage/goog4_request`;
+  const credential = `${serviceAccount.clientEmail}/${scope}`;
+  const canonicalUri = `/${encodePath(input.bucket)}/${
+    encodePath(input.objectName)
+  }`;
+  const query: Record<string, string> = {
+    "X-Goog-Algorithm": "GOOG4-RSA-SHA256",
+    "X-Goog-Credential": credential,
+    "X-Goog-Date": timestamp,
+    "X-Goog-Expires": String(input.expiresInSeconds),
+    "X-Goog-SignedHeaders": "host",
+  };
+  const canonicalQuery = canonicalQueryString(query);
+  const canonicalHeaders = "host:storage.googleapis.com\n";
+  const canonicalRequest = [
+    "HEAD",
+    canonicalUri,
+    canonicalQuery,
+    canonicalHeaders,
+    "host",
+    "UNSIGNED-PAYLOAD",
+  ].join("\n");
+  const stringToSign = [
+    "GOOG4-RSA-SHA256",
+    timestamp,
+    scope,
+    await sha256Hex(canonicalRequest),
+  ].join("\n");
+  const signature = await rsaSha256(serviceAccount.privateKey, stringToSign);
+  return `https://storage.googleapis.com${canonicalUri}?${canonicalQuery}&X-Goog-Signature=${signature}`;
 }
 
 async function createGcsV4SignedDeleteUrl(input: {
@@ -917,7 +1149,114 @@ function requireStringList(value: unknown, name: string) {
   if (list.length === 0) {
     throw new SafeError("INVALID_PAYLOAD", `${name} alanı zorunlu.`, 400);
   }
+  if (list.length > MAX_BATCH_FILE_IDS) {
+    throw new SafeError(
+      "INVALID_PAYLOAD",
+      `${name} çok fazla öğe içeriyor.`,
+      400,
+    );
+  }
   return list;
+}
+
+function validateDisplayText(text: string, name: string, maxLength: number) {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length < 2) {
+    throw new SafeError("INVALID_PAYLOAD", `${name} çok kısa.`, 400);
+  }
+  if (normalized.length > maxLength) {
+    throw new SafeError("INVALID_PAYLOAD", `${name} çok uzun.`, 400);
+  }
+  return normalized;
+}
+
+function boundedNumber(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+  name: string,
+) {
+  const numberValue = value === undefined || value === null || value === ""
+    ? fallback
+    : Number(value);
+  if (
+    !Number.isInteger(numberValue) || numberValue < min || numberValue > max
+  ) {
+    throw new SafeError("INVALID_PAYLOAD", `${name} geçersiz.`, 400);
+  }
+  return numberValue;
+}
+
+function validateUploadFile(
+  rawFileName: string,
+  rawContentType: string,
+  sizeBytes: number,
+) {
+  const fileName = rawFileName.replace(/\s+/g, " ").trim();
+  const contentType = rawContentType.toLowerCase().split(";")[0].trim();
+  if (
+    !fileName || fileName.length > 180 || /[\\/]/.test(fileName) ||
+    /[\x00-\x1F\x7F]/.test(fileName)
+  ) {
+    throw new SafeError("INVALID_FILE_NAME", "Dosya adı geçersiz.", 400);
+  }
+  if (
+    !Number.isFinite(sizeBytes) || sizeBytes <= 0 ||
+    sizeBytes > MAX_UPLOAD_BYTES
+  ) {
+    throw new SafeError(
+      "INVALID_FILE_SIZE",
+      "Dosya boyutu SourceBase yükleme sınırları dışında.",
+      400,
+    );
+  }
+  const extension = fileName.split(".").pop()?.toLowerCase() ?? "";
+  const supported = SUPPORTED_UPLOAD_TYPES[extension];
+  if (!supported) {
+    throw new SafeError(
+      "UNSUPPORTED_FILE_TYPE",
+      "Bu dosya tipi desteklenmiyor.",
+      400,
+    );
+  }
+  if (!supported.mimeTypes.includes(contentType)) {
+    throw new SafeError(
+      "UNSUPPORTED_MIME_TYPE",
+      "Dosya MIME tipi desteklenmiyor.",
+      400,
+    );
+  }
+  return { fileName, contentType, fileType: supported.fileType };
+}
+
+function isAllowedMimeForFileType(fileType: string, contentType: string) {
+  const normalized = contentType.toLowerCase().split(";")[0].trim();
+  const supported = Object.values(SUPPORTED_UPLOAD_TYPES).find((item) =>
+    item.fileType === fileType
+  );
+  return Boolean(supported?.mimeTypes.includes(normalized));
+}
+
+function assertUploadObjectName(
+  userId: string,
+  objectName: string,
+  expectedSafeName: string,
+) {
+  const prefix = `user/${userId}/drive/uploads/`;
+  if (!objectName.startsWith(prefix)) {
+    throw new SafeError("FORBIDDEN_OBJECT", "Dosya yolu yetkili değil.", 403);
+  }
+  const rest = objectName.slice(prefix.length);
+  const parts = rest.split("/");
+  const uuidLike =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (
+    parts.length !== 2 || !uuidLike.test(parts[0]) ||
+    parts[1] !== expectedSafeName
+  ) {
+    throw new SafeError("FORBIDDEN_OBJECT", "Dosya yolu doğrulanamadı.", 403);
+  }
 }
 
 function sanitizeFileName(fileName: string) {
@@ -930,13 +1269,29 @@ function sanitizeFileName(fileName: string) {
   return safe || "sourcebase-upload.bin";
 }
 
-function fileKind(fileName: string) {
-  const lower = fileName.toLowerCase();
-  if (lower.endsWith(".pdf")) return "pdf";
-  if (lower.endsWith(".ppt") || lower.endsWith(".pptx")) return "pptx";
-  if (lower.endsWith(".doc")) return "doc";
-  if (lower.endsWith(".zip")) return "zip";
-  return "docx";
+function normalizeGeneratedOutputKind(kind: string) {
+  const normalized = kind.trim();
+  const aliases: Record<string, string> = {
+    quiz: "question",
+    questions: "question",
+    clinicalScenario: "clinical_scenario",
+    clinical_scenario: "clinical_scenario",
+    learningPlan: "learning_plan",
+    learning_plan: "learning_plan",
+    infographic: "infographic",
+    mind_map: "mindMap",
+    mindmap: "mindMap",
+    mindMap: "mindMap",
+  };
+  const outputType = aliases[normalized] ?? normalized;
+  if (!GENERATED_OUTPUT_TYPES.has(outputType)) {
+    throw new SafeError(
+      "UNSUPPORTED_OUTPUT_TYPE",
+      "Bu içerik türü desteklenmiyor.",
+      400,
+    );
+  }
+  return outputType;
 }
 
 function generatedTitle(kind: string) {
@@ -946,7 +1301,10 @@ function generatedTitle(kind: string) {
     summary: "Özet",
     algorithm: "Algoritma",
     comparison: "Karşılaştırma",
+    clinical_scenario: "Klinik Senaryo",
+    learning_plan: "Öğrenme Planı",
     podcast: "Podcast",
+    infographic: "İnfografik",
     table: "Tablo",
     mindMap: "Zihin Haritası",
   };
@@ -960,7 +1318,10 @@ function generatedCount(kind: string) {
     summary: 4,
     algorithm: 1,
     comparison: 1,
+    clinical_scenario: 1,
+    learning_plan: 1,
     podcast: 1,
+    infographic: 1,
     table: 1,
     mindMap: 1,
   };
@@ -976,6 +1337,10 @@ function canonicalQueryString(query: Record<string, string>) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, value]) => `${rfc3986Encode(key)}=${rfc3986Encode(value)}`)
     .join("&");
+}
+
+function encodeRestValue(value: string) {
+  return encodeURIComponent(value);
 }
 
 function rfc3986Encode(value: string) {

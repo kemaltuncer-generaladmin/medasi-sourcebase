@@ -48,14 +48,31 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create the trigger for the 'sources' table
-CREATE TRIGGER on_source_change
-AFTER INSERT OR UPDATE ON sourcebase.sources
-FOR EACH ROW
-EXECUTE FUNCTION sourcebase.trigger_embed_content();
+-- Create triggers only when the base tables already exist. Fresh shadow DBs may
+-- apply this timestamped migration before 20260516_complete_sourcebase_schema.sql.
+DO $$
+BEGIN
+    IF to_regclass('sourcebase.sources') IS NOT NULL
+       AND NOT EXISTS (
+          SELECT 1 FROM pg_trigger
+          WHERE tgname = 'on_source_change'
+            AND tgrelid = 'sourcebase.sources'::regclass
+       ) THEN
+        CREATE TRIGGER on_source_change
+        AFTER INSERT OR UPDATE ON sourcebase.sources
+        FOR EACH ROW
+        EXECUTE FUNCTION sourcebase.trigger_embed_content();
+    END IF;
 
--- Create the trigger for the 'cards' table
-CREATE TRIGGER on_card_change
-AFTER INSERT OR UPDATE ON sourcebase.cards
-FOR EACH ROW
-EXECUTE FUNCTION sourcebase.trigger_embed_content();
+    IF to_regclass('sourcebase.cards') IS NOT NULL
+       AND NOT EXISTS (
+          SELECT 1 FROM pg_trigger
+          WHERE tgname = 'on_card_change'
+            AND tgrelid = 'sourcebase.cards'::regclass
+       ) THEN
+        CREATE TRIGGER on_card_change
+        AFTER INSERT OR UPDATE ON sourcebase.cards
+        FOR EACH ROW
+        EXECUTE FUNCTION sourcebase.trigger_embed_content();
+    END IF;
+END $$;

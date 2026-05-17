@@ -7,6 +7,9 @@
 
 import { SafeError } from "../types.ts";
 
+const MAX_EXTRACTION_BYTES = 100 * 1024 * 1024;
+const MIN_EXTRACTED_TEXT_CHARS = 10;
+
 export interface ExtractionResult {
   text: string;
   pageCount?: number;
@@ -24,6 +27,13 @@ export async function downloadFromGcs(
   objectName: string,
   serviceAccountJson: string,
 ): Promise<ArrayBuffer> {
+  if (!bucket || !objectName || objectName.includes("..")) {
+    throw new SafeError(
+      "GCS_OBJECT_INVALID",
+      "Dosya depolama yolu geçersiz.",
+      400,
+    );
+  }
   return downloadFile(
     await createGcsV4SignedGetUrl({
       bucket,
@@ -59,6 +69,13 @@ function extractionResult(
   pageCount?: number,
 ): ExtractionResult & { chunks: string[] } {
   const text = sanitizeSourceText(rawText);
+  if (text.length < MIN_EXTRACTED_TEXT_CHARS) {
+    throw new SafeError(
+      "EXTRACTION_EMPTY",
+      "Dosyadan okunabilir metin çıkarılamadı.",
+      400,
+    );
+  }
   return {
     text,
     pageCount,
@@ -103,19 +120,7 @@ export async function extractText(
         );
     }
 
-    // Metni temizle ve sanitize et
-    text = sanitizeSourceText(text);
-
-    return {
-      text,
-      pageCount,
-      metadata: {
-        fileType,
-        extractedAt: new Date().toISOString(),
-        charCount: text.length,
-        wordCount: text.split(/\s+/).filter((w) => w.length > 0).length,
-      },
-    };
+    return extractionResult(fileType, text, pageCount);
   } catch (error) {
     if (error instanceof SafeError) {
       throw error;
@@ -139,8 +144,31 @@ async function downloadFile(url: string): Promise<ArrayBuffer> {
       throw new Error(`GCS download failed: ${response.status}`);
     }
 
-    return await response.arrayBuffer();
+    const contentLength = Number(response.headers.get("content-length") ?? 0);
+    if (contentLength > MAX_EXTRACTION_BYTES) {
+      throw new SafeError(
+        "FILE_TOO_LARGE",
+        "Dosya işleme sınırından büyük.",
+        400,
+      );
+    }
+
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength <= 0) {
+      throw new SafeError("FILE_EMPTY", "Dosya boş görünüyor.", 400);
+    }
+    if (buffer.byteLength > MAX_EXTRACTION_BYTES) {
+      throw new SafeError(
+        "FILE_TOO_LARGE",
+        "Dosya işleme sınırından büyük.",
+        400,
+      );
+    }
+    return buffer;
   } catch (error) {
+    if (error instanceof SafeError) {
+      throw error;
+    }
     throw new SafeError(
       "GCS_DOWNLOAD_FAILED",
       "Dosya indirilemedi.",
@@ -169,8 +197,7 @@ async function extractFromPDF(
   const pageCount = pageMatches.length || 1;
 
   return {
-    text: extractedText ||
-      "PDF içeriği çıkarılamadı. Lütfen farklı bir format deneyin.",
+    text: extractedText,
     pageCount,
   };
 }
@@ -188,8 +215,7 @@ async function extractFromDOCX(content: ArrayBuffer): Promise<string> {
     .map((m) => m.replace(/<w:t[^>]*>([^<]+)<\/w:t>/, "$1"))
     .join(" ");
 
-  return extractedText ||
-    "DOCX içeriği çıkarılamadı. Lütfen farklı bir format deneyin.";
+  return extractedText;
 }
 
 /**
@@ -205,8 +231,7 @@ async function extractFromPPTX(content: ArrayBuffer): Promise<string> {
     .map((m) => m.replace(/<a:t[^>]*>([^<]+)<\/a:t>/, "$1"))
     .join("\n");
 
-  return extractedText ||
-    "PPTX içeriği çıkarılamadı. Lütfen farklı bir format deneyin.";
+  return extractedText;
 }
 
 /**
