@@ -416,49 +416,12 @@ class _CourseRow extends StatelessWidget {
                 ),
                 _CourseStatus(status: course.status),
                 const SizedBox(width: 8),
-                Material(
-                  color: Colors.transparent,
-                  child: PopupMenuButton<_CourseMenuAction>(
-                    tooltip: 'Ders işlemleri',
-                    icon: const Icon(
-                      Icons.more_vert_rounded,
-                      color: AppColors.muted,
-                    ),
-                    onSelected: (action) {
-                      switch (action) {
-                        case _CourseMenuAction.open:
-                          onTap();
-                        case _CourseMenuAction.rename:
-                          onRename();
-                        case _CourseMenuAction.delete:
-                          onDelete();
-                      }
-                    },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: _CourseMenuAction.open,
-                        child: _MenuItem(
-                          icon: Icons.open_in_new_rounded,
-                          label: 'Dersi Aç',
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: _CourseMenuAction.rename,
-                        child: _MenuItem(
-                          icon: Icons.edit_outlined,
-                          label: 'Yeniden Adlandır',
-                        ),
-                      ),
-                      PopupMenuDivider(),
-                      PopupMenuItem(
-                        value: _CourseMenuAction.delete,
-                        child: _MenuItem(
-                          icon: Icons.delete_outline_rounded,
-                          label: 'Dersi Sil',
-                          destructive: true,
-                        ),
-                      ),
-                    ],
+                IconButton(
+                  tooltip: 'Ders işlemleri',
+                  onPressed: () => _showCourseActions(context),
+                  icon: const Icon(
+                    Icons.more_vert_rounded,
+                    color: AppColors.muted,
                   ),
                 ),
               ],
@@ -468,33 +431,114 @@ class _CourseRow extends StatelessWidget {
       ),
     );
   }
+
+  void _showCourseActions(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 6, 18, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  course.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _CourseActionTile(
+                  icon: Icons.open_in_new_rounded,
+                  label: 'Dersi Aç',
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    onTap();
+                  },
+                ),
+                _CourseActionTile(
+                  icon: Icons.edit_outlined,
+                  label: 'Yeniden Adlandır',
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    onRename();
+                  },
+                ),
+                _CourseActionTile(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Dersi Sil',
+                  destructive: true,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    onDelete();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
-enum _CourseMenuAction { open, rename, delete }
-
-class _MenuItem extends StatelessWidget {
-  const _MenuItem({
+class _CourseActionTile extends StatelessWidget {
+  const _CourseActionTile({
     required this.icon,
     required this.label,
+    required this.onTap,
     this.destructive = false,
   });
 
   final IconData icon;
   final String label;
+  final VoidCallback onTap;
   final bool destructive;
 
   @override
   Widget build(BuildContext context) {
     final color = destructive ? AppColors.red : AppColors.navy;
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(width: 10),
-        Text(
-          label,
-          style: TextStyle(color: color, fontWeight: FontWeight.w600),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Material(
+        color: destructive ? const Color(0xFFFFF1F2) : AppColors.selectedBlue,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            child: Row(
+              children: [
+                Icon(icon, color: color, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: color),
+              ],
+            ),
+          ),
         ),
-      ],
+      ),
     );
   }
 }
