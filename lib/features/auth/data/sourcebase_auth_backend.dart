@@ -40,6 +40,15 @@ class AuthActionResult {
   bool get ok => error == null;
 }
 
+class AuthCallbackResult {
+  const AuthCallbackResult({this.redirectType});
+
+  final String? redirectType;
+
+  bool get isPasswordRecovery =>
+      redirectType == 'recovery' || redirectType == 'passwordRecovery';
+}
+
 class SourceBaseProfile {
   const SourceBaseProfile({required this.faculty, required this.department});
 
@@ -159,7 +168,7 @@ class SourceBaseAuthBackend {
       OAuthProvider.google,
       redirectTo: SourceBaseAuthConfig.authRedirectTo,
     );
-    return const AuthActionResult.success('Google girisi baslatildi.');
+    return const AuthActionResult.success('Google girişi başlatıldı.');
   }
 
   static Future<AuthActionResult> signInWithApple() async {
@@ -168,7 +177,7 @@ class SourceBaseAuthBackend {
       OAuthProvider.apple,
       redirectTo: SourceBaseAuthConfig.authRedirectTo,
     );
-    return const AuthActionResult.success('Apple girisi baslatildi.');
+    return const AuthActionResult.success('Apple girişi başlatıldı.');
   }
 
   static Future<AuthActionResult> updateSourceBaseProfile(
@@ -227,9 +236,10 @@ class SourceBaseAuthBackend {
     return const AuthActionResult.success('E-posta doğrulaması tamamlandı.');
   }
 
-  static Future<AuthActionResult> completeCallback(Uri uri) async {
+  static Future<AuthCallbackResult> completeCallback(Uri uri) async {
     final auth = _authOrThrow();
     final fragmentParameters = _fragmentParameters(uri);
+    String? redirectType;
     final errorDescription = uri.queryParameters['error_description'] ??
         fragmentParameters['error_description'];
     final error = uri.queryParameters['error'] ?? fragmentParameters['error'];
@@ -239,20 +249,23 @@ class SourceBaseAuthBackend {
 
     final code = uri.queryParameters['code'] ?? fragmentParameters['code'];
     if (code != null && code.trim().isNotEmpty) {
-      await auth.exchangeCodeForSession(code);
+      final response = await auth.exchangeCodeForSession(code);
+      redirectType = response.redirectType;
     } else if (uri.queryParameters.containsKey('access_token')) {
-      await auth.getSessionFromUrl(uri);
+      final response = await auth.getSessionFromUrl(uri);
+      redirectType = response.redirectType;
     } else if (fragmentParameters.containsKey('access_token')) {
-      await auth.getSessionFromUrl(
+      final response = await auth.getSessionFromUrl(
         uri.replace(queryParameters: fragmentParameters, fragment: ''),
       );
+      redirectType = response.redirectType;
     }
 
     if (auth.currentUser == null) {
       throw const AuthException('Oturum bulunamadı.');
     }
 
-    return const AuthActionResult.success('Oturum doğrulandı.');
+    return AuthCallbackResult(redirectType: redirectType);
   }
 
   static Map<String, String> _fragmentParameters(Uri uri) {
