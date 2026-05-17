@@ -326,8 +326,11 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
     });
   }
 
-  Future<void> _generateFromFile(GeneratedKind kind) async {
-    final file = _primaryFile;
+  Future<void> _generateFromFile(
+    GeneratedKind kind, [
+    DriveFile? source,
+  ]) async {
+    final file = source ?? _primaryFile;
     if (file == null) {
       _showSnack('Üretim için önce Drive’dan bir dosya seçin.');
       return;
@@ -573,6 +576,15 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
   }
 
   void _replaceFile(DriveFile updated) {
+    final existingCollectionIds = {
+      for (final bundle in data.collections) bundle.file.id,
+    };
+    final updatedCollection = CollectionBundle(
+      file: updated,
+      outputs: updated.generated,
+      subject: updated.courseTitle,
+      previewKind: updated.generated.firstOrNull?.kind ?? GeneratedKind.summary,
+    );
     final courses = data.courses.map((course) {
       return course.copyWith(
         sections: course.sections.map((section) {
@@ -590,6 +602,23 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
         recentFiles: data.recentFiles
             .map((file) => file.id == updated.id ? updated : file)
             .toList(),
+        uploads: [
+          for (final task in data.uploads)
+            UploadTask(
+              file: task.file.id == updated.id ? updated : task.file,
+              status: task.status,
+              progress: task.progress,
+              errorLabel: task.errorLabel,
+            ),
+        ],
+        collections: [
+          for (final bundle in data.collections)
+            if (bundle.file.id == updated.id)
+              if (updated.generated.isNotEmpty) updatedCollection else bundle,
+          if (updated.generated.isNotEmpty &&
+              !existingCollectionIds.contains(updated.id))
+            updatedCollection,
+        ],
       );
     });
   }
@@ -828,6 +857,9 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
                   data: workspace,
                   onSearch: _openGlobalFileSearch,
                   onBackToDrive: () => _go(WorkspaceRouteKey.home),
+                  onOpenFile: _openFile,
+                  onGenerateForFile: (file, kind) =>
+                      _generateFromFile(kind, file),
                 ),
                 WorkspaceRouteKey.baseForce => BaseForceScreen(
                   data: workspace,

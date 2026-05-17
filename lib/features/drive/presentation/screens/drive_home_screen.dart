@@ -75,11 +75,6 @@ class DriveHomeScreen extends StatelessWidget {
                 },
               ),
               _QuickAction(
-                icon: Icons.picture_as_pdf_rounded,
-                label: 'PDF/PPT',
-                onTap: onOpenUploads,
-              ),
-              _QuickAction(
                 icon: Icons.layers_rounded,
                 label: 'Koleksiyonlar',
                 onTap: onOpenCollections,
@@ -421,47 +416,50 @@ class _CourseRow extends StatelessWidget {
                 ),
                 _CourseStatus(status: course.status),
                 const SizedBox(width: 8),
-                PopupMenuButton<_CourseMenuAction>(
-                  tooltip: 'Ders işlemleri',
-                  icon: const Icon(
-                    Icons.more_vert_rounded,
-                    color: AppColors.muted,
+                Material(
+                  color: Colors.transparent,
+                  child: PopupMenuButton<_CourseMenuAction>(
+                    tooltip: 'Ders işlemleri',
+                    icon: const Icon(
+                      Icons.more_vert_rounded,
+                      color: AppColors.muted,
+                    ),
+                    onSelected: (action) {
+                      switch (action) {
+                        case _CourseMenuAction.open:
+                          onTap();
+                        case _CourseMenuAction.rename:
+                          onRename();
+                        case _CourseMenuAction.delete:
+                          onDelete();
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: _CourseMenuAction.open,
+                        child: _MenuItem(
+                          icon: Icons.open_in_new_rounded,
+                          label: 'Dersi Aç',
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: _CourseMenuAction.rename,
+                        child: _MenuItem(
+                          icon: Icons.edit_outlined,
+                          label: 'Yeniden Adlandır',
+                        ),
+                      ),
+                      PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: _CourseMenuAction.delete,
+                        child: _MenuItem(
+                          icon: Icons.delete_outline_rounded,
+                          label: 'Dersi Sil',
+                          destructive: true,
+                        ),
+                      ),
+                    ],
                   ),
-                  onSelected: (action) {
-                    switch (action) {
-                      case _CourseMenuAction.open:
-                        onTap();
-                      case _CourseMenuAction.rename:
-                        onRename();
-                      case _CourseMenuAction.delete:
-                        onDelete();
-                    }
-                  },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: _CourseMenuAction.open,
-                      child: _MenuItem(
-                        icon: Icons.open_in_new_rounded,
-                        label: 'Dersi Aç',
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: _CourseMenuAction.rename,
-                      child: _MenuItem(
-                        icon: Icons.edit_outlined,
-                        label: 'Yeniden Adlandır',
-                      ),
-                    ),
-                    PopupMenuDivider(),
-                    PopupMenuItem(
-                      value: _CourseMenuAction.delete,
-                      child: _MenuItem(
-                        icon: Icons.delete_outline_rounded,
-                        label: 'Dersi Sil',
-                        destructive: true,
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),

@@ -4,38 +4,84 @@ import '../../../../core/theme/app_colors.dart';
 import '../../data/drive_models.dart';
 import '../widgets/drive_ui.dart';
 
-void _showCollectionsToast(BuildContext context, String message) {
-  ScaffoldMessenger.of(context)
-    ..clearSnackBars()
-    ..showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(milliseconds: 1100),
-      ),
-    );
-}
+enum _CollectionSort { newest, name, outputCount }
 
-class CollectionsScreen extends StatelessWidget {
+enum _CollectionMenuAction { open, flashcard, question, summary }
+
+class CollectionsScreen extends StatefulWidget {
   const CollectionsScreen({
     required this.data,
     required this.onSearch,
     required this.onBackToDrive,
+    required this.onOpenFile,
+    required this.onGenerateForFile,
     super.key,
   });
 
   final DriveWorkspaceData data;
   final VoidCallback onSearch;
   final VoidCallback onBackToDrive;
+  final ValueChanged<DriveFile> onOpenFile;
+  final void Function(DriveFile file, GeneratedKind kind) onGenerateForFile;
+
+  @override
+  State<CollectionsScreen> createState() => _CollectionsScreenState();
+}
+
+class _CollectionsScreenState extends State<CollectionsScreen> {
+  GeneratedKind? _selectedKind;
+  _CollectionSort _sort = _CollectionSort.newest;
+
+  List<CollectionBundle> get _visibleCollections {
+    final filtered = [
+      for (final bundle in widget.data.collections)
+        if (_selectedKind == null ||
+            bundle.outputs.any((output) => output.kind == _selectedKind))
+          bundle,
+    ];
+    return switch (_sort) {
+      _CollectionSort.newest => filtered,
+      _CollectionSort.name => [
+        ...filtered,
+      ]..sort((a, b) => a.file.title.compareTo(b.file.title)),
+      _CollectionSort.outputCount => [
+        ...filtered,
+      ]..sort((a, b) => b.outputs.length.compareTo(a.outputs.length)),
+    };
+  }
+
+  int _count(GeneratedKind kind) {
+    return widget.data.collections.fold<int>(
+      0,
+      (total, bundle) =>
+          total + bundle.outputs.where((output) => output.kind == kind).length,
+    );
+  }
+
+  String get _sortLabel {
+    return switch (_sort) {
+      _CollectionSort.newest => 'En yeni',
+      _CollectionSort.name => 'A-Z',
+      _CollectionSort.outputCount => 'Çıktı sayısı',
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
+    final visibleCollections = _visibleCollections;
     return WorkspaceScroll(
       children: [
-        DriveTopBar(title: 'Koleksiyonlar', onSearch: onSearch),
+        DriveTopBar(title: 'Koleksiyonlar', onSearch: widget.onSearch),
         Row(
-          children: const [
-            Expanded(
+          children: [
+            IconButton(
+              tooltip: 'Drive’a dön',
+              onPressed: widget.onBackToDrive,
+              color: AppColors.navy,
+              icon: const Icon(Icons.arrow_back_rounded, size: 30),
+            ),
+            const SizedBox(width: 6),
+            const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -55,39 +101,43 @@ class CollectionsScreen extends StatelessWidget {
                 ],
               ),
             ),
-            SizedBox(width: 150, height: 122, child: _CollectionHeroArt()),
+            const SizedBox(
+              width: 150,
+              height: 122,
+              child: _CollectionHeroArt(),
+            ),
           ],
         ),
         const SizedBox(height: 16),
         GlassPanel(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
           child: Row(
-            children: const [
+            children: [
               _Metric(
                 icon: Icons.style_rounded,
                 color: AppColors.blue,
-                value: '-',
+                value: _count(GeneratedKind.flashcard).toString(),
                 label: 'Flashcard',
               ),
-              _MetricDivider(),
+              const _MetricDivider(),
               _Metric(
                 icon: Icons.help_rounded,
-                color: Color(0xFF0BB0D4),
-                value: '-',
+                color: const Color(0xFF0BB0D4),
+                value: _count(GeneratedKind.question).toString(),
                 label: 'Soru',
               ),
-              _MetricDivider(),
+              const _MetricDivider(),
               _Metric(
                 icon: Icons.description_rounded,
                 color: AppColors.purple,
-                value: '-',
+                value: _count(GeneratedKind.summary).toString(),
                 label: 'Özet',
               ),
-              _MetricDivider(),
+              const _MetricDivider(),
               _Metric(
                 icon: Icons.account_tree_rounded,
                 color: AppColors.green,
-                value: '-',
+                value: _count(GeneratedKind.algorithm).toString(),
                 label: 'Algoritma',
               ),
             ],
@@ -97,18 +147,46 @@ class CollectionsScreen extends StatelessWidget {
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
-            children: const [
-              _CollectionFilter(label: 'Tümü', selected: true),
-              _CollectionFilter(label: 'Flashcard', icon: Icons.style_rounded),
-              _CollectionFilter(label: 'Soru', icon: Icons.help_rounded),
-              _CollectionFilter(label: 'Özet', icon: Icons.description_rounded),
+            children: [
+              _CollectionFilter(
+                label: 'Tümü',
+                selected: _selectedKind == null,
+                onTap: () => setState(() => _selectedKind = null),
+              ),
+              _CollectionFilter(
+                label: 'Flashcard',
+                icon: Icons.style_rounded,
+                selected: _selectedKind == GeneratedKind.flashcard,
+                onTap: () =>
+                    setState(() => _selectedKind = GeneratedKind.flashcard),
+              ),
+              _CollectionFilter(
+                label: 'Soru',
+                icon: Icons.help_rounded,
+                selected: _selectedKind == GeneratedKind.question,
+                onTap: () =>
+                    setState(() => _selectedKind = GeneratedKind.question),
+              ),
+              _CollectionFilter(
+                label: 'Özet',
+                icon: Icons.description_rounded,
+                selected: _selectedKind == GeneratedKind.summary,
+                onTap: () =>
+                    setState(() => _selectedKind = GeneratedKind.summary),
+              ),
               _CollectionFilter(
                 label: 'Tablo',
                 icon: Icons.table_chart_rounded,
+                selected: _selectedKind == GeneratedKind.table,
+                onTap: () =>
+                    setState(() => _selectedKind = GeneratedKind.table),
               ),
               _CollectionFilter(
                 label: 'Podcast',
                 icon: Icons.headphones_rounded,
+                selected: _selectedKind == GeneratedKind.podcast,
+                onTap: () =>
+                    setState(() => _selectedKind = GeneratedKind.podcast),
               ),
             ],
           ),
@@ -118,32 +196,67 @@ class CollectionsScreen extends StatelessWidget {
             const Expanded(
               child: SectionTitle(title: 'Kaynaklara göre koleksiyonlar'),
             ),
-            TextButton(
-              onPressed: () =>
-                  _showCollectionsToast(context, 'Sıralama: en yeni.'),
-              style: TextButton.styleFrom(foregroundColor: AppColors.blue),
-              child: const Row(
-                children: [
-                  Text(
-                    'En yeni',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  Icon(Icons.keyboard_arrow_down_rounded),
-                ],
+            PopupMenuButton<_CollectionSort>(
+              tooltip: 'Sıralama',
+              initialValue: _sort,
+              onSelected: (sort) => setState(() => _sort = sort),
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: _CollectionSort.newest,
+                  child: Text('En yeni'),
+                ),
+                PopupMenuItem(value: _CollectionSort.name, child: Text('A-Z')),
+                PopupMenuItem(
+                  value: _CollectionSort.outputCount,
+                  child: Text('Çıktı sayısı'),
+                ),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      _sortLabel,
+                      style: const TextStyle(
+                        color: AppColors.blue,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.blue,
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
         ),
-        if (data.collections.isEmpty)
+        if (widget.data.collections.isEmpty)
           const GlassPanel(
             child: EmptyState(
               message: 'Henüz bir koleksiyonunuz yok.',
               subMessage: 'Dosyalarınızdan AI çıktıları üreterek başlayın.',
             ),
           )
+        else if (visibleCollections.isEmpty)
+          const GlassPanel(
+            child: EmptyState(
+              message: 'Bu filtrede koleksiyon yok.',
+              subMessage: 'Başka bir çıktı türü seçin veya yeni çıktı üretin.',
+            ),
+          )
         else
-          for (final bundle in data.collections) ...[
-            _CollectionCard(bundle: bundle),
+          for (final bundle in visibleCollections) ...[
+            _CollectionCard(
+              bundle: bundle,
+              selectedKind: _selectedKind,
+              onOpenFile: widget.onOpenFile,
+              onGenerate: widget.onGenerateForFile,
+            ),
             const SizedBox(height: 12),
           ],
         const SizedBox(height: 10),
@@ -268,11 +381,13 @@ class _MetricDivider extends StatelessWidget {
 class _CollectionFilter extends StatelessWidget {
   const _CollectionFilter({
     required this.label,
+    required this.onTap,
     this.icon,
     this.selected = false,
   });
 
   final String label;
+  final VoidCallback onTap;
   final IconData? icon;
   final bool selected;
 
@@ -283,8 +398,7 @@ class _CollectionFilter extends StatelessWidget {
       selected: selected,
       label: '$label filtresi',
       child: InkWell(
-        onTap: () =>
-            _showCollectionsToast(context, '$label filtresi uygulandı.'),
+        onTap: onTap,
         borderRadius: BorderRadius.circular(18),
         child: ExcludeSemantics(
           child: Container(
@@ -325,13 +439,29 @@ class _CollectionFilter extends StatelessWidget {
 }
 
 class _CollectionCard extends StatelessWidget {
-  const _CollectionCard({required this.bundle});
+  const _CollectionCard({
+    required this.bundle,
+    required this.selectedKind,
+    required this.onOpenFile,
+    required this.onGenerate,
+  });
 
   final CollectionBundle bundle;
+  final GeneratedKind? selectedKind;
+  final ValueChanged<DriveFile> onOpenFile;
+  final void Function(DriveFile file, GeneratedKind kind) onGenerate;
 
   @override
   Widget build(BuildContext context) {
     final file = bundle.file;
+    final outputs = selectedKind == null
+        ? bundle.outputs
+        : bundle.outputs
+              .where((output) => output.kind == selectedKind)
+              .toList();
+    final previewKind = outputs.isEmpty
+        ? bundle.previewKind
+        : outputs.first.kind;
     final details = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -355,8 +485,7 @@ class _CollectionCard extends StatelessWidget {
                 runSpacing: 6,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  for (final output in bundle.outputs)
-                    _OutputLabel(output: output),
+                  for (final output in outputs) _OutputLabel(output: output),
                 ],
               ),
               const SizedBox(height: 16),
@@ -375,10 +504,7 @@ class _CollectionCard extends StatelessWidget {
     final preview = Column(
       children: [
         OutlinedButton(
-          onPressed: () => _showCollectionsToast(
-            context,
-            '${bundle.file.title} koleksiyonu görüntüleniyor.',
-          ),
+          onPressed: () => onOpenFile(file),
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.blue,
             backgroundColor: AppColors.selectedBlue,
@@ -390,12 +516,12 @@ class _CollectionCard extends StatelessWidget {
           child: const Text('Görüntüle'),
         ),
         const SizedBox(height: 10),
-        _CollectionPreview(kind: bundle.previewKind),
+        _CollectionPreview(kind: previewKind),
         const SizedBox(height: 8),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(
-            4,
+            outputs.length.clamp(1, 4).toInt(),
             (index) => Container(
               margin: const EdgeInsets.symmetric(horizontal: 3),
               width: 7,
@@ -410,19 +536,50 @@ class _CollectionCard extends StatelessWidget {
       ],
     );
 
-    final menu = IconButton(
+    final menu = PopupMenuButton<_CollectionMenuAction>(
       tooltip: 'Diğer işlemler',
-      onPressed: () =>
-          _showCollectionsToast(context, 'Koleksiyon işlemleri açıldı.'),
       icon: const Icon(Icons.more_vert_rounded, color: AppColors.muted),
-      visualDensity: VisualDensity.compact,
+      onSelected: (action) {
+        switch (action) {
+          case _CollectionMenuAction.open:
+            onOpenFile(file);
+          case _CollectionMenuAction.flashcard:
+            onGenerate(file, GeneratedKind.flashcard);
+          case _CollectionMenuAction.question:
+            onGenerate(file, GeneratedKind.question);
+          case _CollectionMenuAction.summary:
+            onGenerate(file, GeneratedKind.summary);
+        }
+      },
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          value: _CollectionMenuAction.open,
+          child: _MenuItem(
+            icon: Icons.open_in_new_rounded,
+            label: 'Kaynağı Aç',
+          ),
+        ),
+        PopupMenuDivider(),
+        PopupMenuItem(
+          value: _CollectionMenuAction.flashcard,
+          child: _MenuItem(icon: Icons.style_rounded, label: 'Flashcard Üret'),
+        ),
+        PopupMenuItem(
+          value: _CollectionMenuAction.question,
+          child: _MenuItem(icon: Icons.help_rounded, label: 'Soru Üret'),
+        ),
+        PopupMenuItem(
+          value: _CollectionMenuAction.summary,
+          child: _MenuItem(icon: Icons.description_rounded, label: 'Özet Üret'),
+        ),
+      ],
     );
 
     return Semantics(
       container: true,
       explicitChildNodes: true,
       label:
-          '${file.title} koleksiyonu. ${bundle.outputs.length} çıktı. ${bundle.subject}. Son güncelleme: ${file.updatedLabel}.',
+          '${file.title} koleksiyonu. ${outputs.length} çıktı. ${bundle.subject}. Son güncelleme: ${file.updatedLabel}.',
       child: GlassPanel(
         padding: const EdgeInsets.all(16),
         child: LayoutBuilder(
@@ -453,6 +610,24 @@ class _CollectionCard extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+class _MenuItem extends StatelessWidget {
+  const _MenuItem({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.navy, size: 20),
+        const SizedBox(width: 10),
+        Text(label),
+      ],
     );
   }
 }

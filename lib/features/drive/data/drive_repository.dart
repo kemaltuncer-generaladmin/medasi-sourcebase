@@ -141,12 +141,12 @@ DriveWorkspaceData _workspaceFromJson(Map<String, dynamic> json) {
         (course) => _courseFromRow(course, rawSections, rawFiles, rawOutputs),
       )
       .toList();
-  final recent = courses
+  final files = courses
       .expand((course) => course.sections)
       .expand((section) => section.files)
-      .take(5)
       .toList();
-  final collections = recent
+  final recent = files.take(5).toList();
+  final collections = files
       .where((file) => file.generated.isNotEmpty)
       .map(
         (file) => CollectionBundle(
