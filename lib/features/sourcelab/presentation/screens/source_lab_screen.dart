@@ -248,176 +248,188 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
           child: KeyedSubtree(
             key: ValueKey(view),
             child: switch (view) {
-          SourceLabView.home => _SourceLabHome(
-            selectedSources: selectedSources,
-            onSearch: widget.onSearch,
-            onPickSources: _showSourcePicker,
-            onOpenTool: _openTool,
-            onContinue: () => _openTool(_ToolKind.clinical),
-            onToast: _toast,
-          ),
-          SourceLabView.clinicalBuilder => _ClinicalScenarioBuilder(
-            selectedSources: selectedSources,
-            clinicalType: clinicalType,
-            difficulty: clinicalDifficulty,
-            level: clinicalLevel,
-            branch: clinicalBranch,
-            patientAge: patientAge,
-            feedback: clinicalFeedback,
-            onBack: _back,
-            onSearch: widget.onSearch,
-            onPickSources: _showSourcePicker,
-            onRemoveSource: _removeSource,
-            onClinicalType: (value) => setState(() => clinicalType = value),
-            onDifficulty: (value) => setState(() => clinicalDifficulty = value),
-            onLevel: (value) => setState(() => clinicalLevel = value),
-            onBranch: (value) => setState(() => clinicalBranch = value),
-            onAge: (value) => setState(() => patientAge = value),
-            onFeedback: (value) => setState(() => clinicalFeedback = value),
-            onGenerate: () => _generate(SourceLabView.clinicalResult),
-          ),
-          SourceLabView.clinicalResult => _ClinicalScenarioResult(
-            onBack: _back,
-            onSearch: widget.onSearch,
-            onSave: () => _toast('Bu özellik henüz hazır değil.'),
-            onExport: () => _toast('Bu özellik henüz hazır değil.'),
-            onRegenerate: () => _open(SourceLabView.clinicalBuilder),
-            onComplete: () => _toast('Bu özellik henüz hazır değil.'),
-          ),
-          SourceLabView.planBuilder => _LearningPlanBuilder(
-            selectedSources: selectedSources,
-            goal: planGoal,
-            priority: planPriority,
-            intensity: planIntensity,
-            days: planDays,
-            dailyDuration: dailyDuration,
-            includeReviews: includeReviews,
-            onBack: _back,
-            onSearch: widget.onSearch,
-            onPickSources: _showSourcePicker,
-            onGoal: (value) => setState(() => planGoal = value),
-            onPriority: (value) => setState(() => planPriority = value),
-            onIntensity: (value) => setState(() => planIntensity = value),
-            onDaysChanged: (value) => setState(() => planDays = value),
-            onDuration: (value) => setState(() => dailyDuration = value),
-            onReviews: (value) => setState(() => includeReviews = value),
-            onGenerate: () => _generate(SourceLabView.planResult),
-          ),
-          SourceLabView.planResult => _LearningPlanResult(
-            selectedSources: selectedSources,
-            planDays: planDays,
-            planGoal: planGoal,
-            onBack: _back,
-            onSave: () => _toast('Bu özellik henüz hazır değil.'),
-            onCalendar: () => _toast('Bu özellik henüz hazır değil.'),
-            onExport: () => _toast('Bu özellik henüz hazır değil.'),
-            onRegenerate: () => _open(SourceLabView.planBuilder),
-          ),
-          SourceLabView.podcastBuilder => _PodcastBuilder(
-            selectedSources: selectedSources,
-            voice: podcastVoice,
-            duration: podcastDuration,
-            focus: podcastFocus,
-            pace: podcastPace,
-            includeMiniQuiz: includeMiniQuiz,
-            onBack: _back,
-            onSearch: widget.onSearch,
-            onPickSources: _showSourcePicker,
-            onRemoveSource: _removeSource,
-            onVoice: (value) => setState(() => podcastVoice = value),
-            onDuration: (value) => setState(() => podcastDuration = value),
-            onFocus: (value) => setState(() => podcastFocus = value),
-            onPace: (value) => setState(() => podcastPace = value),
-            onMiniQuiz: (value) => setState(() => includeMiniQuiz = value),
-            onGenerate: () => _generate(SourceLabView.podcastResult),
-          ),
-          SourceLabView.podcastResult => _PodcastResult(
-            playing: podcastPlaying,
-            position: podcastPosition,
-            onBack: _back,
-            onTogglePlay: () =>
-                setState(() => podcastPlaying = !podcastPlaying),
-            onPosition: (value) => setState(() => podcastPosition = value),
-            onSpeed: () => _toast('Bu özellik henüz hazır değil.'),
-            onShare: () => _toast('Bu özellik henüz hazır değil.'),
-            onExport: () => _toast('Bu özellik henüz hazır değil.'),
-            onRegenerate: () => _open(SourceLabView.podcastBuilder),
-            onSave: () => _toast('Bu özellik henüz hazır değil.'),
-            onSkipBack: () {
-              setState(() {
-                podcastPosition = math.max(0, podcastPosition - .08);
-              });
+              SourceLabView.home => _SourceLabHome(
+                selectedSources: selectedSources,
+                onSearch: widget.onSearch,
+                onPickSources: _showSourcePicker,
+                onOpenTool: _openTool,
+                onContinue: () => _openTool(_ToolKind.clinical),
+                onToast: _toast,
+              ),
+              SourceLabView.clinicalBuilder => _ClinicalScenarioBuilder(
+                selectedSources: selectedSources,
+                clinicalType: clinicalType,
+                difficulty: clinicalDifficulty,
+                level: clinicalLevel,
+                branch: clinicalBranch,
+                patientAge: patientAge,
+                feedback: clinicalFeedback,
+                onBack: _back,
+                onSearch: widget.onSearch,
+                onPickSources: _showSourcePicker,
+                onRemoveSource: _removeSource,
+                onClinicalType: (value) => setState(() => clinicalType = value),
+                onDifficulty: (value) =>
+                    setState(() => clinicalDifficulty = value),
+                onLevel: (value) => setState(() => clinicalLevel = value),
+                onBranch: (value) => setState(() => clinicalBranch = value),
+                onAge: (value) => setState(() => patientAge = value),
+                onFeedback: (value) => setState(() => clinicalFeedback = value),
+                onGenerate: () => _generate(SourceLabView.clinicalResult),
+              ),
+              SourceLabView.clinicalResult => _ClinicalScenarioResult(
+                onBack: _back,
+                onSearch: widget.onSearch,
+                onSave: () => _toast('Bu özellik henüz hazır değil.'),
+                onExport: () => _toast('Bu özellik henüz hazır değil.'),
+                onRegenerate: () => _open(SourceLabView.clinicalBuilder),
+                onComplete: () => _toast('Bu özellik henüz hazır değil.'),
+              ),
+              SourceLabView.planBuilder => _LearningPlanBuilder(
+                selectedSources: selectedSources,
+                goal: planGoal,
+                priority: planPriority,
+                intensity: planIntensity,
+                days: planDays,
+                dailyDuration: dailyDuration,
+                includeReviews: includeReviews,
+                onBack: _back,
+                onSearch: widget.onSearch,
+                onPickSources: _showSourcePicker,
+                onGoal: (value) => setState(() => planGoal = value),
+                onPriority: (value) => setState(() => planPriority = value),
+                onIntensity: (value) => setState(() => planIntensity = value),
+                onDaysChanged: (value) => setState(() => planDays = value),
+                onDuration: (value) => setState(() => dailyDuration = value),
+                onReviews: (value) => setState(() => includeReviews = value),
+                onGenerate: () => _generate(SourceLabView.planResult),
+              ),
+              SourceLabView.planResult => _LearningPlanResult(
+                selectedSources: selectedSources,
+                planDays: planDays,
+                planGoal: planGoal,
+                onBack: _back,
+                onSave: () => _toast('Bu özellik henüz hazır değil.'),
+                onCalendar: () => _toast('Bu özellik henüz hazır değil.'),
+                onExport: () => _toast('Bu özellik henüz hazır değil.'),
+                onRegenerate: () => _open(SourceLabView.planBuilder),
+              ),
+              SourceLabView.podcastBuilder => _PodcastBuilder(
+                selectedSources: selectedSources,
+                voice: podcastVoice,
+                duration: podcastDuration,
+                focus: podcastFocus,
+                pace: podcastPace,
+                includeMiniQuiz: includeMiniQuiz,
+                onBack: _back,
+                onSearch: widget.onSearch,
+                onPickSources: _showSourcePicker,
+                onRemoveSource: _removeSource,
+                onVoice: (value) => setState(() => podcastVoice = value),
+                onDuration: (value) => setState(() => podcastDuration = value),
+                onFocus: (value) => setState(() => podcastFocus = value),
+                onPace: (value) => setState(() => podcastPace = value),
+                onMiniQuiz: (value) => setState(() => includeMiniQuiz = value),
+                onGenerate: () => _generate(SourceLabView.podcastResult),
+              ),
+              SourceLabView.podcastResult => _PodcastResult(
+                playing: podcastPlaying,
+                position: podcastPosition,
+                onBack: _back,
+                onTogglePlay: () =>
+                    setState(() => podcastPlaying = !podcastPlaying),
+                onPosition: (value) => setState(() => podcastPosition = value),
+                onSpeed: () => _toast('Bu özellik henüz hazır değil.'),
+                onShare: () => _toast('Bu özellik henüz hazır değil.'),
+                onExport: () => _toast('Bu özellik henüz hazır değil.'),
+                onRegenerate: () => _open(SourceLabView.podcastBuilder),
+                onSave: () => _toast('Bu özellik henüz hazır değil.'),
+                onSkipBack: () {
+                  setState(() {
+                    podcastPosition = math.max(0, podcastPosition - .08);
+                  });
+                },
+                onSkipForward: () {
+                  setState(() {
+                    podcastPosition = math.min(1, podcastPosition + .08);
+                  });
+                },
+                onVolume: () => _toast('Bu özellik henüz hazır değil.'),
+              ),
+              SourceLabView.infographicBuilder => _InfographicBuilder(
+                selectedSources: selectedSources,
+                style: infographicStyle,
+                size: infographicSize,
+                density: infographicDensity,
+                accent: infographicAccent,
+                showSources: showInfographicSources,
+                onBack: _back,
+                onSearch: widget.onSearch,
+                onPickSources: _showSourcePicker,
+                onStyle: (value) => setState(() => infographicStyle = value),
+                onSize: (value) => setState(() => infographicSize = value),
+                onDensity: (value) =>
+                    setState(() => infographicDensity = value),
+                onAccent: (value) => setState(() => infographicAccent = value),
+                onShowSources: (value) =>
+                    setState(() => showInfographicSources = value),
+                onGenerate: () => _generate(SourceLabView.infographicResult),
+              ),
+              SourceLabView.infographicResult => _InfographicResult(
+                onBack: _back,
+                onSearch: widget.onSearch,
+                onSave: () => _toast('Bu özellik henüz hazır değil.'),
+                onPng: () => _toast('Bu özellik henüz hazır değil.'),
+                onPdf: () => _toast('Bu özellik henüz hazır değil.'),
+                onRegenerate: () => _open(SourceLabView.infographicBuilder),
+              ),
+              SourceLabView.mindMapBuilder => _MindMapBuilder(
+                selectedSources: selectedSources,
+                mapKind: mapKind,
+                depth: mapDepth,
+                look: mapLook,
+                topics: mapTopics,
+                expandChildren: expandChildren,
+                onBack: _back,
+                onSearch: widget.onSearch,
+                onPickSources: _showSourcePicker,
+                onRemoveSource: _removeSource,
+                onMapKind: (value) => setState(() => mapKind = value),
+                onDepth: (value) => setState(() => mapDepth = value),
+                onLook: (value) => setState(() => mapLook = value),
+                onToggleTopic: (topic) {
+                  setState(() {
+                    if (mapTopics.contains(topic)) {
+                      if (mapTopics.length == 1) {
+                        return;
+                      }
+                      mapTopics.remove(topic);
+                    } else {
+                      mapTopics.add(topic);
+                    }
+                  });
+                },
+                onExpandChildren: (value) =>
+                    setState(() => expandChildren = value),
+                onGenerate: () => _generate(SourceLabView.mindMapResult),
+              ),
+              SourceLabView.mindMapResult => _MindMapResult(
+                onBack: _back,
+                onSave: () => _toast('Bu özellik henüz hazır değil.'),
+                onExport: () => _toast('Bu özellik henüz hazır değil.'),
+                onRegenerate: () => _open(SourceLabView.mindMapBuilder),
+              ),
             },
-            onSkipForward: () {
-              setState(() {
-                podcastPosition = math.min(1, podcastPosition + .08);
-              });
-            },
-            onVolume: () => _toast('Bu özellik henüz hazır değil.'),
           ),
-          SourceLabView.infographicBuilder => _InfographicBuilder(
-            selectedSources: selectedSources,
-            style: infographicStyle,
-            size: infographicSize,
-            density: infographicDensity,
-            accent: infographicAccent,
-            showSources: showInfographicSources,
-            onBack: _back,
-            onSearch: widget.onSearch,
-            onPickSources: _showSourcePicker,
-            onStyle: (value) => setState(() => infographicStyle = value),
-            onSize: (value) => setState(() => infographicSize = value),
-            onDensity: (value) => setState(() => infographicDensity = value),
-            onAccent: (value) => setState(() => infographicAccent = value),
-            onShowSources: (value) =>
-                setState(() => showInfographicSources = value),
-            onGenerate: () => _generate(SourceLabView.infographicResult),
+        ),
+        if (_isLoading)
+          const Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            child: LinearProgressIndicator(minHeight: 3),
           ),
-          SourceLabView.infographicResult => _InfographicResult(
-            onBack: _back,
-            onSearch: widget.onSearch,
-            onSave: () => _toast('Bu özellik henüz hazır değil.'),
-            onPng: () => _toast('Bu özellik henüz hazır değil.'),
-            onPdf: () => _toast('Bu özellik henüz hazır değil.'),
-            onRegenerate: () => _open(SourceLabView.infographicBuilder),
-          ),
-          SourceLabView.mindMapBuilder => _MindMapBuilder(
-            selectedSources: selectedSources,
-            mapKind: mapKind,
-            depth: mapDepth,
-            look: mapLook,
-            topics: mapTopics,
-            expandChildren: expandChildren,
-            onBack: _back,
-            onSearch: widget.onSearch,
-            onPickSources: _showSourcePicker,
-            onRemoveSource: _removeSource,
-            onMapKind: (value) => setState(() => mapKind = value),
-            onDepth: (value) => setState(() => mapDepth = value),
-            onLook: (value) => setState(() => mapLook = value),
-            onToggleTopic: (topic) {
-              setState(() {
-                if (mapTopics.contains(topic)) {
-                  if (mapTopics.length == 1) {
-                    return;
-                  }
-                  mapTopics.remove(topic);
-                } else {
-                  mapTopics.add(topic);
-                }
-              });
-            },
-            onExpandChildren: (value) => setState(() => expandChildren = value),
-            onGenerate: () => _generate(SourceLabView.mindMapResult),
-          ),
-          SourceLabView.mindMapResult => _MindMapResult(
-            onBack: _back,
-            onSave: () => _toast('Bu özellik henüz hazır değil.'),
-            onExport: () => _toast('Bu özellik henüz hazır değil.'),
-            onRegenerate: () => _open(SourceLabView.mindMapBuilder),
-          ),
-        },
-      ),
+      ],
     );
   }
 }
@@ -799,8 +811,7 @@ class _SmartSuggestionsPanel extends StatelessWidget {
           _SuggestionRow(
             icon: Icons.keyboard_voice_outlined,
             color: AppColors.blue,
-            text:
-                'Ders notlarını podcast formatında dinleyebilirsin.',
+            text: 'Ders notlarını podcast formatında dinleyebilirsin.',
             onTap: () => onOpenTool(_ToolKind.podcast),
           ),
         ],
@@ -5583,10 +5594,10 @@ class _PlanPreviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lines = const [
-        'İçerik hazırlanıyor',
-        'İçerik hazırlanıyor',
-        'İçerik hazırlanıyor',
-      ];
+      'İçerik hazırlanıyor',
+      'İçerik hazırlanıyor',
+      'İçerik hazırlanıyor',
+    ];
     return Container(
       height: 170,
       padding: const EdgeInsets.all(16),
@@ -5953,24 +5964,9 @@ class _PlanTimelinePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      (
-        '1',
-        'Bölüm 1',
-        'İçerik hazırlanıyor',
-        '—',
-      ),
-      (
-        '2',
-        'Bölüm 2',
-        'İçerik hazırlanıyor',
-        '—',
-      ),
-      (
-        '3',
-        'Bölüm 3',
-        'İçerik hazırlanıyor',
-        '—',
-      ),
+      ('1', 'Bölüm 1', 'İçerik hazırlanıyor', '—'),
+      ('2', 'Bölüm 2', 'İçerik hazırlanıyor', '—'),
+      ('3', 'Bölüm 3', 'İçerik hazırlanıyor', '—'),
     ];
     return _LabPanel(
       padding: EdgeInsets.zero,
@@ -6111,10 +6107,7 @@ class _TodayGoalCard extends StatelessWidget {
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  TextSpan(
-                    text:
-                        'Konu Başlığı\nBu bölüm henüz hazır değil.',
-                  ),
+                  TextSpan(text: 'Konu Başlığı\nBu bölüm henüz hazır değil.'),
                 ],
               ),
               style: TextStyle(
@@ -6292,9 +6285,21 @@ class _LegendList extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: const [
-        _LegendRow(label: 'Kategori 1', value: 'İçerik hazırlanıyor', color: AppColors.blue),
-        _LegendRow(label: 'Kategori 2', value: 'İçerik hazırlanıyor', color: AppColors.green),
-        _LegendRow(label: 'Kategori 3', value: 'İçerik hazırlanıyor', color: AppColors.purple),
+        _LegendRow(
+          label: 'Kategori 1',
+          value: 'İçerik hazırlanıyor',
+          color: AppColors.blue,
+        ),
+        _LegendRow(
+          label: 'Kategori 2',
+          value: 'İçerik hazırlanıyor',
+          color: AppColors.green,
+        ),
+        _LegendRow(
+          label: 'Kategori 3',
+          value: 'İçerik hazırlanıyor',
+          color: AppColors.purple,
+        ),
       ],
     );
   }
@@ -6894,13 +6899,11 @@ class _PodcastNotesPanel extends StatelessWidget {
             icon: Icons.notes_rounded,
             title: 'Notlar',
             action: 'Kritik Noktalar',
-            onAction: () => _showLabSnack(context, 'Bu bölüm henüz hazır değil.'),
+            onAction: () =>
+                _showLabSnack(context, 'Bu bölüm henüz hazır değil.'),
           ),
           for (final note in const [
-            (
-              'Not başlığı yükleniyor...',
-              'İçerik açıklaması hazırlanıyor.',
-            ),
+            ('Not başlığı yükleniyor...', 'İçerik açıklaması hazırlanıyor.'),
           ])
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
@@ -7089,7 +7092,10 @@ class _HeartCoverCard extends StatelessWidget {
           Text(
             'KONU\nBAŞLIĞI',
             textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900),
+            style: TextStyle(
+              color: AppColors.muted,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ],
       ),

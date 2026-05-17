@@ -297,7 +297,7 @@ class SocialAuthButton extends StatelessWidget {
 
   final String label;
   final Widget icon;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {

@@ -196,10 +196,8 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             addHints: flashcardAddHints,
             onStyleChanged: (v) => setState(() => flashcardStyle = v),
             onCountChanged: (v) => setState(() => flashcardCount = v),
-            onDifficultyChanged: (v) =>
-                setState(() => flashcardDifficulty = v),
-            onExtractKeyChanged: (v) =>
-                setState(() => flashcardExtractKey = v),
+            onDifficultyChanged: (v) => setState(() => flashcardDifficulty = v),
+            onExtractKeyChanged: (v) => setState(() => flashcardExtractKey = v),
             onAddHintsChanged: (v) => setState(() => flashcardAddHints = v),
             onGenerate: _handleFlashcardGenerate,
             onSavePreview: _honestToast,
@@ -233,11 +231,9 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             checklist: summaryChecklist,
             onLengthChanged: (v) => setState(() => summaryLength = v),
             onFocusChanged: (v) => setState(() => summaryFocus = v),
-            onMarkTermsChanged: (v) =>
-                setState(() => summaryMarkTerms = v),
+            onMarkTermsChanged: (v) => setState(() => summaryMarkTerms = v),
             onToTableChanged: (v) => setState(() => summaryToTable = v),
-            onChecklistChanged: (v) =>
-                setState(() => summaryChecklist = v),
+            onChecklistChanged: (v) => setState(() => summaryChecklist = v),
             onGenerate: _handleSummaryGenerate,
           ),
           BaseForceView.algorithmFactory => _AlgorithmFactoryScreen(
@@ -429,7 +425,10 @@ class _BaseForceTopBar extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    if (onBack != null) ...[backButton, const SizedBox(width: 6)],
+                    if (onBack != null) ...[
+                      backButton,
+                      const SizedBox(width: 6),
+                    ],
                     const Flexible(child: SourceBaseBrand(compact: true)),
                     const Spacer(),
                     actions,
@@ -1026,7 +1025,8 @@ class _SourcePickerScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return _BaseForcePage(
       title: 'Kaynak Seç',
-      subtitle: 'Drive\u2019daki dosyalar\u0131n\u0131 se\xE7 veya yeni y\xFCkle.',
+      subtitle:
+          'Drive\u2019daki dosyalar\u0131n\u0131 se\xE7 veya yeni y\xFCkle.',
       onSearch: onSearch,
       onBack: onBack,
       heroTight: true,
@@ -1173,7 +1173,8 @@ class _FlashcardFactoryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return _BaseForcePage(
       title: 'Flashcard Fabrikas\u0131',
-      subtitle: 'Kaynaklar\u0131ndan ak\u0131ll\u0131 flashcard\u2019lar \xFCret.',
+      subtitle:
+          'Kaynaklar\u0131ndan ak\u0131ll\u0131 flashcard\u2019lar \xFCret.',
       onSearch: onSearch,
       onBack: onBack,
       art: _BaseForceArtKind.cardSet,
@@ -1217,7 +1218,8 @@ class _FlashcardFactoryScreen extends StatelessWidget {
                             label: 'H\u0131zl\u0131 Tekrar',
                             icon: Icons.sync_rounded,
                             selected: cardStyle == 'H\u0131zl\u0131 Tekrar',
-                            onTap: () => onStyleChanged('H\u0131zl\u0131 Tekrar'),
+                            onTap: () =>
+                                onStyleChanged('H\u0131zl\u0131 Tekrar'),
                           ),
                         ),
                       ],
@@ -1437,7 +1439,12 @@ class _QuestionFactoryScreen extends StatelessWidget {
               _ResponsiveGrid(
                 minItemWidth: 120,
                 children: [
-                  for (final value in const ['Kolay', 'Orta', 'Zor', '\xC7ok Zor'])
+                  for (final value in const [
+                    'Kolay',
+                    'Orta',
+                    'Zor',
+                    '\xC7ok Zor',
+                  ])
                     _SegmentButton(
                       label: value,
                       selected: selectedDifficulty == value,
@@ -1684,7 +1691,10 @@ class _AlgorithmFactoryScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('\xC7\u0131kt\u0131 Ayarlar\u0131', style: _titleStyle),
+              const Text(
+                '\xC7\u0131kt\u0131 Ayarlar\u0131',
+                style: _titleStyle,
+              ),
               const SizedBox(height: 16),
               _SettingGridRow(
                 label: '\xC7\u0131kt\u0131 Modu',
@@ -2223,7 +2233,8 @@ class _AllGenerationsScreen extends StatelessWidget {
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
-            onPressed: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
+            onPressed: () =>
+                _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
             child: const Text(
               'Sırala:  En Yeni ⌄',
               style: TextStyle(
@@ -3501,7 +3512,12 @@ class _SegmentButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: onTap ?? () => _showBaseForceToast(context, 'Bu \xF6zellik hen\xFCz haz\u0131r de\u011Fil.'),
+      onTap:
+          onTap ??
+          () => _showBaseForceToast(
+            context,
+            'Bu \xF6zellik hen\xFCz haz\u0131r de\u011Fil.',
+          ),
       borderRadius: BorderRadius.circular(9),
       child: Container(
         height: 50,
@@ -3713,7 +3729,11 @@ class _DifficultyChipState extends State<_DifficultyChip> {
 }
 
 class _ToggleLine extends StatefulWidget {
-  const _ToggleLine({required this.label, this.initialValue = true, this.onChanged});
+  const _ToggleLine({
+    required this.label,
+    this.initialValue = true,
+    this.onChanged,
+  });
 
   final String label;
   final bool initialValue;
@@ -3973,7 +3993,8 @@ class _TagChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
+      onTap: () =>
+          _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
       borderRadius: BorderRadius.circular(18),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -4163,7 +4184,10 @@ class _ExplanationPreview extends StatelessWidget {
 }
 
 class _SummaryOptionPanel extends StatelessWidget {
-  const _SummaryOptionPanel({required this.selectedLength, required this.onLengthChanged});
+  const _SummaryOptionPanel({
+    required this.selectedLength,
+    required this.onLengthChanged,
+  });
 
   final String selectedLength;
   final ValueChanged<String> onLengthChanged;
@@ -4174,7 +4198,10 @@ class _SummaryOptionPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _PanelTitle(icon: Icons.description_outlined, title: '\xD6zet Uzunlu\u011Fu'),
+          const _PanelTitle(
+            icon: Icons.description_outlined,
+            title: '\xD6zet Uzunlu\u011Fu',
+          ),
           const SizedBox(height: 16),
           _RadioOption(
             title: '1 sayfa',
@@ -4201,7 +4228,10 @@ class _SummaryOptionPanel extends StatelessWidget {
 }
 
 class _FocusOptionPanel extends StatelessWidget {
-  const _FocusOptionPanel({required this.selectedFocus, required this.onFocusChanged});
+  const _FocusOptionPanel({
+    required this.selectedFocus,
+    required this.onFocusChanged,
+  });
 
   final String selectedFocus;
   final ValueChanged<String> onFocusChanged;
@@ -4212,13 +4242,18 @@ class _FocusOptionPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _PanelTitle(icon: Icons.track_changes_rounded, title: 'Odak Modu'),
+          const _PanelTitle(
+            icon: Icons.track_changes_rounded,
+            title: 'Odak Modu',
+          ),
           const SizedBox(height: 16),
           _RadioOption(
             title: 'Y\xFCksek Olas\u0131l\u0131kl\u0131 Sorular',
             subtitle: '\xC7\u0131kma ihtimali y\xFCksek konular',
-            selected: selectedFocus == 'Y\xFCksek Olas\u0131l\u0131kl\u0131 Sorular',
-            onTap: (selected) => onFocusChanged('Y\xFCksek Olas\u0131l\u0131kl\u0131 Sorular'),
+            selected:
+                selectedFocus == 'Y\xFCksek Olas\u0131l\u0131kl\u0131 Sorular',
+            onTap: (selected) =>
+                onFocusChanged('Y\xFCksek Olas\u0131l\u0131kl\u0131 Sorular'),
           ),
           _RadioOption(
             title: 'Kritik Noktalar',
@@ -4261,7 +4296,10 @@ class _HighlightOptionPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _PanelTitle(icon: Icons.edit_outlined, title: 'Vurgu Se\xE7enekleri'),
+          const _PanelTitle(
+            icon: Icons.edit_outlined,
+            title: 'Vurgu Se\xE7enekleri',
+          ),
           const SizedBox(height: 22),
           _ToggleLine(
             label: 'Anahtar terimleri i\u015Faretle',
@@ -5099,7 +5137,8 @@ class _DropdownBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
+      onTap: () =>
+          _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -5375,30 +5414,30 @@ class _QueueFilter extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Container(
-      height: 54,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        color: selected ? AppColors.blue : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: selected ? AppColors.blue : AppColors.line),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (dot != null) ...[
-            CircleAvatar(radius: 5, backgroundColor: dot),
-            const SizedBox(width: 10),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              color: selected ? Colors.white : AppColors.navy,
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
+        height: 54,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.blue : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: selected ? AppColors.blue : AppColors.line),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (dot != null) ...[
+              CircleAvatar(radius: 5, backgroundColor: dot),
+              const SizedBox(width: 10),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : AppColors.navy,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -5636,12 +5675,7 @@ class _QueueRow extends StatelessWidget {
   }
 }
 
-
-
-
-
-
-
+// ignore: unused_element
 class _FaceColumn extends StatelessWidget {
   const _FaceColumn({required this.label, required this.text});
 
@@ -5683,12 +5717,7 @@ class _FaceColumn extends StatelessWidget {
   }
 }
 
-
-
-
-
-
-
+// ignore: unused_element
 class _PiePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -5713,6 +5742,7 @@ class _PiePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
+// ignore: unused_element
 class _LegendLine extends StatelessWidget {
   const _LegendLine({
     required this.color,
@@ -5750,6 +5780,7 @@ class _LegendLine extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _BarLine extends StatelessWidget {
   const _BarLine({
     required this.label,
@@ -6149,7 +6180,8 @@ class _MoreMenuButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       tooltip: 'Diğer işlemler',
-      onPressed: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
+      onPressed: () =>
+          _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
       icon: Icon(Icons.more_vert_rounded, color: color),
       visualDensity: VisualDensity.compact,
     );
