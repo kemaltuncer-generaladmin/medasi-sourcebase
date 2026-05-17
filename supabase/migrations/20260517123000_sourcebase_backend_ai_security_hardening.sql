@@ -2,6 +2,20 @@
 -- This migration is additive/non-destructive: it tightens RLS ownership checks,
 -- aligns AI job types with the backend, and moves internal embedding calls off anon auth.
 
+create extension if not exists vector;
+
+alter table if exists sourcebase.sources
+  add column if not exists embedding vector(768);
+
+alter table if exists sourcebase.cards
+  add column if not exists embedding vector(768);
+
+create index if not exists sourcebase_sources_embedding_idx
+  on sourcebase.sources using ivfflat (embedding vector_cosine_ops) with (lists = 100);
+
+create index if not exists sourcebase_cards_embedding_idx
+  on sourcebase.cards using ivfflat (embedding vector_cosine_ops) with (lists = 100);
+
 alter table if exists sourcebase.generated_jobs
   drop constraint if exists generated_jobs_job_type_check;
 
@@ -287,5 +301,32 @@ begin
     return NEW;
 end;
 $$ language plpgsql;
+
+do $$
+begin
+    if to_regclass('sourcebase.sources') is not null
+       and not exists (
+          select 1 from pg_trigger
+          where tgname = 'on_source_change'
+            and tgrelid = to_regclass('sourcebase.sources')
+       ) then
+        create trigger on_source_change
+        after insert or update on sourcebase.sources
+        for each row
+        execute function sourcebase.trigger_embed_content();
+    end if;
+
+    if to_regclass('sourcebase.cards') is not null
+       and not exists (
+          select 1 from pg_trigger
+          where tgname = 'on_card_change'
+            and tgrelid = to_regclass('sourcebase.cards')
+       ) then
+        create trigger on_card_change
+        after insert or update on sourcebase.cards
+        for each row
+        execute function sourcebase.trigger_embed_content();
+    end if;
+end $$;
 
 notify pgrst, 'reload schema';
