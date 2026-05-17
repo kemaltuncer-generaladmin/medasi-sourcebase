@@ -38,6 +38,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _profileFuture;
   }
 
+  void _openProfileSetup() {
+    Navigator.of(context).pushNamed(ProfileSetupScreen.route).then((_) {
+      if (mounted) {
+        setState(() => _profileFuture = _ProfileSnapshot.load());
+      }
+    });
+  }
+
+  void _showSettingsInfo({
+    required String title,
+    required String message,
+    IconData icon = Icons.info_outline_rounded,
+  }) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(icon, color: AppColors.blue),
+            const SizedBox(width: 10),
+            Expanded(child: Text(title)),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Tamam'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _signOut(BuildContext context) async {
     if (_signingOut) return;
     final confirmed = await showDialog<bool>(
@@ -137,31 +171,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _ProfileHeader(
-                  profile: current,
-                  onEdit: () {
-                    if (current.isComplete) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Profil düzenleme özelliği yakında aktif olacak.',
-                          ),
-                          behavior: SnackBarBehavior.floating,
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                      return;
-                    }
-                    Navigator.of(context).pushNamed(ProfileSetupScreen.route);
-                  },
-                ),
+                _ProfileHeader(profile: current, onEdit: _openProfileSetup),
                 if (!current.isComplete) ...[
                   const SizedBox(height: 12),
-                  _ProfileCompletionPanel(
-                    onComplete: () => Navigator.of(
-                      context,
-                    ).pushNamed(ProfileSetupScreen.route),
-                  ),
+                  _ProfileCompletionPanel(onComplete: _openProfileSetup),
                 ],
                 if (current.profileLoadFailed) ...[
                   const SizedBox(height: 12),
@@ -183,17 +196,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 12),
                 const SectionTitle(title: 'Hesap Ayarları'),
-                const _SettingsGroup(
+                _SettingsGroup(
                   items: [
                     _SettingsItem(
                       icon: Icons.person_outline_rounded,
                       title: 'Profil Bilgileri',
                       description:
                           'Fakülte, bölüm ve sınıf bilgileri profil tamamlama ekranından yönetilir.',
-                      enabled: false,
-                      onTap: null,
+                      onTap: _openProfileSetup,
                     ),
-                    _SettingsItem(
+                    const _SettingsItem(
                       icon: Icons.notifications_none_rounded,
                       title: 'Bildirim Tercihleri',
                       description:
@@ -205,17 +217,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: Icons.security_rounded,
                       title: 'Güvenlik ve Şifre',
                       description:
-                          'Şifre işlemleri mevcut auth akışlarından yapılır.',
-                      enabled: false,
-                      onTap: null,
+                          'Şifre sıfırlama ve oturum güvenliği mevcut auth akışlarıyla yönetilir.',
+                      onTap: () => _showSettingsInfo(
+                        title: 'Güvenlik ve Şifre',
+                        message:
+                            'Şifre yenileme işlemi giriş ekranındaki şifremi unuttum akışından yapılır. Aktif oturumu sonlandırmak için bu ekrandaki Çıkış Yap butonunu kullanabilirsin.',
+                        icon: Icons.security_rounded,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 const SectionTitle(title: 'Uygulama'),
-                const _SettingsGroup(
+                _SettingsGroup(
                   items: [
-                    _SettingsItem(
+                    const _SettingsItem(
                       icon: Icons.dark_mode_outlined,
                       title: 'Görünüm',
                       description:
@@ -223,7 +239,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       enabled: false,
                       onTap: null,
                     ),
-                    _SettingsItem(
+                    const _SettingsItem(
                       icon: Icons.language_rounded,
                       title: 'Dil',
                       description:
@@ -232,12 +248,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onTap: null,
                     ),
                     _SettingsItem(
+                      icon: Icons.privacy_tip_outlined,
+                      title: 'Gizlilik ve Destek',
+                      description:
+                          'Veri güvenliği, ödeme doğrulama ve destek kanalı bilgilerini gösterir.',
+                      onTap: () => _showSettingsInfo(
+                        title: 'Gizlilik ve Destek',
+                        message:
+                            'SourceBase hesap, profil, dosya ve cüzdan verilerini sadece oturum sahibi kullanıcı için gösterir. Ödeme ve bakiye güncellemeleri backend doğrulaması olmadan client tarafında yapılmaz. Destek için uygulama içi resmi destek kanalı yayınlandığında bu alana bağlanacaktır.',
+                        icon: Icons.privacy_tip_outlined,
+                      ),
+                    ),
+                    _SettingsItem(
                       icon: Icons.info_outline_rounded,
                       title: 'SourceBase Hakkında',
                       description:
-                          'Sürüm ve yasal metin bağlantıları henüz yayınlanmadı.',
-                      enabled: false,
-                      onTap: null,
+                          'SourceBase amacı, hesap ve mağaza gerçeklik durumunu gösterir.',
+                      onTap: () => _showSettingsInfo(
+                        title: 'SourceBase Hakkında',
+                        message:
+                            'SourceBase, öğrencinin kendi kaynaklarını Drive’da düzenleyip bu kaynaklardan öğrenme çıktıları üretmesi için tasarlanmıştır. Profil ve mağaza ekranı kimlik, profil tamamlama, cüzdan, paket ve çıkış yönetimini sağlar.',
+                        icon: Icons.info_outline_rounded,
+                      ),
                     ),
                   ],
                 ),
@@ -1142,8 +1174,27 @@ class _StorePackageTileState extends State<_StorePackageTile> {
         return;
       }
       final data = json['data'];
-      final checkoutUrl = data is Map ? _safeText(data['url']) : '';
-      if (json['ok'] == true && checkoutUrl.isNotEmpty) {
+      final purchaseData = data is Map ? Map<String, dynamic>.from(data) : null;
+      final checkoutUrl = _safeText(
+        purchaseData?['url'] ?? purchaseData?['checkout_url'],
+      );
+      final status = _safeText(
+        purchaseData?['status'] ?? purchaseData?['payment_status'],
+      ).toLowerCase();
+      if (json['ok'] == true && _isPaidStatus(status)) {
+        if (!mounted) return;
+        setState(
+          () => _buyInfo =
+              'Ödeme backend tarafından onaylandı. Bakiye yenileniyor.',
+        );
+        widget.onPurchaseStateChanged();
+      } else if (json['ok'] == true && _isCancelledStatus(status)) {
+        if (!mounted) return;
+        setState(() => _buyError = 'Satın alma iptal edildi.');
+      } else if (json['ok'] == true && _isFailedStatus(status)) {
+        if (!mounted) return;
+        setState(() => _buyError = 'Ödeme tamamlanamadı. Lütfen tekrar dene.');
+      } else if (json['ok'] == true && checkoutUrl.isNotEmpty) {
         if (!mounted) return;
         setState(
           () => _buyInfo =
@@ -1256,7 +1307,7 @@ class _StorePackageTileState extends State<_StorePackageTile> {
                   : const FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        'Satın Al',
+                        'Ödeme Linki Al',
                         style: TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
@@ -1342,6 +1393,21 @@ class _StorePackageTileState extends State<_StorePackageTile> {
       ),
     );
   }
+}
+
+bool _isPaidStatus(String status) {
+  return status == 'paid' ||
+      status == 'success' ||
+      status == 'succeeded' ||
+      status == 'completed';
+}
+
+bool _isCancelledStatus(String status) {
+  return status == 'cancel' || status == 'canceled' || status == 'cancelled';
+}
+
+bool _isFailedStatus(String status) {
+  return status == 'failed' || status == 'failure' || status == 'declined';
 }
 
 class _StoreWalletSummary extends StatelessWidget {
