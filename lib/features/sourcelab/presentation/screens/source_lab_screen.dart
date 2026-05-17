@@ -241,11 +241,13 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 180),
-      child: KeyedSubtree(
-        key: ValueKey(view),
-        child: switch (view) {
+    return Stack(
+      children: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: KeyedSubtree(
+            key: ValueKey(view),
+            child: switch (view) {
           SourceLabView.home => _SourceLabHome(
             selectedSources: selectedSources,
             onSearch: widget.onSearch,
