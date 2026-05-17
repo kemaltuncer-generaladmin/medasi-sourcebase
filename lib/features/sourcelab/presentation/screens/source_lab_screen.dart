@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
 import '../../../drive/data/drive_models.dart';
+import '../../../drive/data/sourcebase_drive_api.dart';
 import '../../../drive/presentation/widgets/drive_ui.dart';
 
 enum SourceLabView {
@@ -41,14 +42,17 @@ class SourceLabScreen extends StatefulWidget {
 }
 
 class _SourceLabScreenState extends State<SourceLabScreen> {
+  final SourceBaseDriveApi _api = const SourceBaseDriveApi();
   SourceLabView view = SourceLabView.home;
   late List<_LabSource> selectedSources;
   bool _isLoading = false;
+  _LabGenerationResult? _labResult;
+  String? _labError;
 
   @override
   void initState() {
     super.initState();
-    selectedSources = _sourcePool(widget.data);
+    selectedSources = const [];
   }
 
   String clinicalType = '';
@@ -109,16 +113,99 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
     });
   }
 
-  void _generate(SourceLabView resultView) {
+  Future<void> _generate(SourceLabView resultView, _ToolKind tool) async {
+    if (selectedSources.isEmpty) {
+      _toast('Üretim için önce Drive’dan kaynak seçin.');
+      _showSourcePicker();
+      return;
+    }
+    final file = _driveFileForSource(selectedSources.first);
+    if (file == null || file.id.trim().isEmpty) {
+      _toast('Seçilen kaynak Drive kaydıyla eşleşmiyor.');
+      return;
+    }
+    if (file.status != DriveItemStatus.completed) {
+      _toast('Seçilen kaynak henüz işlenmeye hazır değil.');
+      return;
+    }
+
     setState(() {
       _isLoading = true;
+      _labError = null;
+      _labResult = null;
       view = resultView;
     });
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (mounted) {
-        setState(() => _isLoading = false);
+
+    final jobType = _sourceLabJobType(tool);
+    if (jobType == null) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _labError =
+            '${_sourceLabToolTitle(tool)} için backend job type henüz aktif değil. Üretim başlatılmadı.';
+      });
+      return;
+    }
+
+    try {
+      final createResponse = await _api.createGenerationJob(
+        fileId: file.id,
+        jobType: jobType,
+      );
+      final data = createResponse['data'];
+      final jobId = data is Map ? data['jobId']?.toString().trim() ?? '' : '';
+      if (jobId.isEmpty) {
+        throw StateError('AI üretim işi başlatılamadı.');
       }
-    });
+      final content = await _pollLabContent(jobId);
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _labResult = _LabGenerationResult(
+          tool: tool,
+          title: _sourceLabToolTitle(tool),
+          sourceTitle: file.title,
+          content: content,
+        );
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _labError = _friendlyLabError(error);
+      });
+    }
+  }
+
+  Future<Object?> _pollLabContent(String jobId) async {
+    const maxAttempts = 24;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      final statusResponse = await _api.getJobStatus(jobId);
+      final data = statusResponse['data'];
+      final status = data is Map ? data['status']?.toString() ?? '' : '';
+      if (status == 'completed') {
+        final contentResponse = await _api.getGeneratedContent(jobId);
+        final contentData = contentResponse['data'];
+        return contentData is Map ? contentData['content'] : null;
+      }
+      if (status == 'failed') {
+        final message = data is Map
+            ? data['errorMessage']?.toString()
+            : 'AI üretimi başarısız oldu.';
+        throw StateError(message == null || message.trim().isEmpty
+            ? 'AI üretimi başarısız oldu.'
+            : message);
+      }
+      await Future<void>.delayed(const Duration(seconds: 2));
+    }
+    throw StateError('AI üretimi zaman aşımına uğradı. Lütfen tekrar deneyin.');
+  }
+
+  DriveFile? _driveFileForSource(_LabSource source) {
+    for (final file in widget.data.recentFiles) {
+      if (file.id == source.id) return file;
+    }
+    return null;
   }
 
   void _toast(String message) {
@@ -198,27 +285,40 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
                       style: TextStyle(color: AppColors.muted, fontSize: 15),
                     ),
                     const SizedBox(height: 18),
-                    Flexible(
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemBuilder: (context, index) {
-                          final source = pool[index];
-                          final selected = selectedIds.contains(source.id);
-                          return _SourcePickerRow(
-                            source: source,
-                            selected: selected,
-                            onTap: () => toggle(source),
-                          );
-                        },
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemCount: pool.length,
+                    if (pool.isEmpty)
+                      const _LabPanel(
+                        child: _LabEmptyState(
+                          icon: Icons.folder_off_outlined,
+                          title: 'Drive kaynağı yok',
+                          message: 'SourceLab üretimi için önce Drive’a dosya yükleyin.',
+                        ),
+                      )
+                    else
+                      Flexible(
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemBuilder: (context, index) {
+                            final source = pool[index];
+                            final selected = selectedIds.contains(source.id);
+                            return _SourcePickerRow(
+                              source: source,
+                              selected: selected,
+                              onTap: () => toggle(source),
+                            );
+                          },
+                          separatorBuilder: (_, _) => const SizedBox(height: 10),
+                          itemCount: pool.length,
+                        ),
                       ),
-                    ),
                     const SizedBox(height: 18),
                     _PrimaryLabButton(
                       label: 'Seçimi Kullan',
                       icon: Icons.check_rounded,
                       onTap: () {
+                        if (selectedIds.isEmpty) {
+                          _toast('En az bir kaynak seçin.');
+                          return;
+                        }
                         setState(() {
                           selectedSources = pool
                               .where(
@@ -274,9 +374,12 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onBranch: (value) => setState(() => clinicalBranch = value),
             onAge: (value) => setState(() => patientAge = value),
             onFeedback: (value) => setState(() => clinicalFeedback = value),
-            onGenerate: () => _generate(SourceLabView.clinicalResult),
+            onGenerate: () => _generate(SourceLabView.clinicalResult, _ToolKind.clinical),
           ),
           SourceLabView.clinicalResult => _ClinicalScenarioResult(
+            loading: _isLoading,
+            result: _labResult,
+            error: _labError,
             onBack: _back,
             onSearch: widget.onSearch,
             onSave: () => _toast('Bu özellik henüz hazır değil.'),
@@ -301,12 +404,15 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onDaysChanged: (value) => setState(() => planDays = value),
             onDuration: (value) => setState(() => dailyDuration = value),
             onReviews: (value) => setState(() => includeReviews = value),
-            onGenerate: () => _generate(SourceLabView.planResult),
+            onGenerate: () => _generate(SourceLabView.planResult, _ToolKind.plan),
           ),
           SourceLabView.planResult => _LearningPlanResult(
             selectedSources: selectedSources,
             planDays: planDays,
             planGoal: planGoal,
+            loading: _isLoading,
+            result: _labResult,
+            error: _labError,
             onBack: _back,
             onSave: () => _toast('Bu özellik henüz hazır değil.'),
             onCalendar: () => _toast('Bu özellik henüz hazır değil.'),
@@ -329,14 +435,16 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onFocus: (value) => setState(() => podcastFocus = value),
             onPace: (value) => setState(() => podcastPace = value),
             onMiniQuiz: (value) => setState(() => includeMiniQuiz = value),
-            onGenerate: () => _generate(SourceLabView.podcastResult),
+            onGenerate: () => _generate(SourceLabView.podcastResult, _ToolKind.podcast),
           ),
           SourceLabView.podcastResult => _PodcastResult(
             playing: podcastPlaying,
             position: podcastPosition,
+            loading: _isLoading,
+            result: _labResult,
+            error: _labError,
             onBack: _back,
-            onTogglePlay: () =>
-                setState(() => podcastPlaying = !podcastPlaying),
+            onTogglePlay: () => _toast('Ses dosyası üretilmedi; metinsel podcast scripti gösteriliyor.'),
             onPosition: (value) => setState(() => podcastPosition = value),
             onSpeed: () => _toast('Bu özellik henüz hazır değil.'),
             onShare: () => _toast('Bu özellik henüz hazır değil.'),
@@ -371,9 +479,12 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onAccent: (value) => setState(() => infographicAccent = value),
             onShowSources: (value) =>
                 setState(() => showInfographicSources = value),
-            onGenerate: () => _generate(SourceLabView.infographicResult),
+            onGenerate: () => _generate(SourceLabView.infographicResult, _ToolKind.infographic),
           ),
           SourceLabView.infographicResult => _InfographicResult(
+            loading: _isLoading,
+            result: _labResult,
+            error: _labError,
             onBack: _back,
             onSearch: widget.onSearch,
             onSave: () => _toast('Bu özellik henüz hazır değil.'),
@@ -408,16 +519,21 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
               });
             },
             onExpandChildren: (value) => setState(() => expandChildren = value),
-            onGenerate: () => _generate(SourceLabView.mindMapResult),
+            onGenerate: () => _generate(SourceLabView.mindMapResult, _ToolKind.mindMap),
           ),
           SourceLabView.mindMapResult => _MindMapResult(
+            loading: _isLoading,
+            result: _labResult,
+            error: _labError,
             onBack: _back,
             onSave: () => _toast('Bu özellik henüz hazır değil.'),
             onExport: () => _toast('Bu özellik henüz hazır değil.'),
             onRegenerate: () => _open(SourceLabView.mindMapBuilder),
           ),
-        },
-      ),
+            },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -440,12 +556,26 @@ class _LabSource {
   final String tag;
 }
 
+class _LabGenerationResult {
+  const _LabGenerationResult({
+    required this.tool,
+    required this.title,
+    required this.sourceTitle,
+    required this.content,
+  });
+
+  final _ToolKind tool;
+  final String title;
+  final String sourceTitle;
+  final Object? content;
+}
+
 List<_LabSource> _sourcePool(DriveWorkspaceData data) {
   final converted = <_LabSource>[];
   for (final file in data.recentFiles) {
     converted.add(
       _LabSource(
-        id: 'drive-${file.id}',
+        id: file.id,
         title: file.title,
         kind: file.kind,
         size: file.sizeLabel,
@@ -455,6 +585,40 @@ List<_LabSource> _sourcePool(DriveWorkspaceData data) {
     );
   }
   return converted;
+}
+
+String? _sourceLabJobType(_ToolKind tool) {
+  return switch (tool) {
+    _ToolKind.podcast => 'podcast',
+    _ToolKind.clinical ||
+    _ToolKind.plan ||
+    _ToolKind.infographic ||
+    _ToolKind.mindMap => null,
+  };
+}
+
+String _sourceLabToolTitle(_ToolKind tool) {
+  return switch (tool) {
+    _ToolKind.clinical => 'Klinik Senaryo',
+    _ToolKind.plan => 'Öğrenme Planı',
+    _ToolKind.podcast => 'Podcast Özeti',
+    _ToolKind.infographic => 'İnfografik',
+    _ToolKind.mindMap => 'Zihin Haritası',
+  };
+}
+
+String _friendlyLabError(Object error) {
+  final text = error
+      .toString()
+      .replaceFirst('Bad state: ', '')
+      .replaceFirst('Exception: ', '')
+      .trim();
+  if (text.contains('SourceBase Supabase client is not configured')) {
+    return 'Oturum bağlantısı hazır değil. Lütfen tekrar giriş yapın.';
+  }
+  return text.isEmpty
+      ? 'AI üretimi tamamlanamadı. Lütfen tekrar deneyin.'
+      : text;
 }
 
 void _showLabSnack(BuildContext context, String message) {
@@ -467,6 +631,55 @@ void _showLabSnack(BuildContext context, String message) {
         duration: const Duration(milliseconds: 1100),
       ),
     );
+}
+
+class _LabEmptyState extends StatelessWidget {
+  const _LabEmptyState({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: AppColors.selectedBlue,
+            child: Icon(icon, color: AppColors.blue),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 15,
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SourceLabHome extends StatelessWidget {
@@ -520,16 +733,22 @@ class _SourceLabHome extends StatelessWidget {
         ),
         _LabPanel(
           padding: EdgeInsets.zero,
-          child: Column(
-            children: [
-              for (var i = 0; i < selectedSources.length; i++)
-                _RecentSourceRow(
-                  source: selectedSources[i],
-                  trailing: 'Şimdi',
-                  onTap: onPickSources,
+          child: selectedSources.isEmpty
+              ? const _LabEmptyState(
+                  icon: Icons.folder_open_outlined,
+                  title: 'Kaynak seçilmedi',
+                  message: 'SourceLab araçlarını kullanmak için Drive’dan en az bir kaynak seçin.',
+                )
+              : Column(
+                  children: [
+                    for (var i = 0; i < selectedSources.length; i++)
+                      _RecentSourceRow(
+                        source: selectedSources[i],
+                        trailing: 'Şimdi',
+                        onTap: onPickSources,
+                      ),
+                  ],
                 ),
-            ],
-          ),
         ),
         const SizedBox(height: 18),
         _ResponsiveSplit(
@@ -596,9 +815,11 @@ class _HomeContinuePanel extends StatelessWidget {
                 ],
               );
               final button = _PrimaryLabButton(
-                label: 'Devam Et',
-                icon: Icons.arrow_forward_rounded,
-                onTap: onContinue,
+                label: sources.isEmpty ? 'Kaynak Seç' : 'Devam Et',
+                icon: sources.isEmpty
+                    ? Icons.folder_open_rounded
+                    : Icons.arrow_forward_rounded,
+                onTap: sources.isEmpty ? onPickSources : onContinue,
               );
 
               if (compact) {
@@ -1066,6 +1287,9 @@ class _ClinicalScenarioBuilder extends StatelessWidget {
 
 class _ClinicalScenarioResult extends StatelessWidget {
   const _ClinicalScenarioResult({
+    required this.loading,
+    required this.result,
+    required this.error,
     required this.onBack,
     required this.onSearch,
     required this.onSave,
@@ -1074,6 +1298,9 @@ class _ClinicalScenarioResult extends StatelessWidget {
     required this.onComplete,
   });
 
+  final bool loading;
+  final _LabGenerationResult? result;
+  final String? error;
   final VoidCallback onBack;
   final VoidCallback onSearch;
   final VoidCallback onSave;
@@ -1083,6 +1310,18 @@ class _ClinicalScenarioResult extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (loading || result != null || error != null) {
+      return _SourceLabGeneratedResult(
+        title: 'Klinik Senaryo',
+        loading: loading,
+        result: result,
+        error: error,
+        onBack: onBack,
+        onSave: onSave,
+        onExport: onExport,
+        onRegenerate: onRegenerate,
+      );
+    }
     return _LabScroll(
       children: [
         _LabTopBar(onBack: onBack, onSearch: onSearch),
@@ -1384,6 +1623,9 @@ class _LearningPlanResult extends StatelessWidget {
     required this.selectedSources,
     required this.planDays,
     required this.planGoal,
+    required this.loading,
+    required this.result,
+    required this.error,
     required this.onBack,
     required this.onSave,
     required this.onCalendar,
@@ -1394,6 +1636,9 @@ class _LearningPlanResult extends StatelessWidget {
   final List<_LabSource> selectedSources;
   final int planDays;
   final String planGoal;
+  final bool loading;
+  final _LabGenerationResult? result;
+  final String? error;
   final VoidCallback onBack;
   final VoidCallback onSave;
   final VoidCallback onCalendar;
@@ -1402,6 +1647,18 @@ class _LearningPlanResult extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (loading || result != null || error != null) {
+      return _SourceLabGeneratedResult(
+        title: 'Öğrenme Planı',
+        loading: loading,
+        result: result,
+        error: error,
+        onBack: onBack,
+        onSave: onSave,
+        onExport: onExport,
+        onRegenerate: onRegenerate,
+      );
+    }
     return _LabScroll(
       children: [
         _ResultHeader(
@@ -1671,6 +1928,9 @@ class _PodcastResult extends StatelessWidget {
   const _PodcastResult({
     required this.playing,
     required this.position,
+    required this.loading,
+    required this.result,
+    required this.error,
     required this.onBack,
     required this.onTogglePlay,
     required this.onPosition,
@@ -1686,6 +1946,9 @@ class _PodcastResult extends StatelessWidget {
 
   final bool playing;
   final double position;
+  final bool loading;
+  final _LabGenerationResult? result;
+  final String? error;
   final VoidCallback onBack;
   final VoidCallback onTogglePlay;
   final ValueChanged<double> onPosition;
@@ -1700,6 +1963,19 @@ class _PodcastResult extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (loading || result != null || error != null) {
+      return _SourceLabGeneratedResult(
+        title: 'Podcast Özeti',
+        loading: loading,
+        result: result,
+        error: error,
+        onBack: onBack,
+        onSave: onSave,
+        onExport: onExport,
+        onRegenerate: onRegenerate,
+        audioNotice: 'Backend metinsel podcast scripti döndürüyor; gerçek ses dosyası/oynatıcı entegrasyonu bağlı değil.',
+      );
+    }
     return _LabScroll(
       children: [
         _MinimalTopBar(
@@ -1958,6 +2234,9 @@ class _InfographicBuilder extends StatelessWidget {
 
 class _InfographicResult extends StatelessWidget {
   const _InfographicResult({
+    required this.loading,
+    required this.result,
+    required this.error,
     required this.onBack,
     required this.onSearch,
     required this.onSave,
@@ -1966,6 +2245,9 @@ class _InfographicResult extends StatelessWidget {
     required this.onRegenerate,
   });
 
+  final bool loading;
+  final _LabGenerationResult? result;
+  final String? error;
   final VoidCallback onBack;
   final VoidCallback onSearch;
   final VoidCallback onSave;
@@ -1975,6 +2257,18 @@ class _InfographicResult extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (loading || result != null || error != null) {
+      return _SourceLabGeneratedResult(
+        title: 'İnfografik',
+        loading: loading,
+        result: result,
+        error: error,
+        onBack: onBack,
+        onSave: onSave,
+        onExport: onPdf,
+        onRegenerate: onRegenerate,
+      );
+    }
     return _LabScroll(
       children: [
         _LabTopBar(onBack: onBack, onSearch: onSearch),
@@ -2201,12 +2495,18 @@ class _MindMapBuilder extends StatelessWidget {
 
 class _MindMapResult extends StatelessWidget {
   const _MindMapResult({
+    required this.loading,
+    required this.result,
+    required this.error,
     required this.onBack,
     required this.onSave,
     required this.onExport,
     required this.onRegenerate,
   });
 
+  final bool loading;
+  final _LabGenerationResult? result;
+  final String? error;
   final VoidCallback onBack;
   final VoidCallback onSave;
   final VoidCallback onExport;
@@ -2214,6 +2514,18 @@ class _MindMapResult extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (loading || result != null || error != null) {
+      return _SourceLabGeneratedResult(
+        title: 'Zihin Haritası',
+        loading: loading,
+        result: result,
+        error: error,
+        onBack: onBack,
+        onSave: onSave,
+        onExport: onExport,
+        onRegenerate: onRegenerate,
+      );
+    }
     return _LabScroll(
       children: [
         _MinimalTopBar(
@@ -2251,6 +2563,331 @@ class _MindMapResult extends StatelessWidget {
           height: 74,
         ),
       ],
+    );
+  }
+}
+
+class _SourceLabGeneratedResult extends StatelessWidget {
+  const _SourceLabGeneratedResult({
+    required this.title,
+    required this.loading,
+    required this.result,
+    required this.error,
+    required this.onBack,
+    required this.onSave,
+    required this.onExport,
+    required this.onRegenerate,
+    this.audioNotice,
+  });
+
+  final String title;
+  final bool loading;
+  final _LabGenerationResult? result;
+  final String? error;
+  final VoidCallback onBack;
+  final VoidCallback onSave;
+  final VoidCallback onExport;
+  final VoidCallback onRegenerate;
+  final String? audioNotice;
+
+  @override
+  Widget build(BuildContext context) {
+    return _LabScroll(
+      children: [
+        _MinimalTopBar(
+          title: title,
+          subtitle: loading
+              ? 'Üretim kuyruğu işleniyor.'
+              : result == null
+                  ? 'Üretim tamamlanamadı.'
+                  : '${result!.sourceTitle} kaynağından oluşturuldu.',
+          onBack: onBack,
+        ),
+        _LabPanel(
+          child: loading
+              ? const _LabLoadingState()
+              : error != null
+                  ? _LabEmptyState(
+                      icon: Icons.error_outline_rounded,
+                      title: 'Üretim başlatılamadı',
+                      message: error!,
+                    )
+                  : result == null
+                      ? const _LabEmptyState(
+                          icon: Icons.warning_amber_rounded,
+                          title: 'Boş sonuç',
+                          message: 'Backend tamamlandı ancak gösterilecek içerik dönmedi.',
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (audioNotice != null) ...[
+                              _LabNotice(text: audioNotice!),
+                              const SizedBox(height: 14),
+                            ],
+                            _LabGeneratedContent(content: result!.content),
+                          ],
+                        ),
+        ),
+        _ResponsiveActions(
+          children: [
+            _SecondaryLabButton(
+              label: 'Kaydet',
+              icon: Icons.bookmark_border_rounded,
+              onTap: onSave,
+            ),
+            _SecondaryLabButton(
+              label: 'Dışa Aktar',
+              icon: Icons.file_download_outlined,
+              onTap: onExport,
+            ),
+            _SecondaryLabButton(
+              label: 'Yeniden Üret',
+              icon: Icons.refresh_rounded,
+              onTap: onRegenerate,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _LabLoadingState extends StatelessWidget {
+  const _LabLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 20),
+      child: Column(
+        children: [
+          CircularProgressIndicator(color: AppColors.blue),
+          SizedBox(height: 16),
+          Text(
+            'AI üretimi devam ediyor. Bu ekran tamamlanınca otomatik güncellenecek.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.muted,
+              fontSize: 15,
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LabNotice extends StatelessWidget {
+  const _LabNotice({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7E8),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFDCA8)),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Color(0xFF9A5A00),
+          height: 1.35,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _LabGeneratedContent extends StatelessWidget {
+  const _LabGeneratedContent({required this.content});
+
+  final Object? content;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = content;
+    if (value == null ||
+        (value is String && value.trim().isEmpty) ||
+        (value is List && value.isEmpty) ||
+        (value is Map && value.isEmpty)) {
+      return const _LabEmptyState(
+        icon: Icons.warning_amber_rounded,
+        title: 'Boş içerik döndü',
+        message: 'AI işi tamamlandı ancak görüntülenecek içerik bulunamadı.',
+      );
+    }
+    if (value is List) {
+      return Column(
+        children: [
+          for (var i = 0; i < value.length; i++)
+            _LabGeneratedItem(index: i + 1, value: value[i]),
+        ],
+      );
+    }
+    if (value is Map) {
+      final title = value['title']?.toString().trim() ?? '';
+      final list = _labPreferredList(value);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (title.isNotEmpty) ...[
+            Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.navy,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+          if (list != null && list.isNotEmpty)
+            for (var i = 0; i < list.length; i++)
+              _LabGeneratedItem(index: i + 1, value: list[i])
+          else
+            for (final entry in value.entries)
+              _LabGeneratedPair(label: entry.key.toString(), value: entry.value),
+        ],
+      );
+    }
+    return _LabGeneratedText(text: value.toString());
+  }
+}
+
+List<Object?>? _labPreferredList(Map<dynamic, dynamic> content) {
+  for (final key in const ['segments', 'chapters', 'steps', 'days', 'nodes', 'questions', 'rows', 'bulletPoints']) {
+    final value = content[key];
+    if (value is List) return value.cast<Object?>();
+  }
+  return null;
+}
+
+class _LabGeneratedItem extends StatelessWidget {
+  const _LabGeneratedItem({required this.index, required this.value});
+
+  final int index;
+  final Object? value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FBFF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 14,
+            backgroundColor: AppColors.selectedBlue,
+            child: Text(
+              '$index',
+              style: const TextStyle(
+                color: AppColors.blue,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: _LabGeneratedValue(value: value)),
+        ],
+      ),
+    );
+  }
+}
+
+class _LabGeneratedPair extends StatelessWidget {
+  const _LabGeneratedPair({required this.label, required this.value});
+
+  final String label;
+  final Object? value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.blue,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          _LabGeneratedValue(value: value),
+        ],
+      ),
+    );
+  }
+}
+
+class _LabGeneratedValue extends StatelessWidget {
+  const _LabGeneratedValue({required this.value});
+
+  final Object? value;
+
+  @override
+  Widget build(BuildContext context) {
+    if (value is Map) {
+      final map = value as Map;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final entry in map.entries)
+            _LabGeneratedPair(label: entry.key.toString(), value: entry.value),
+        ],
+      );
+    }
+    if (value is List) {
+      final list = value as List;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final item in list)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: _LabGeneratedValue(value: item),
+            ),
+        ],
+      );
+    }
+    return _LabGeneratedText(text: value?.toString() ?? '-');
+  }
+}
+
+class _LabGeneratedText extends StatelessWidget {
+  const _LabGeneratedText({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.trim().isEmpty ? '-' : text,
+      softWrap: true,
+      style: const TextStyle(
+        color: AppColors.navy,
+        fontSize: 15,
+        height: 1.45,
+        fontWeight: FontWeight.w600,
+      ),
     );
   }
 }

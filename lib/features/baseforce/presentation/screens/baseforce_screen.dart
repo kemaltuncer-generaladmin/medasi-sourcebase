@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
 import '../../../drive/data/drive_models.dart';
+import '../../../drive/data/sourcebase_drive_api.dart';
 import '../../../drive/presentation/widgets/drive_ui.dart';
 
 enum BaseForceView {
@@ -35,13 +36,16 @@ class BaseForceScreen extends StatefulWidget {
 }
 
 class _BaseForceScreenState extends State<BaseForceScreen> {
+  final SourceBaseDriveApi _api = const SourceBaseDriveApi();
   BaseForceView view = BaseForceView.home;
   late final Set<String> selectedSources;
+  final List<_BaseForceJobState> _jobs = [];
+  _GenerationResult? _latestResult;
 
   @override
   void initState() {
     super.initState();
-    selectedSources = widget.data.recentFiles.take(2).map((f) => f.id).toSet();
+    selectedSources = <String>{};
   }
 
   String selectedFactory = 'flashcard';
@@ -96,44 +100,158 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
     _toast('Bu özellik henüz hazır değil.');
   }
 
-  void _handleFlashcardGenerate() {
-    _toast(
-      'Flashcard üretimi başlatıldı.\nStil: $flashcardStyle, '
-      'Sayı: $flashcardCount, Zorluk: $flashcardDifficulty, '
-      'Kavram çıkar: $flashcardExtractKey, İpuçları: $flashcardAddHints',
-    );
-    _open(BaseForceView.queue);
+  DriveFile? _selectedFile() {
+    for (final file in widget.data.recentFiles) {
+      if (selectedSources.contains(file.id) && file.id.trim().isNotEmpty) {
+        return file;
+      }
+    }
+    return null;
   }
 
-  void _handleQuestionGenerate() {
-    _toast(
-      'Soru üretimi başlatıldı.\nTip: $questionType, '
-      'Sayı: $questionCount, Zorluk: $selectedQuestionDifficulty, '
-      'Açıklama: $questionAddExplanation',
+  Future<void> _startGeneration(GeneratedKind kind) async {
+    final file = _selectedFile();
+    if (file == null) {
+      _toast('Üretim için önce Drive’dan bir kaynak seçin.');
+      _open(BaseForceView.sourcePicker);
+      return;
+    }
+    if (file.status != DriveItemStatus.completed) {
+      _toast('Seçilen dosya henüz işlenmeye hazır değil.');
+      return;
+    }
+
+    final jobType = _baseForceJobType(kind);
+    final job = _BaseForceJobState(
+      localId: DateTime.now().microsecondsSinceEpoch.toString(),
+      kind: kind,
+      source: file,
+      title: _baseForceTitle(kind),
     );
-    _open(BaseForceView.queue);
+    setState(() {
+      _jobs.insert(0, job);
+      view = BaseForceView.queue;
+    });
+
+    try {
+      final createResponse = await _api.createGenerationJob(
+        fileId: file.id,
+        jobType: jobType,
+        count: _baseForceCount(kind),
+      );
+      final data = createResponse['data'];
+      final jobId = data is Map ? data['jobId']?.toString().trim() ?? '' : '';
+      if (jobId.isEmpty) {
+        throw StateError('AI üretim işi başlatılamadı.');
+      }
+      _updateJob(job.localId, jobId: jobId, status: _JobUiStatus.running);
+      final content = await _pollGeneratedContent(job.localId, jobId);
+      final result = _GenerationResult(
+        kind: kind,
+        title: _baseForceTitle(kind),
+        sourceTitle: file.title,
+        content: content,
+      );
+      try {
+        await _api.createGeneratedOutput(
+          fileId: file.id,
+          kind: kind,
+          itemCount: _baseForceContentCount(content),
+        );
+      } catch (_) {
+        // İçerik gösterimi tamamlandı; kayıt hatası kullanıcıyı bloklamasın.
+      }
+      if (!mounted) return;
+      setState(() {
+        _latestResult = result;
+        _updateJobValue(
+          job.localId,
+          status: _JobUiStatus.completed,
+          result: result,
+          progress: 1,
+        );
+        view = BaseForceView.flashcardResults;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      final message = _friendlyBaseForceError(error);
+      setState(() {
+        _updateJobValue(
+          job.localId,
+          status: _JobUiStatus.failed,
+          errorMessage: message,
+          progress: 1,
+        );
+      });
+      _toast(message);
+    }
   }
 
-  void _handleSummaryGenerate() {
-    _toast(
-      'Özet üretimi başlatıldı.\nUzunluk: $summaryLength, '
-      'Odak: $summaryFocus',
-    );
-    _open(BaseForceView.queue);
+  Future<Object?> _pollGeneratedContent(String localId, String jobId) async {
+    const maxAttempts = 24;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      final statusResponse = await _api.getJobStatus(jobId);
+      final data = statusResponse['data'];
+      final status = data is Map ? data['status']?.toString() ?? '' : '';
+      if (status == 'completed') {
+        final contentResponse = await _api.getGeneratedContent(jobId);
+        final contentData = contentResponse['data'];
+        return contentData is Map ? contentData['content'] : null;
+      }
+      if (status == 'failed') {
+        final message = data is Map
+            ? data['errorMessage']?.toString()
+            : 'AI üretimi başarısız oldu.';
+        throw StateError(message == null || message.trim().isEmpty
+            ? 'AI üretimi başarısız oldu.'
+            : message);
+      }
+      if (mounted) {
+        _updateJob(
+          localId,
+          status: attempt == 0 ? _JobUiStatus.pending : _JobUiStatus.running,
+          progress: (attempt + 1) / maxAttempts,
+        );
+      }
+      await Future<void>.delayed(const Duration(seconds: 2));
+    }
+    throw StateError('AI üretimi zaman aşımına uğradı. Kuyruktan tekrar deneyin.');
   }
 
-  void _handleAlgorithmGenerate() {
-    _toast(
-      'Algoritma üretimi başlatıldı.\nMod: $algorithmMode, '
-      'Yerleşim: $algorithmLayout, Detay: $algorithmDetail, '
-      'Renkli: $algorithmColorfulNodes, Klinik not: $algorithmClinicalNotes',
-    );
-    _open(BaseForceView.queue);
+  void _updateJob(
+    String localId, {
+    String? jobId,
+    _JobUiStatus? status,
+    double? progress,
+  }) {
+    if (!mounted) return;
+    setState(() {
+      _updateJobValue(
+        localId,
+        jobId: jobId,
+        status: status,
+        progress: progress,
+      );
+    });
   }
 
-  void _handleComparisonGenerate() {
-    _toast('Karşılaştırma tablosu üretimi başlatıldı.');
-    _open(BaseForceView.queue);
+  void _updateJobValue(
+    String localId, {
+    String? jobId,
+    _JobUiStatus? status,
+    _GenerationResult? result,
+    String? errorMessage,
+    double? progress,
+  }) {
+    final index = _jobs.indexWhere((item) => item.localId == localId);
+    if (index == -1) return;
+    _jobs[index] = _jobs[index].copyWith(
+      jobId: jobId,
+      status: status,
+      result: result,
+      errorMessage: errorMessage,
+      progress: progress,
+    );
   }
 
   @override
@@ -201,7 +319,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             onExtractKeyChanged: (v) =>
                 setState(() => flashcardExtractKey = v),
             onAddHintsChanged: (v) => setState(() => flashcardAddHints = v),
-            onGenerate: _handleFlashcardGenerate,
+            onGenerate: () => _startGeneration(GeneratedKind.flashcard),
             onSavePreview: _honestToast,
           ),
           BaseForceView.questionFactory => _QuestionFactoryScreen(
@@ -219,7 +337,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             onCountChanged: (v) => setState(() => questionCount = v),
             onExplanationChanged: (v) =>
                 setState(() => questionAddExplanation = v),
-            onGenerate: _handleQuestionGenerate,
+            onGenerate: () => _startGeneration(GeneratedKind.question),
           ),
           BaseForceView.summaryFactory => _SummaryFactoryScreen(
             data: widget.data,
@@ -238,7 +356,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             onToTableChanged: (v) => setState(() => summaryToTable = v),
             onChecklistChanged: (v) =>
                 setState(() => summaryChecklist = v),
-            onGenerate: _handleSummaryGenerate,
+            onGenerate: () => _startGeneration(GeneratedKind.summary),
           ),
           BaseForceView.algorithmFactory => _AlgorithmFactoryScreen(
             data: widget.data,
@@ -257,18 +375,19 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
                 setState(() => algorithmColorfulNodes = v),
             onClinicalNotesChanged: (v) =>
                 setState(() => algorithmClinicalNotes = v),
-            onGenerate: _handleAlgorithmGenerate,
+            onGenerate: () => _startGeneration(GeneratedKind.algorithm),
           ),
           BaseForceView.comparisonFactory => _ComparisonFactoryScreen(
             data: widget.data,
             onSearch: widget.onSearch,
             onBack: _backToHome,
             onPickSources: () => _open(BaseForceView.sourcePicker),
-            onGenerate: _handleComparisonGenerate,
+            onGenerate: () => _startGeneration(GeneratedKind.comparison),
             onOpenResult: () => _open(BaseForceView.flashcardResults),
           ),
           BaseForceView.queue => _QueueScreen(
             data: widget.data,
+            jobs: _jobs,
             onSearch: widget.onSearch,
             onBack: _backToHome,
             queueFilter: queueFilter,
@@ -278,6 +397,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             onStop: _honestToast,
           ),
           BaseForceView.flashcardResults => _FlashcardResultsScreen(
+            result: _latestResult,
             onSearch: widget.onSearch,
             onBack: _backToHome,
             onSave: _honestToast,
@@ -287,6 +407,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
           ),
           BaseForceView.allGenerations => _AllGenerationsScreen(
             data: widget.data,
+            jobs: _jobs,
             selectedFilter: selectedFilter,
             onSearch: widget.onSearch,
             onBack: _backToHome,
@@ -300,6 +421,143 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
       ),
     );
   }
+}
+
+enum _JobUiStatus { pending, running, completed, failed }
+
+class _BaseForceJobState {
+  const _BaseForceJobState({
+    required this.localId,
+    required this.kind,
+    required this.source,
+    required this.title,
+    this.jobId,
+    this.status = _JobUiStatus.pending,
+    this.progress = 0,
+    this.result,
+    this.errorMessage,
+  });
+
+  final String localId;
+  final String? jobId;
+  final GeneratedKind kind;
+  final DriveFile source;
+  final String title;
+  final _JobUiStatus status;
+  final double progress;
+  final _GenerationResult? result;
+  final String? errorMessage;
+
+  _BaseForceJobState copyWith({
+    String? jobId,
+    _JobUiStatus? status,
+    double? progress,
+    _GenerationResult? result,
+    String? errorMessage,
+  }) {
+    return _BaseForceJobState(
+      localId: localId,
+      jobId: jobId ?? this.jobId,
+      kind: kind,
+      source: source,
+      title: title,
+      status: status ?? this.status,
+      progress: progress ?? this.progress,
+      result: result ?? this.result,
+      errorMessage: errorMessage ?? this.errorMessage,
+    );
+  }
+}
+
+class _GenerationResult {
+  const _GenerationResult({
+    required this.kind,
+    required this.title,
+    required this.sourceTitle,
+    required this.content,
+  });
+
+  final GeneratedKind kind;
+  final String title;
+  final String sourceTitle;
+  final Object? content;
+}
+
+String _baseForceJobType(GeneratedKind kind) {
+  return switch (kind) {
+    GeneratedKind.flashcard => 'flashcard',
+    GeneratedKind.question => 'quiz',
+    GeneratedKind.summary => 'summary',
+    GeneratedKind.algorithm => 'algorithm',
+    GeneratedKind.comparison || GeneratedKind.table => 'comparison',
+    GeneratedKind.podcast => 'podcast',
+    GeneratedKind.mindMap => 'algorithm',
+  };
+}
+
+int? _baseForceCount(GeneratedKind kind) {
+  return switch (kind) {
+    GeneratedKind.flashcard => 20,
+    GeneratedKind.question => 10,
+    _ => null,
+  };
+}
+
+String _baseForceTitle(GeneratedKind kind) {
+  return switch (kind) {
+    GeneratedKind.flashcard => 'Flashcard Seti',
+    GeneratedKind.question => 'Soru Seti',
+    GeneratedKind.summary => 'Özet',
+    GeneratedKind.algorithm => 'Algoritma',
+    GeneratedKind.comparison || GeneratedKind.table => 'Karşılaştırma',
+    GeneratedKind.podcast => 'Podcast',
+    GeneratedKind.mindMap => 'Zihin Haritası',
+  };
+}
+
+String _baseForceKindLabel(GeneratedKind kind) {
+  return switch (kind) {
+    GeneratedKind.flashcard => 'Flashcard',
+    GeneratedKind.question => 'Soru',
+    GeneratedKind.summary => 'Özet',
+    GeneratedKind.algorithm => 'Algoritma',
+    GeneratedKind.comparison || GeneratedKind.table => 'Tablo',
+    GeneratedKind.podcast => 'Podcast',
+    GeneratedKind.mindMap => 'Zihin Haritası',
+  };
+}
+
+int _baseForceContentCount(Object? content) {
+  if (content is List) return content.length;
+  if (content is Map) {
+    for (final key in const ['cards', 'questions', 'bulletPoints', 'steps', 'rows', 'segments']) {
+      final value = content[key];
+      if (value is List) return value.length;
+    }
+  }
+  return content == null ? 0 : 1;
+}
+
+String _friendlyBaseForceError(Object error) {
+  final raw = error.toString();
+  final text = raw
+      .replaceFirst('Bad state: ', '')
+      .replaceFirst('Exception: ', '')
+      .trim();
+  if (text.isEmpty) return 'AI üretimi tamamlanamadı. Lütfen tekrar deneyin.';
+  if (text.contains('SourceBase Supabase client is not configured')) {
+    return 'Oturum bağlantısı hazır değil. Lütfen tekrar giriş yapın.';
+  }
+  return text;
+}
+
+String _jobStatusLabel(_JobUiStatus status) {
+  return switch (status) {
+    _JobUiStatus.pending => 'Beklemede',
+    _JobUiStatus.running => 'İşleniyor',
+    _JobUiStatus.completed => 'Tamamlandı',
+    _JobUiStatus.failed => 'Hata',
+  };
 }
 
 class _BaseForcePage extends StatelessWidget {
@@ -936,7 +1194,7 @@ class _BaseForceHome extends StatelessWidget {
               onTap: () => onOpenFactory('algorithm'),
             ),
             _FactoryCard(
-              kind: GeneratedKind.table,
+              kind: GeneratedKind.comparison,
               title: 'Karşılaştırma\nTablosu',
               subtitle: 'Kavramları yan yana karşılaştırır.',
               buttonColor: AppColors.cyan,
@@ -958,46 +1216,61 @@ class _BaseForceHome extends StatelessWidget {
         ),
         _BasePanel(
           padding: EdgeInsets.zero,
-          child: Column(
-            children: [
-              for (final file in data.recentFiles.take(3))
-                _RecentSourceRow(
-                  source: _BFSource(
-                    id: file.id,
-                    name: file.title,
-                    kind: file.kind,
-                    size: file.sizeLabel,
-                    pages: file.pageLabel,
-                    subject: file.courseTitle,
-                    time: 'Az önce',
-                    warning: false,
-                  ),
-                  onTap: onOpenSources,
+          child: data.recentFiles.isEmpty
+              ? const _EmptyBaseForceState(
+                  icon: Icons.drive_folder_upload_outlined,
+                  title: 'Drive kaynağı yok',
+                  message: 'Üretim başlatmak için Drive’a PDF, PPTX veya DOCX kaynak ekleyin.',
+                )
+              : Column(
+                  children: [
+                    for (final file in data.recentFiles.take(3))
+                      _RecentSourceRow(
+                        source: _BFSource(
+                          id: file.id,
+                          name: file.title,
+                          kind: file.kind,
+                          size: file.sizeLabel,
+                          pages: file.pageLabel,
+                          subject: file.courseTitle,
+                          time: 'Az önce',
+                          warning: false,
+                        ),
+                        onTap: onOpenSources,
+                      ),
+                  ],
                 ),
-            ],
-          ),
         ),
         _SectionHeader(
           title: 'Son Üretimler',
           action: 'Tümünü Gör',
           onTap: onOpenAll,
         ),
-        _ResponsiveGrid(
-          minItemWidth: 220,
-          children: [
-            for (final file in data.recentFiles)
-              for (final gen in file.generated)
-                _RecentGenerationCard(
-                  kind: gen.kind,
-                  title: gen.title,
-                  value: gen.detail,
-                  label: gen.kind.name,
-                  source: file.title,
-                  time: gen.updatedLabel,
-                  onTap: onOpenResult,
-                ),
-          ],
-        ),
+        if (data.recentFiles.every((file) => file.generated.isEmpty))
+          const _BasePanel(
+            child: _EmptyBaseForceState(
+              icon: Icons.auto_awesome_rounded,
+              title: 'Henüz üretim yok',
+              message: 'Bir kaynak seçip üretim fabrikalarından birini başlatın.',
+            ),
+          )
+        else
+          _ResponsiveGrid(
+            minItemWidth: 220,
+            children: [
+              for (final file in data.recentFiles)
+                for (final gen in file.generated)
+                  _RecentGenerationCard(
+                    kind: gen.kind,
+                    title: gen.title,
+                    value: gen.detail,
+                    label: _baseForceKindLabel(gen.kind),
+                    source: file.title,
+                    time: gen.updatedLabel,
+                    onTap: onOpenResult,
+                  ),
+            ],
+          ),
       ],
     );
   }
@@ -1098,25 +1371,31 @@ class _SourcePickerScreen extends StatelessWidget {
         ),
         _BasePanel(
           padding: EdgeInsets.zero,
-          child: Column(
-            children: [
-              for (final file in data.recentFiles)
-                _SourceSelectRow(
-                  source: _BFSource(
-                    id: file.id,
-                    name: file.title,
-                    kind: file.kind,
-                    size: file.sizeLabel,
-                    pages: file.pageLabel,
-                    subject: file.courseTitle,
-                    time: 'Az önce',
-                    warning: false,
-                  ),
-                  selected: selectedSources.contains(file.id),
-                  onTap: () => onToggleSource(file.id),
+          child: data.recentFiles.isEmpty
+              ? const _EmptyBaseForceState(
+                  icon: Icons.folder_off_outlined,
+                  title: 'Seçilebilir dosya yok',
+                  message: 'Yeni Yükle ile Drive’a kaynak ekledikten sonra üretim başlatabilirsiniz.',
+                )
+              : Column(
+                  children: [
+                    for (final file in data.recentFiles)
+                      _SourceSelectRow(
+                        source: _BFSource(
+                          id: file.id,
+                          name: file.title,
+                          kind: file.kind,
+                          size: file.sizeLabel,
+                          pages: file.pageLabel,
+                          subject: file.courseTitle,
+                          time: 'Az önce',
+                          warning: false,
+                        ),
+                        selected: selectedSources.contains(file.id),
+                        onTap: () => onToggleSource(file.id),
+                      ),
+                  ],
                 ),
-            ],
-          ),
         ),
         const SizedBox(height: 18),
         _UploadDropZone(onTap: onUpload),
@@ -1915,6 +2194,7 @@ class _ComparisonFactoryScreen extends StatelessWidget {
 class _QueueScreen extends StatelessWidget {
   const _QueueScreen({
     required this.data,
+    required this.jobs,
     required this.onSearch,
     required this.onBack,
     required this.queueFilter,
@@ -1925,6 +2205,7 @@ class _QueueScreen extends StatelessWidget {
   });
 
   final DriveWorkspaceData data;
+  final List<_BaseForceJobState> jobs;
   final VoidCallback onSearch;
   final VoidCallback onBack;
   final String queueFilter;
@@ -1935,7 +2216,30 @@ class _QueueScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final allRows = <_QueueRow>[];
+    final allRows = <Widget>[];
+    for (final job in jobs) {
+      allRows.add(
+        _QueueRow(
+          source: _BFSource(
+            id: job.source.id,
+            name: job.source.title,
+            kind: job.source.kind,
+            size: job.source.sizeLabel,
+            pages: job.source.pageLabel,
+            subject: job.source.courseTitle,
+            time: 'Az önce',
+          ),
+          title: job.title,
+          kind: job.kind,
+          complete: job.status == _JobUiStatus.completed,
+          failed: job.status == _JobUiStatus.failed,
+          progress: job.progress,
+          time: job.errorMessage ?? _jobStatusLabel(job.status),
+          filterStatus: _jobStatusLabel(job.status),
+          onAction: job.status == _JobUiStatus.completed ? onOpenResult : onRetry,
+        ),
+      );
+    }
     for (final file in data.recentFiles) {
       if (file.generated.isNotEmpty) {
         for (final gen in file.generated) {
@@ -1951,6 +2255,7 @@ class _QueueScreen extends StatelessWidget {
                 time: 'Az \xF6nce',
               ),
               title: gen.title,
+              kind: gen.kind,
               complete: true,
               failed: false,
               progress: 1,
@@ -1965,7 +2270,19 @@ class _QueueScreen extends StatelessWidget {
 
     final filteredRows = queueFilter == 'T\xFCm\xFC'
         ? allRows
-        : allRows.where((r) => r.filterStatus == queueFilter).toList();
+        : allRows.where((row) {
+            return row is _QueueRow && row.filterStatus == queueFilter;
+          }).toList();
+
+    final runningCount = jobs
+        .where((job) =>
+            job.status == _JobUiStatus.pending ||
+            job.status == _JobUiStatus.running)
+        .length;
+    final completedCount =
+        jobs.where((job) => job.status == _JobUiStatus.completed).length;
+    final failedCount =
+        jobs.where((job) => job.status == _JobUiStatus.failed).length;
 
     return _BaseForcePage(
       title: '\xDcretim Kuyru\u011Fu',
@@ -1974,29 +2291,29 @@ class _QueueScreen extends StatelessWidget {
       onBack: onBack,
       heroTight: true,
       children: [
-        const _ResponsiveGrid(
+        _ResponsiveGrid(
           minItemWidth: 230,
           children: [
             _QueueMetric(
               icon: Icons.play_circle_outline_rounded,
               title: 'Devam Eden',
-              value: '2',
+              value: '$runningCount',
               subtitle: '\u0130\u015Fleniyor',
               color: AppColors.blue,
             ),
             _QueueMetric(
               icon: Icons.check_circle_rounded,
               title: 'Tamamland\u0131',
-              value: '2',
+              value: '$completedCount',
               subtitle: 'Ba\u015Far\u0131yla bitti',
               color: AppColors.green,
             ),
             _QueueMetric(
               icon: Icons.error_rounded,
-              title: 'Beklemede',
-              value: '1',
-              subtitle: 'S\u0131rada bekliyor',
-              color: AppColors.orange,
+              title: 'Hata',
+              value: '$failedCount',
+              subtitle: 'Tekrar denenebilir',
+              color: AppColors.red,
             ),
           ],
         ),
@@ -2031,7 +2348,16 @@ class _QueueScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 22),
-        ...filteredRows,
+        if (filteredRows.isEmpty)
+          const _BasePanel(
+            child: _EmptyBaseForceState(
+              icon: Icons.pending_actions_rounded,
+              title: 'Kuyruk boş',
+              message: 'Üretim başlatıldığında pending, işleniyor, tamamlandı ve hata durumları burada görünür.',
+            ),
+          )
+        else
+          ...filteredRows,
       ],
     );
   }
@@ -2039,6 +2365,7 @@ class _QueueScreen extends StatelessWidget {
 
 class _FlashcardResultsScreen extends StatelessWidget {
   const _FlashcardResultsScreen({
+    required this.result,
     required this.onSearch,
     required this.onBack,
     required this.onSave,
@@ -2047,6 +2374,7 @@ class _FlashcardResultsScreen extends StatelessWidget {
     required this.onEdit,
   });
 
+  final _GenerationResult? result;
   final VoidCallback onSearch;
   final VoidCallback onBack;
   final VoidCallback onSave;
@@ -2056,30 +2384,27 @@ class _FlashcardResultsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final current = result;
     return _BaseForcePage(
-      title: 'Flashcard Sonu\xE7lar\u0131',
-      subtitle: '\xDcretilen seti incele, d\xFCzenle ve\nkoleksiyonuna kaydet.',
-      art: _BaseForceArtKind.flashcards,
+      title: current == null ? 'Üretim Sonucu' : current.title,
+      subtitle: current == null
+          ? 'Üretim tamamlandığında sonuç burada görünür.'
+          : '${current.sourceTitle} kaynağından üretilen içeriği incele.',
+      art: current?.kind == GeneratedKind.summary
+          ? _BaseForceArtKind.notebook
+          : _BaseForceArtKind.flashcards,
       onSearch: onSearch,
       onBack: onBack,
       children: [
         _BasePanel(
           padding: const EdgeInsets.all(22),
-          child: const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 18),
-              child: Text(
-                'Bu i\xE7erik hen\xFCz olu\u015Fturulmad\u0131.\nBir \xFCretim fabrikas\u0131ndan i\xE7erik \xFCretip\ng\xF6r\xFCnt\xFClemek i\xE7in \u201C\xDCret\u201D butonuna bas\u0131n.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.muted,
-                  fontSize: 17,
-                  height: 1.45,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ),
+          child: current == null
+              ? const _EmptyBaseForceState(
+                  icon: Icons.auto_awesome_rounded,
+                  title: 'Sonuç bekleniyor',
+                  message: 'Bir üretim fabrikasından içerik üretip görüntülemek için Üret butonuna basın.',
+                )
+              : _GeneratedContentView(result: current),
         ),
         const SizedBox(height: 16),
         _SectionHeader(title: 'H\u0131zl\u0131 Aksiyonlar'),
@@ -2123,9 +2448,210 @@ class _FlashcardResultsScreen extends StatelessWidget {
   }
 }
 
+class _GeneratedContentView extends StatelessWidget {
+  const _GeneratedContentView({required this.result});
+
+  final _GenerationResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = result.content;
+    if (content == null ||
+        (content is String && content.trim().isEmpty) ||
+        (content is List && content.isEmpty) ||
+        (content is Map && content.isEmpty)) {
+      return const _EmptyBaseForceState(
+        icon: Icons.warning_amber_rounded,
+        title: 'Boş içerik döndü',
+        message: 'AI işi tamamlandı ancak görüntülenecek içerik bulunamadı. Yeniden üretmeyi deneyin.',
+      );
+    }
+    if (content is List) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < content.length; i++)
+            _GeneratedItemCard(index: i + 1, value: content[i]),
+        ],
+      );
+    }
+    if (content is Map) {
+      final preferred = _preferredGeneratedList(content);
+      if (preferred != null && preferred.isNotEmpty) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if ((content['title']?.toString().trim() ?? '').isNotEmpty) ...[
+              Text(
+                content['title'].toString(),
+                style: const TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
+            for (var i = 0; i < preferred.length; i++)
+              _GeneratedItemCard(index: i + 1, value: preferred[i]),
+          ],
+        );
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final entry in content.entries)
+            _GeneratedKeyValue(label: entry.key.toString(), value: entry.value),
+        ],
+      );
+    }
+    return Text(
+      content.toString(),
+      style: const TextStyle(
+        color: AppColors.navy,
+        fontSize: 16,
+        height: 1.45,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+}
+
+List<Object?>? _preferredGeneratedList(Map<dynamic, dynamic> content) {
+  for (final key in const [
+    'cards',
+    'flashcards',
+    'questions',
+    'items',
+    'bulletPoints',
+    'steps',
+    'rows',
+    'segments',
+  ]) {
+    final value = content[key];
+    if (value is List) return value.cast<Object?>();
+  }
+  return null;
+}
+
+class _GeneratedItemCard extends StatelessWidget {
+  const _GeneratedItemCard({required this.index, required this.value});
+
+  final int index;
+  final Object? value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FBFF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 15,
+            backgroundColor: AppColors.selectedBlue,
+            child: Text(
+              '$index',
+              style: const TextStyle(
+                color: AppColors.blue,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: _GeneratedValue(value: value)),
+        ],
+      ),
+    );
+  }
+}
+
+class _GeneratedKeyValue extends StatelessWidget {
+  const _GeneratedKeyValue({required this.label, required this.value});
+
+  final String label;
+  final Object? value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.blue,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          _GeneratedValue(value: value),
+        ],
+      ),
+    );
+  }
+}
+
+class _GeneratedValue extends StatelessWidget {
+  const _GeneratedValue({required this.value});
+
+  final Object? value;
+
+  @override
+  Widget build(BuildContext context) {
+    if (value is Map) {
+      final map = value as Map;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final entry in map.entries)
+            _GeneratedKeyValue(
+              label: entry.key.toString(),
+              value: entry.value,
+            ),
+        ],
+      );
+    }
+    if (value is List) {
+      final list = value as List;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final item in list)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: _GeneratedValue(value: item),
+            ),
+        ],
+      );
+    }
+    return Text(
+      value?.toString().trim().isEmpty ?? true ? '-' : value.toString(),
+      softWrap: true,
+      style: const TextStyle(
+        color: AppColors.navy,
+        fontSize: 15,
+        height: 1.45,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+}
+
 class _AllGenerationsScreen extends StatelessWidget {
   const _AllGenerationsScreen({
     required this.data,
+    required this.jobs,
     required this.selectedFilter,
     required this.onSearch,
     required this.onBack,
@@ -2137,6 +2663,7 @@ class _AllGenerationsScreen extends StatelessWidget {
   });
 
   final DriveWorkspaceData data;
+  final List<_BaseForceJobState> jobs;
   final String selectedFilter;
   final VoidCallback onSearch;
   final VoidCallback onBack;
@@ -2154,13 +2681,27 @@ class _AllGenerationsScreen extends StatelessWidget {
             (gen) => _GenerationRowData(
               title: gen.title,
               source: file.title,
-              kind: gen.kind.name,
+              kind: _baseForceKindLabel(gen.kind),
               count: gen.detail,
               time: gen.updatedLabel,
             ),
           ),
         )
-        .toList();
+        .toList()
+      ..insertAll(
+        0,
+        jobs
+            .where((job) => job.status == _JobUiStatus.completed)
+            .map(
+              (job) => _GenerationRowData(
+                title: job.title,
+                source: job.source.title,
+                kind: _baseForceKindLabel(job.kind),
+                count: '${_baseForceContentCount(job.result?.content)} öğe',
+                time: 'Bugün',
+              ),
+            ),
+      );
 
     final visible = selectedFilter == 'T\xFCm\xFC'
         ? allGenerations
@@ -2234,13 +2775,22 @@ class _AllGenerationsScreen extends StatelessWidget {
             ),
           ),
         ),
-        for (final row in visible)
-          _GenerationListRow(
-            data: row,
-            onOpen: onOpenResult,
-            onShare: onShare,
-            onRegenerate: onRegenerate,
-          ),
+        if (visible.isEmpty)
+          const _BasePanel(
+            child: _EmptyBaseForceState(
+              icon: Icons.collections_bookmark_outlined,
+              title: 'Henüz üretim yok',
+              message: 'Bir kaynak seçip üretim başlattığınızda sonuçlar burada listelenir.',
+            ),
+          )
+        else
+          for (final row in visible)
+            _GenerationListRow(
+              data: row,
+              onOpen: onOpenResult,
+              onShare: onShare,
+              onRegenerate: onRegenerate,
+            ),
       ],
     );
   }
@@ -2282,6 +2832,55 @@ class _BasePanel extends StatelessWidget {
         ],
       ),
       child: child,
+    );
+  }
+}
+
+class _EmptyBaseForceState extends StatelessWidget {
+  const _EmptyBaseForceState({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: AppColors.selectedBlue,
+            child: Icon(icon, color: AppColors.blue, size: 30),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 15,
+              height: 1.35,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -5408,6 +6007,7 @@ class _QueueRow extends StatelessWidget {
   const _QueueRow({
     required this.source,
     required this.title,
+    required this.kind,
     required this.time,
     required this.onAction,
     this.progress,
@@ -5418,6 +6018,7 @@ class _QueueRow extends StatelessWidget {
 
   final _BFSource source;
   final String title;
+  final GeneratedKind kind;
   final String time;
   final VoidCallback onAction;
   final double? progress;
@@ -5427,16 +6028,6 @@ class _QueueRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kind = failed
-        ? GeneratedKind.algorithm
-        : title.startsWith('Soru')
-        ? GeneratedKind.question
-        : title.startsWith('Sınav')
-        ? GeneratedKind.summary
-        : title.startsWith('Karşılaştırma')
-        ? GeneratedKind.table
-        : GeneratedKind.flashcard;
-
     final statusIcon = complete
         ? Icons.check_circle_rounded
         : failed
@@ -6161,7 +6752,7 @@ GeneratedKind _kindForTurkishLabel(String label) {
     'Soru' => GeneratedKind.question,
     'Özet' => GeneratedKind.summary,
     'Algoritma' => GeneratedKind.algorithm,
-    'Tablo' => GeneratedKind.table,
+    'Tablo' => GeneratedKind.comparison,
     _ => GeneratedKind.flashcard,
   };
 }
