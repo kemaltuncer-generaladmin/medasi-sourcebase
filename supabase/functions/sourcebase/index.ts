@@ -438,17 +438,16 @@ async function createGcsV4SignedPutUrl(input: {
     "X-Goog-Credential": credential,
     "X-Goog-Date": timestamp,
     "X-Goog-Expires": String(input.expiresInSeconds),
-    "X-Goog-SignedHeaders": "content-type;host",
+    "X-Goog-SignedHeaders": "host",
   };
   const canonicalQuery = canonicalQueryString(query);
-  const canonicalHeaders =
-    `content-type:${input.contentType}\nhost:storage.googleapis.com\n`;
+  const canonicalHeaders = "host:storage.googleapis.com\n";
   const canonicalRequest = [
     "PUT",
     canonicalUri,
     canonicalQuery,
     canonicalHeaders,
-    "content-type;host",
+    "host",
     "UNSIGNED-PAYLOAD",
   ].join("\n");
   const stringToSign = [
