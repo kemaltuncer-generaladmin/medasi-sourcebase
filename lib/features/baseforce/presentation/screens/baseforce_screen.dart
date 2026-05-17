@@ -88,53 +88,55 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
         SnackBar(
           content: Text(message),
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(milliseconds: 1100),
+          duration: const Duration(milliseconds: 2600),
         ),
       );
   }
 
   void _honestToast() {
-    _toast('Bu özellik henüz hazır değil.');
+    _toast(
+      'Bu işlem şu anda canlı üretime bağlı değil. Drive kaynaklarını seçip '
+      'ayarları inceleyebilirsiniz.',
+    );
+  }
+
+  void _openQueuePreview(String detail) {
+    _toast(
+      'Ayarlar kaydedildi; canlı üretim bağlantısı henüz etkin değil.\n$detail',
+    );
+    _open(BaseForceView.queue);
   }
 
   void _handleFlashcardGenerate() {
-    _toast(
-      'Flashcard üretimi başlatıldı.\nStil: $flashcardStyle, '
+    _openQueuePreview(
+      'Flashcard: $flashcardStyle, '
       'Sayı: $flashcardCount, Zorluk: $flashcardDifficulty, '
       'Kavram çıkar: $flashcardExtractKey, İpuçları: $flashcardAddHints',
     );
-    _open(BaseForceView.queue);
   }
 
   void _handleQuestionGenerate() {
-    _toast(
-      'Soru üretimi başlatıldı.\nTip: $questionType, '
+    _openQueuePreview(
+      'Soru: $questionType, '
       'Sayı: $questionCount, Zorluk: $selectedQuestionDifficulty, '
       'Açıklama: $questionAddExplanation',
     );
-    _open(BaseForceView.queue);
   }
 
   void _handleSummaryGenerate() {
-    _toast(
-      'Özet üretimi başlatıldı.\nUzunluk: $summaryLength, '
-      'Odak: $summaryFocus',
-    );
-    _open(BaseForceView.queue);
+    _openQueuePreview('Özet: $summaryLength, Odak: $summaryFocus');
   }
 
   void _handleAlgorithmGenerate() {
-    _toast(
-      'Algoritma üretimi başlatıldı.\nMod: $algorithmMode, '
+    _openQueuePreview(
+      'Algoritma: $algorithmMode, '
       'Yerleşim: $algorithmLayout, Detay: $algorithmDetail, '
       'Renkli: $algorithmColorfulNodes, Klinik not: $algorithmClinicalNotes',
     );
-    _open(BaseForceView.queue);
   }
 
   void _handleComparisonGenerate() {
-    _toast('Karşılaştırma tablosu üretimi başlatıldı.');
-    _open(BaseForceView.queue);
+    _openQueuePreview('Karşılaştırma tablosu ayarları hazır.');
   }
 
   @override

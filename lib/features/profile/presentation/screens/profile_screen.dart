@@ -18,17 +18,17 @@ class ProfileScreen extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cikis Yap'),
-        content: const Text('Hesabindan cikis yapmak istedigine emin misin?'),
+        title: const Text('Çıkış Yap'),
+        content: const Text('Hesabından çıkış yapmak istediğine emin misin?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Vazgec'),
+            child: const Text('Vazgeç'),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.red),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Cikis Yap'),
+            child: const Text('Çıkış Yap'),
           ),
         ],
       ),
@@ -40,7 +40,7 @@ class ProfileScreen extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Cikis yapilirken bir sorun olustu.'),
+            content: Text('Çıkış yapılırken bir sorun oluştu.'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -86,7 +86,9 @@ class ProfileScreen extends StatelessWidget {
           onEdit: () {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Profil düzenleme özelliği yakında aktif olacak.'),
+                content: Text(
+                  'Profil düzenleme şu anda etkin değil. Hesap bilgilerinizi profil kartında görebilirsiniz.',
+                ),
                 behavior: SnackBarBehavior.floating,
                 duration: Duration(seconds: 2),
               ),
@@ -475,7 +477,7 @@ class _StorePackageTileState extends State<_StorePackageTile> {
     try {
       final client = SourceBaseAuthBackend.client;
       if (client == null) {
-        setState(() => _buyError = 'Giris yapmaniz gerekiyor.');
+        setState(() => _buyError = 'Giriş yapmanız gerekiyor.');
         return;
       }
       final result = await client.functions.invoke(
@@ -495,18 +497,23 @@ class _StorePackageTileState extends State<_StorePackageTile> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Odeme sayfasina yonlendiriliyorsunuz...'),
+            content: Text(
+              'Ödeme bağlantısı hazırlandı. Yönlendirme açılmadıysa mağazayı web üzerinden tekrar deneyin.',
+            ),
             behavior: SnackBarBehavior.floating,
           ),
         );
       } else {
         setState(
-          () => _buyError = json['error']?['message'] ?? 'Odeme baslatilamadi.',
+          () =>
+              _buyError = json['error']?['message'] ?? 'Ödeme başlatılamadı.',
         );
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _buyError = 'Odeme baslatilamadi. Lutfen tekrar deneyin.');
+        setState(
+          () => _buyError = 'Ödeme başlatılamadı. Lütfen tekrar deneyin.',
+        );
       }
     } finally {
       if (mounted) setState(() => _buying = false);

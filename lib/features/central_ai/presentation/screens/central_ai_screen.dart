@@ -240,7 +240,9 @@ class _AiInputArea extends StatelessWidget {
   void _showAttachmentNotImplemented(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Dosya ekleme özelliği yakında aktif olacak.'),
+        content: Text(
+          'Dosya ekleme şu anda etkin değil. Drive içeriğini arama üzerinden açabilirsiniz.',
+        ),
         behavior: SnackBarBehavior.floating,
         duration: Duration(seconds: 2),
       ),
@@ -282,7 +284,7 @@ class _AiInputArea extends StatelessWidget {
                 minLines: 1,
                 maxLines: 4,
                 decoration: const InputDecoration(
-                  hintText: "SourceBase AI'ya bir sey sor...",
+                  hintText: "SourceBase AI'ya bir şey sor...",
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(horizontal: 12),
                 ),

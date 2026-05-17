@@ -456,7 +456,7 @@ class _LabLoadingCard extends StatelessWidget {
           ConstrainedBox(
             constraints: BoxConstraints(maxWidth: 220),
             child: Text(
-              'SourceLab çıktısı hazırlanıyor...',
+              'SourceLab önizlemesi hazırlanıyor...',
               style: TextStyle(
                 color: AppColors.navy,
                 fontSize: 15,

@@ -69,7 +69,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     if (loading) return;
     final code = _enteredCode;
     if (code.length != 6) {
-      setState(() => errorMessage = 'Lutfen 6 haneli dogrulama kodunu girin.');
+      setState(
+        () => errorMessage = 'Lütfen 6 haneli doğrulama kodunu girin.',
+      );
       return;
     }
     if (!SourceBaseAuthBackend.isConfigured) {
