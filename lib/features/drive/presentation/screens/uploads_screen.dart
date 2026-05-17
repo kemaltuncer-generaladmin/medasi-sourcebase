@@ -4,7 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../data/drive_models.dart';
 import '../widgets/drive_ui.dart';
 
-class UploadsScreen extends StatelessWidget {
+class UploadsScreen extends StatefulWidget {
   const UploadsScreen({
     required this.uploads,
     required this.onSearch,
@@ -21,10 +21,39 @@ class UploadsScreen extends StatelessWidget {
   final ValueChanged<UploadTask> onRetryUpload;
 
   @override
+  State<UploadsScreen> createState() => _UploadsScreenState();
+}
+
+enum _UploadFilterKind { all, active, completed, failed }
+
+class _UploadsScreenState extends State<UploadsScreen> {
+  _UploadFilterKind _filter = _UploadFilterKind.all;
+
+  List<UploadTask> get _visibleUploads {
+    return switch (_filter) {
+      _UploadFilterKind.all => widget.uploads,
+      _UploadFilterKind.active => widget.uploads
+          .where(
+            (upload) =>
+                upload.status == DriveItemStatus.uploading ||
+                upload.status == DriveItemStatus.processing,
+          )
+          .toList(),
+      _UploadFilterKind.completed => widget.uploads
+          .where((upload) => upload.status == DriveItemStatus.completed)
+          .toList(),
+      _UploadFilterKind.failed => widget.uploads
+          .where((upload) => upload.status == DriveItemStatus.failed)
+          .toList(),
+    };
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final visibleUploads = _visibleUploads;
     return WorkspaceScroll(
       children: [
-        DriveTopBar(title: 'Drive', onSearch: onSearch),
+        DriveTopBar(title: 'Drive', onSearch: widget.onSearch),
         Row(
           children: [
             Container(
@@ -36,7 +65,7 @@ class UploadsScreen extends StatelessWidget {
                 border: Border.all(color: AppColors.line),
               ),
               child: IconButton(
-                onPressed: onBack,
+                onPressed: widget.onBack,
                 icon: const Icon(Icons.arrow_back_rounded, size: 33),
                 color: AppColors.navy,
               ),
@@ -66,7 +95,7 @@ class UploadsScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${uploads.length} dosya',
+                      '${widget.uploads.length} dosya',
                       style: const TextStyle(
                         color: AppColors.navy,
                         fontSize: 26,
@@ -90,7 +119,7 @@ class UploadsScreen extends StatelessWidget {
                   SBSecondaryButton(
                     label: 'Yeni Dosya',
                     icon: Icons.add_rounded,
-                    onPressed: onNewFile,
+                    onPressed: widget.onNewFile,
                     size: SBButtonSize.small,
                     fullWidth: false,
                   ),
@@ -109,44 +138,84 @@ class UploadsScreen extends StatelessWidget {
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
-            children: const [
+            children: [
               _UploadFilter(
                 label: 'Tümü',
                 icon: Icons.format_list_bulleted_rounded,
-                active: true,
+                active: _filter == _UploadFilterKind.all,
+                onTap: () => setState(() => _filter = _UploadFilterKind.all),
               ),
-              _UploadFilter(label: 'Yükleniyor', icon: Icons.sync_rounded),
+              _UploadFilter(
+                label: 'Yükleniyor',
+                icon: Icons.sync_rounded,
+                active: _filter == _UploadFilterKind.active,
+                onTap: () => setState(() => _filter = _UploadFilterKind.active),
+              ),
               _UploadFilter(
                 label: 'Tamamlandı',
                 icon: Icons.check_circle_outline_rounded,
+                active: _filter == _UploadFilterKind.completed,
+                onTap: () =>
+                    setState(() => _filter = _UploadFilterKind.completed),
               ),
               _UploadFilter(
                 label: 'Hata',
                 icon: Icons.warning_amber_rounded,
                 color: AppColors.red,
+                active: _filter == _UploadFilterKind.failed,
+                onTap: () => setState(() => _filter = _UploadFilterKind.failed),
               ),
             ],
           ),
         ),
         const SizedBox(height: 18),
-        if (uploads.isEmpty)
-          const GlassPanel(
+        if (widget.uploads.isEmpty)
+          GlassPanel(
             child: EmptyState(
               message: 'Aktif yükleme bulunmuyor.',
               subMessage: 'Yeni dosyalar yükleyerek başlayabilirsiniz.',
               icon: Icons.cloud_done_outlined,
             ),
           )
+        else if (visibleUploads.isEmpty)
+          GlassPanel(
+            child: EmptyState(
+              message: _emptyTitle,
+              subMessage: _emptySubtitle,
+              icon: Icons.filter_alt_off_outlined,
+            ),
+          )
         else
-          for (final upload in uploads) ...[
+          for (final upload in visibleUploads) ...[
             _UploadRow(
               upload: upload,
-              onRetry: () => onRetryUpload(upload),
+              onRetry: () => widget.onRetryUpload(upload),
             ),
             const SizedBox(height: 12),
           ],
       ],
     );
+  }
+
+  String get _emptyTitle {
+    return switch (_filter) {
+      _UploadFilterKind.active => 'Devam eden yükleme yok.',
+      _UploadFilterKind.completed => 'Tamamlanan yükleme yok.',
+      _UploadFilterKind.failed => 'Hatalı yükleme yok.',
+      _UploadFilterKind.all => 'Yükleme bulunmuyor.',
+    };
+  }
+
+  String get _emptySubtitle {
+    return switch (_filter) {
+      _UploadFilterKind.active =>
+        'Yeni dosya seçtiğinizde yükleme ilerlemesi burada görünür.',
+      _UploadFilterKind.completed =>
+        'Başarıyla yüklenen dosyalar Drive listesine eklenir.',
+      _UploadFilterKind.failed =>
+        'Yükleme hatası olursa dosyayı tekrar seçerek deneyebilirsiniz.',
+      _UploadFilterKind.all => 'Yeni dosyalar yükleyerek başlayabilirsiniz.',
+    };
   }
 }
 
@@ -212,41 +281,49 @@ class _UploadFilter extends StatelessWidget {
   const _UploadFilter({
     required this.label,
     required this.icon,
+    required this.onTap,
     this.active = false,
     this.color = AppColors.blue,
   });
 
   final String label;
   final IconData icon;
+  final VoidCallback onTap;
   final bool active;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 13),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: active ? AppColors.blue : AppColors.line,
-          width: active ? 1.3 : 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(width: 9),
-          Text(
-            label,
-            style: TextStyle(
-              color: active ? AppColors.blue : AppColors.navy,
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 13),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: active ? AppColors.blue : AppColors.line,
+              width: active ? 1.3 : 1,
             ),
           ),
-        ],
+          child: Row(
+            children: [
+              Icon(icon, color: active ? AppColors.blue : color, size: 24),
+              const SizedBox(width: 9),
+              Text(
+                label,
+                style: TextStyle(
+                  color: active ? AppColors.blue : AppColors.navy,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

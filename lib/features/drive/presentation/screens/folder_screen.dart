@@ -266,6 +266,11 @@ class _FolderScreenState extends State<FolderScreen> {
         if (_hasSelection)
           _SelectionTray(
             selectedCount: _selectedIds.length,
+            onGenerateSummary: () => _generate(GeneratedKind.summary),
+            onGenerateFlashcard: () => _generate(
+              GeneratedKind.flashcard,
+              preferredKind: DriveFileKind.pdf,
+            ),
             onOpenCollections: widget.onOpenCollections,
             onClear: _clearSelection,
           ),
@@ -861,11 +866,15 @@ class _MiniTag extends StatelessWidget {
 class _SelectionTray extends StatelessWidget {
   const _SelectionTray({
     required this.selectedCount,
+    required this.onGenerateSummary,
+    required this.onGenerateFlashcard,
     required this.onOpenCollections,
     required this.onClear,
   });
 
   final int selectedCount;
+  final VoidCallback onGenerateSummary;
+  final VoidCallback onGenerateFlashcard;
   final VoidCallback onOpenCollections;
   final VoidCallback onClear;
 
@@ -890,12 +899,24 @@ class _SelectionTray extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Seçili dosyalar üzerinde işlem yapabilirsiniz.',
+                'Seçili kaynaklardan hızlıca öğrenme çıktısı üretin.',
                 style: TextStyle(color: AppColors.muted, fontSize: 14),
               ),
             ],
           );
           final actions = [
+            _TrayAction(
+              icon: Icons.description_outlined,
+              label: 'Özet Üret',
+              color: AppColors.purple,
+              onTap: onGenerateSummary,
+            ),
+            _TrayAction(
+              icon: Icons.style_outlined,
+              label: 'Flashcard',
+              color: AppColors.green,
+              onTap: onGenerateFlashcard,
+            ),
             _TrayAction(
               icon: Icons.layers_outlined,
               label: 'Koleksiyonlar',
