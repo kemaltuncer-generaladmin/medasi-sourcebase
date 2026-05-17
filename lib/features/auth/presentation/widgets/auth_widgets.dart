@@ -18,15 +18,24 @@ class AuthScreenFrame extends StatelessWidget {
         child: CustomPaint(
           painter: const AuthBackgroundPainter(),
           child: SafeArea(
-            bottom: false,
             child: LayoutBuilder(
               builder: (context, constraints) {
+                final viewInsets = MediaQuery.viewInsetsOf(context);
+                final width = MediaQuery.sizeOf(context).width;
+                final horizontalPadding = width < 390 ? 20.0 : 36.0;
                 return Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 480),
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(36, 36, 36, 44),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: EdgeInsets.fromLTRB(
+                        horizontalPadding,
+                        28,
+                        horizontalPadding,
+                        28 + viewInsets.bottom,
+                      ),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
                           minHeight: constraints.maxHeight - 80,
@@ -66,6 +75,13 @@ class AuthHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final compactLayout = width < 390;
+    final artSize = compactLayout ? 156.0 : 210.0;
+    final titleSize = compactLayout ? 38.0 : 46.0;
+    final subtitleSize = compactLayout ? 18.0 : 21.0;
+    final brandGap = compactLayout ? 58.0 : 88.0;
+
     return Semantics(
       container: true,
       explicitChildNodes: true,
@@ -76,21 +92,23 @@ class AuthHeader extends StatelessWidget {
           Align(
             alignment: Alignment.topRight,
             child: SizedBox(
-              width: 210,
-              height: 210,
+              width: artSize,
+              height: artSize,
               child: CustomPaint(painter: AuthArtPainter(art)),
             ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SourceBaseBrand(),
-              const SizedBox(height: 88),
+              SourceBaseBrand(compact: compactLayout),
+              SizedBox(height: brandGap),
               Text(
                 title,
-                style: const TextStyle(
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
                   color: AppColors.navy,
-                  fontSize: 46,
+                  fontSize: titleSize,
                   height: 1.08,
                   letterSpacing: 0,
                   fontWeight: FontWeight.w800,
@@ -99,9 +117,9 @@ class AuthHeader extends StatelessWidget {
               const SizedBox(height: 18),
               Text(
                 subtitle,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.muted,
-                  fontSize: 21,
+                  fontSize: subtitleSize,
                   height: 1.34,
                   letterSpacing: 0,
                   fontWeight: FontWeight.w400,
@@ -243,7 +261,10 @@ class GradientActionButton extends StatelessWidget {
               letterSpacing: 0,
             ),
           ),
-          child: Text(label),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(label, maxLines: 1),
+          ),
         ),
       ),
     );
@@ -281,7 +302,10 @@ class OutlineActionButton extends StatelessWidget {
             letterSpacing: 0,
           ),
         ),
-        child: Text(label),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label, maxLines: 1),
+        ),
       ),
     );
   }
@@ -377,6 +401,8 @@ class DividerLabel extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: AppColors.muted, fontSize: 18),
           ),
         ),

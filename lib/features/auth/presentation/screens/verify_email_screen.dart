@@ -152,6 +152,8 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         const SizedBox(height: 50),
         Text(
           email,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             color: AppColors.navy,
             fontSize: 20,
@@ -159,48 +161,59 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           ),
         ),
         const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(
-            6,
-            (index) => SizedBox(
-              width: 50,
-              height: 64,
-              child: TextField(
-                controller: _otpControllers[index],
-                textAlign: TextAlign.center,
-                keyboardType: TextInputType.number,
-                maxLength: 1,
-                style: const TextStyle(
-                  color: AppColors.blue,
-                  fontSize: 27,
-                  fontWeight: FontWeight.w800,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final boxWidth = ((constraints.maxWidth - 40) / 6).clamp(
+              42.0,
+              50.0,
+            );
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(
+                6,
+                (index) => SizedBox(
+                  width: boxWidth,
+                  height: 62,
+                  child: TextField(
+                    controller: _otpControllers[index],
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    maxLength: 1,
+                    style: const TextStyle(
+                      color: AppColors.blue,
+                      fontSize: 27,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    decoration: InputDecoration(
+                      counterText: '',
+                      filled: true,
+                      fillColor: AppColors.white.withValues(alpha: .96),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: AppColors.line),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: AppColors.line),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(
+                          color: AppColors.blue,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      if (value.isNotEmpty && index < 5) {
+                        FocusScope.of(context).nextFocus();
+                      }
+                    },
+                  ),
                 ),
-                decoration: InputDecoration(
-                  counterText: '',
-                  filled: true,
-                  fillColor: AppColors.white.withValues(alpha: .96),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppColors.line),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppColors.line),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppColors.blue, width: 2),
-                  ),
-                ),
-                onChanged: (value) {
-                  if (value.isNotEmpty && index < 5) {
-                    FocusScope.of(context).nextFocus();
-                  }
-                },
               ),
-            ),
-          ),
+            );
+          },
         ),
         const SizedBox(height: 30),
         Container(
@@ -211,38 +224,40 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.line),
           ),
-          child: Row(
-            children: [
-              const Text(
-                'Kod gelmedi mi?',
-                style: TextStyle(color: AppColors.muted, fontSize: 18),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed:
-                    loading || !_canResend
-                        ? null
-                        : () => _resend(email),
-                style: TextButton.styleFrom(foregroundColor: AppColors.blue),
-                child: Text(
-                  loading ? 'Gönderiliyor...' : 'Tekrar gönder',
-                  style: const TextStyle(
-                    fontSize: 17,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              children: [
+                const Text(
+                  'Kod gelmedi mi?',
+                  style: TextStyle(color: AppColors.muted, fontSize: 18),
+                ),
+                const SizedBox(width: 16),
+                TextButton(
+                  onPressed: loading || !_canResend
+                      ? null
+                      : () => _resend(email),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.blue),
+                  child: Text(
+                    loading ? 'Gönderiliyor...' : 'Tekrar gönder',
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Container(width: 1, height: 24, color: AppColors.line),
+                const SizedBox(width: 16),
+                Text(
+                  _timerLabel,
+                  style: TextStyle(
+                    color: _canResend ? AppColors.blue : AppColors.muted,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-              Container(width: 1, height: 24, color: AppColors.line),
-              const SizedBox(width: 16),
-              Text(
-                _timerLabel,
-                style: TextStyle(
-                  color: _canResend ? AppColors.blue : AppColors.muted,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         if (message != null || errorMessage != null) ...[

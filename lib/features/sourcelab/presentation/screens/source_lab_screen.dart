@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
 import '../../../drive/data/drive_models.dart';
 import '../../../drive/presentation/widgets/drive_ui.dart';
+import '../../../drive/presentation/widgets/sourcebase_bottom_nav.dart';
 
 enum SourceLabView {
   home,
@@ -416,7 +417,54 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onExport: () => _toast('Bu özellik henüz hazır değil.'),
             onRegenerate: () => _open(SourceLabView.mindMapBuilder),
           ),
-        },
+            },
+          ),
+        ),
+        if (_isLoading)
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.page.withValues(alpha: .72),
+              ),
+              child: const Center(
+                child: _LabLoadingCard(),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _LabLoadingCard extends StatelessWidget {
+  const _LabLoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return _LabPanel(
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+      radius: 18,
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+          SizedBox(width: 14),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: 220),
+            child: Text(
+              'SourceLab çıktısı hazırlanıyor...',
+              style: TextStyle(
+                color: AppColors.navy,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2264,16 +2312,22 @@ class _LabScroll extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final horizontalPadding = width < 420 ? 16.0 : 26.0;
+    final isMobile = width < 600;
+    final topPadding = MediaQuery.viewPaddingOf(context).top + 12;
+    final bottomPadding = isMobile
+        ? SourceBaseBottomNav.contentBottomPadding(context)
+        : 48.0;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 940),
         child: ListView(
           physics: const BouncingScrollPhysics(),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: EdgeInsets.fromLTRB(
             horizontalPadding,
-            16,
+            topPadding,
             horizontalPadding,
-            142,
+            bottomPadding,
           ),
           children: [
             for (final child in children) ...[

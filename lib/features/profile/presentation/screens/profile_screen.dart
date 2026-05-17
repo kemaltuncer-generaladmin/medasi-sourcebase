@@ -170,46 +170,76 @@ class _ProfileHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassPanel(
       padding: const EdgeInsets.all(24),
-      child: Row(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final avatar = Container(
+            width: 72,
+            height: 72,
             decoration: const BoxDecoration(
               gradient: AppColors.primaryGradient,
               shape: BoxShape.circle,
             ),
             child: const Center(
-              child: Icon(Icons.person_rounded, color: Colors.white, size: 40),
+              child: Icon(Icons.person_rounded, color: Colors.white, size: 36),
             ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
+          );
+          final details = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                displayName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                email,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.muted, fontSize: 16),
+              ),
+            ],
+          );
+
+          if (constraints.maxWidth < 360) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  displayName,
-                  style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                  ),
+                Row(
+                  children: [
+                    avatar,
+                    const Spacer(),
+                    IconButton(
+                      onPressed: onEdit,
+                      tooltip: 'Profili düzenle',
+                      icon: const Icon(Icons.edit_outlined, color: AppColors.blue),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  email,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 16),
-                ),
+                const SizedBox(height: 16),
+                details,
               ],
-            ),
-          ),
-          IconButton(
-            onPressed: onEdit,
-            tooltip: 'Profili düzenle',
-            icon: const Icon(Icons.edit_outlined, color: AppColors.blue),
-          ),
-        ],
+            );
+          }
+
+          return Row(
+            children: [
+              avatar,
+              const SizedBox(width: 18),
+              Expanded(child: details),
+              IconButton(
+                onPressed: onEdit,
+                tooltip: 'Profili düzenle',
+                icon: const Icon(Icons.edit_outlined, color: AppColors.blue),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -270,9 +300,11 @@ class _WalletPanel extends StatelessWidget {
                           child: Text(
                             loading ? '...' : balance.label,
                             key: ValueKey(loading ? 'loading' : balance.label),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: AppColors.navy,
-                              fontSize: 30,
+                              fontSize: 28,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
@@ -487,9 +519,9 @@ class _StorePackageTileState extends State<_StorePackageTile> {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       child: Column(
         children: [
-          Row(
-            children: [
-              Container(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final leading = Container(
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
@@ -501,29 +533,28 @@ class _StorePackageTileState extends State<_StorePackageTile> {
                   color: AppColors.blue,
                   size: 26,
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  '${widget.package.coin} MC',
-                  style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                  ),
+              );
+              final title = Text(
+                '${widget.package.coin} MC',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
                 ),
-              ),
-              Text(
+              );
+              final price = Text(
                 '${widget.package.priceTl} TL',
+                maxLines: 1,
                 style: const TextStyle(
                   color: AppColors.blue,
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
                 ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                height: 40,
+              );
+              final buyButton = SizedBox(
+                height: 42,
                 child: FilledButton(
                   onPressed: _buying ? null : _purchase,
                   style: FilledButton.styleFrom(
@@ -541,18 +572,53 @@ class _StorePackageTileState extends State<_StorePackageTile> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text(
-                          'Satın Al',
-                          style: TextStyle(fontWeight: FontWeight.w700),
+                      : const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Satın Al',
+                            maxLines: 1,
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
                         ),
                 ),
-              ),
-            ],
+              );
+
+              if (constraints.maxWidth < 380) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        leading,
+                        const SizedBox(width: 14),
+                        Expanded(child: title),
+                        price,
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    buyButton,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  leading,
+                  const SizedBox(width: 14),
+                  Expanded(child: title),
+                  price,
+                  const SizedBox(width: 12),
+                  SizedBox(width: 116, child: buyButton),
+                ],
+              );
+            },
           ),
           if (_buyError != null) ...[
             const SizedBox(height: 8),
             Text(
               _buyError!,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppColors.red,
                 fontSize: 13,
@@ -665,12 +731,16 @@ class _SettingsItem extends StatelessWidget {
         leading: Icon(icon, color: AppColors.navy),
         title: Row(
           children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: AppColors.navy,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             if (!enabled) ...[

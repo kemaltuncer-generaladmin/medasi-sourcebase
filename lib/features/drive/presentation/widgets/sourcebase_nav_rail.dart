@@ -20,16 +20,36 @@ class SourceBaseNavRail extends StatelessWidget {
       selectedIndex: selectedIndex,
       onDestinationSelected: onChanged,
       extended: extended,
+      minWidth: 78,
+      minExtendedWidth: 188,
+      useIndicator: true,
+      groupAlignment: -0.82,
       labelType: extended
           ? NavigationRailLabelType.none
           : NavigationRailLabelType.all,
       backgroundColor: AppColors.page,
       indicatorColor: AppColors.selectedBlue,
+      indicatorShape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
       selectedLabelTextStyle: const TextStyle(
         color: AppColors.blue,
-        fontWeight: FontWeight.bold,
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
       ),
-      unselectedLabelTextStyle: const TextStyle(color: AppColors.muted),
+      selectedIconTheme: const IconThemeData(
+        color: AppColors.blue,
+        size: 26,
+      ),
+      unselectedLabelTextStyle: const TextStyle(
+        color: AppColors.muted,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+      ),
+      unselectedIconTheme: const IconThemeData(
+        color: AppColors.muted,
+        size: 25,
+      ),
       destinations: const [
         NavigationRailDestination(
           icon: Icon(Icons.psychology_outlined),

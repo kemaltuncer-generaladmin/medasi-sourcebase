@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
 import '../../../drive/data/drive_models.dart';
 import '../../../drive/presentation/widgets/drive_ui.dart';
+import '../../../drive/presentation/widgets/sourcebase_bottom_nav.dart';
 
 enum BaseForceView {
   home,
@@ -325,12 +326,24 @@ class _BaseForcePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+    final horizontalPadding = MediaQuery.sizeOf(context).width < 390 ? 16.0 : 32.0;
+    final topPadding = MediaQuery.viewPaddingOf(context).top + 12;
+    final bottomPadding = isMobile
+        ? SourceBaseBottomNav.contentBottomPadding(context)
+        : 48.0;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 940),
         child: ListView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(32, 18, 32, 142),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            topPadding,
+            horizontalPadding,
+            bottomPadding,
+          ),
           children: [
             _BaseForceTopBar(onSearch: onSearch, onBack: onBack),
             _BaseForceHero(

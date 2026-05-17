@@ -3,6 +3,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
 import '../../../drive/data/sourcebase_drive_api.dart';
 import '../../../drive/presentation/widgets/drive_ui.dart';
+import '../../../drive/presentation/widgets/sourcebase_bottom_nav.dart';
 
 class CentralAiScreen extends StatefulWidget {
   const CentralAiScreen({required this.onSearch, super.key});
@@ -75,54 +76,62 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 900),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 18, 24, 12),
-              child: Row(
-                children: [
-                  const SourceBaseBrand(compact: true),
-                  const _TopDivider(),
-                  const Expanded(
-                    child: Text(
-                      'Merkezi AI',
-                      style: TextStyle(
-                        color: AppColors.blue,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
+    final topPadding = MediaQuery.viewPaddingOf(context).top;
+    return SafeArea(
+      bottom: false,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 900),
+          child: Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(24, topPadding > 0 ? 8 : 18, 24, 12),
+                child: Row(
+                  children: [
+                    const Flexible(child: SourceBaseBrand(compact: true)),
+                    const _TopDivider(),
+                    const Expanded(
+                      child: Text(
+                        'Merkezi AI',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.blue,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
-                  ),
-                  _RoundIconButton(
-                    icon: Icons.search_rounded,
-                    onTap: widget.onSearch,
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 20,
+                    _RoundIconButton(
+                      icon: Icons.search_rounded,
+                      onTap: widget.onSearch,
+                    ),
+                  ],
                 ),
-                reverse: true,
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  final message = _messages[_messages.length - 1 - index];
-                  return _ChatBubble(message: message);
-                },
               ),
-            ),
-            _AiInputArea(
-              controller: _controller,
-              onSend: _sendMessage,
-              sending: _isSending,
-            ),
-          ],
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 20,
+                  ),
+                  reverse: true,
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  itemCount: _messages.length,
+                  itemBuilder: (context, index) {
+                    final message = _messages[_messages.length - 1 - index];
+                    return _ChatBubble(message: message);
+                  },
+                ),
+              ),
+              _AiInputArea(
+                controller: _controller,
+                onSend: _sendMessage,
+                sending: _isSending,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -240,8 +249,9 @@ class _AiInputArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = SourceBaseBottomNav.contentBottomPadding(context);
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 134),
+      padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
@@ -269,6 +279,8 @@ class _AiInputArea extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: controller,
+                minLines: 1,
+                maxLines: 4,
                 decoration: const InputDecoration(
                   hintText: "SourceBase AI'ya bir sey sor...",
                   border: InputBorder.none,
@@ -277,7 +289,16 @@ class _AiInputArea extends StatelessWidget {
                 onSubmitted: (_) => onSend(),
               ),
             ),
-            _SendButton(onTap: onSend, sending: sending),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (context, value, _) {
+                return _SendButton(
+                  onTap: onSend,
+                  sending: sending,
+                  enabled: value.text.trim().isNotEmpty,
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -286,19 +307,25 @@ class _AiInputArea extends StatelessWidget {
 }
 
 class _SendButton extends StatelessWidget {
-  const _SendButton({required this.onTap, required this.sending});
+  const _SendButton({
+    required this.onTap,
+    required this.sending,
+    required this.enabled,
+  });
   final Future<void> Function() onTap;
   final bool sending;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: sending ? null : onTap,
+      onTap: sending || !enabled ? null : onTap,
       child: Container(
         width: 42,
         height: 42,
-        decoration: const BoxDecoration(
-          gradient: AppColors.primaryGradient,
+        decoration: BoxDecoration(
+          gradient: sending || enabled ? AppColors.primaryGradient : null,
+          color: sending || enabled ? null : AppColors.line,
           shape: BoxShape.circle,
         ),
         child: sending
