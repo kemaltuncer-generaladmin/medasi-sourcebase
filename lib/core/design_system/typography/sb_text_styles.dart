@@ -13,7 +13,7 @@ class SBTextStyles {
     fontSize: 48,
     fontWeight: FontWeight.w900,
     height: 1.08,
-    letterSpacing: -0.5,
+    letterSpacing: 0,
   );
 
   /// Display 2: 40px, w900 - Large feature headlines
@@ -21,7 +21,7 @@ class SBTextStyles {
     fontSize: 40,
     fontWeight: FontWeight.w900,
     height: 1.1,
-    letterSpacing: -0.5,
+    letterSpacing: 0,
   );
 
   // Heading Styles (Section Headers)
@@ -30,7 +30,7 @@ class SBTextStyles {
     fontSize: 32,
     fontWeight: FontWeight.w800,
     height: 1.2,
-    letterSpacing: -0.3,
+    letterSpacing: 0,
   );
 
   /// Heading 2: 24px, w800 - Section titles
@@ -38,7 +38,7 @@ class SBTextStyles {
     fontSize: 24,
     fontWeight: FontWeight.w800,
     height: 1.25,
-    letterSpacing: -0.2,
+    letterSpacing: 0,
   );
 
   /// Heading 3: 20px, w700 - Subsection titles

@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
 import '../../../../core/widgets/responsive_layout.dart';
 import '../../data/drive_models.dart';
+import 'sourcebase_bottom_nav.dart';
 
 // Re-export design system buttons for backward compatibility
 export '../../../../core/design_system/buttons/sb_primary_button.dart';
@@ -44,14 +45,12 @@ class WorkspaceScroll extends StatelessWidget {
     final isDesktop = ResponsiveLayout.isDesktop(context);
     final isTablet = ResponsiveLayout.isTablet(context);
     final horizontalPadding = ResponsiveLayout.getHorizontalPadding(context);
-    final mediaQuery = MediaQuery.of(context);
-    final bottomPadding =
-        (isDesktop ? 48.0 : (isTablet ? 48.0 : 138.0)) +
-        mediaQuery.viewPadding.bottom +
-        mediaQuery.viewInsets.bottom;
+    final bottomPadding = isDesktop || isTablet
+        ? 48.0
+        : SourceBaseBottomNav.contentBottomPadding(context);
     final topPadding = isDesktop || isTablet
         ? 18.0
-        : mediaQuery.viewPadding.top + 8.0;
+        : MediaQuery.viewPaddingOf(context).top + 8.0;
 
     final scroll = ListView(
       physics: const BouncingScrollPhysics(),
@@ -479,7 +478,10 @@ class _NotificationTile extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 9),
-                    Row(
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
                       children: [
                         Text(
                           item.timeLabel,
@@ -488,7 +490,6 @@ class _NotificationTile extends StatelessWidget {
                             fontSize: 12,
                           ),
                         ),
-                        const Spacer(),
                         TextButton(
                           onPressed: onToggleRead,
                           child: Text(item.read ? 'Okunmadı yap' : 'Okundu'),
@@ -1149,22 +1150,36 @@ class EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 42, color: AppColors.blue.withValues(alpha: .4)),
-          const SizedBox(height: 12),
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: AppColors.selectedBlue,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(icon, size: 30, color: AppColors.blue),
+          ),
+          const SizedBox(height: 14),
           Text(
             message,
             textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: AppColors.navy,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             subMessage,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.muted, fontSize: 14),
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 14,
+              height: 1.35,
+            ),
           ),
         ],
       ),

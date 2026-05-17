@@ -39,7 +39,7 @@ class ResponsiveLayout extends StatelessWidget {
   static double getHorizontalPadding(BuildContext context) {
     if (isDesktop(context)) return 32;
     if (isTablet(context)) return 24;
-    return 16;
+    return MediaQuery.sizeOf(context).width < 390 ? 14 : 16;
   }
 
   @override
@@ -110,6 +110,7 @@ class ResponsiveGrid extends StatelessWidget {
       crossAxisSpacing: spacing,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
+      childAspectRatio: columns == 1 ? 3.4 : 1.2,
       children: children,
     );
   }

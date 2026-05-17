@@ -93,7 +93,7 @@ class SBPrimaryButton extends StatelessWidget {
               child: Container(
                 padding: EdgeInsets.symmetric(
                   horizontal: SBSpacing.lg,
-                  vertical: SBSpacing.md,
+                  vertical: 0,
                 ),
                 child: loading
                     ? Center(
@@ -130,6 +130,7 @@ class SBPrimaryButton extends StatelessWidget {
                                 letterSpacing: 0,
                               ),
                               overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                               textAlign: TextAlign.center,
                             ),
                           ),

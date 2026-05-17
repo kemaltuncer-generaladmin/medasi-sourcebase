@@ -10,9 +10,6 @@ class AuthScreenFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final viewInsets = MediaQuery.viewInsetsOf(context);
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final horizontalPadding = screenWidth < 380 ? 22.0 : 36.0;
     return Scaffold(
       body: Semantics(
         container: true,
@@ -23,20 +20,25 @@ class AuthScreenFrame extends StatelessWidget {
           child: SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
+                final viewInsets = MediaQuery.viewInsetsOf(context);
+                final width = MediaQuery.sizeOf(context).width;
+                final horizontalPadding = width < 390 ? 20.0 : 36.0;
                 return Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 480),
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
                       padding: EdgeInsets.fromLTRB(
                         horizontalPadding,
                         28,
                         horizontalPadding,
-                        44 + viewInsets.bottom,
+                        28 + viewInsets.bottom,
                       ),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight - 72,
+                          minHeight: constraints.maxHeight - 80,
                         ),
                         child: Semantics(
                           container: true,
@@ -73,8 +75,13 @@ class AuthHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final compact = screenWidth < 380;
+    final width = MediaQuery.sizeOf(context).width;
+    final compactLayout = width < 390;
+    final artSize = compactLayout ? 156.0 : 210.0;
+    final titleSize = compactLayout ? 38.0 : 46.0;
+    final subtitleSize = compactLayout ? 18.0 : 21.0;
+    final brandGap = compactLayout ? 58.0 : 88.0;
+
     return Semantics(
       container: true,
       explicitChildNodes: true,
@@ -85,32 +92,34 @@ class AuthHeader extends StatelessWidget {
           Align(
             alignment: Alignment.topRight,
             child: SizedBox(
-              width: 210,
-              height: 210,
+              width: artSize,
+              height: artSize,
               child: CustomPaint(painter: AuthArtPainter(art)),
             ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SourceBaseBrand(),
-              SizedBox(height: compact ? 62 : 88),
+              SourceBaseBrand(compact: compactLayout),
+              SizedBox(height: brandGap),
               Text(
                 title,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: AppColors.navy,
-                  fontSize: compact ? 38 : 46,
+                  fontSize: titleSize,
                   height: 1.08,
                   letterSpacing: 0,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              SizedBox(height: compact ? 14 : 18),
+              const SizedBox(height: 18),
               Text(
                 subtitle,
                 style: TextStyle(
                   color: AppColors.muted,
-                  fontSize: compact ? 18 : 21,
+                  fontSize: subtitleSize,
                   height: 1.34,
                   letterSpacing: 0,
                   fontWeight: FontWeight.w400,
@@ -216,25 +225,21 @@ class GradientActionButton extends StatelessWidget {
   });
 
   final String label;
-  final VoidCallback? onPressed;
+  final VoidCallback onPressed;
   final double height;
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onPressed != null;
     return SizedBox(
       width: double.infinity,
       height: height,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: enabled ? AppColors.primaryGradient : null,
-          color: enabled ? null : const Color(0xFFE2E8F3),
+          gradient: AppColors.primaryGradient,
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-              color: enabled
-                  ? AppColors.blue.withValues(alpha: .24)
-                  : Colors.transparent,
+              color: AppColors.blue.withValues(alpha: .24),
               blurRadius: 18,
               offset: const Offset(0, 10),
             ),
@@ -246,7 +251,6 @@ class GradientActionButton extends StatelessWidget {
             elevation: 0,
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
-            disabledForegroundColor: AppColors.muted,
             foregroundColor: AppColors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
@@ -257,7 +261,10 @@ class GradientActionButton extends StatelessWidget {
               letterSpacing: 0,
             ),
           ),
-          child: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(label, maxLines: 1),
+          ),
         ),
       ),
     );
@@ -273,7 +280,7 @@ class OutlineActionButton extends StatelessWidget {
   });
 
   final String label;
-  final VoidCallback? onPressed;
+  final VoidCallback onPressed;
   final double height;
 
   @override
@@ -295,7 +302,10 @@ class OutlineActionButton extends StatelessWidget {
             letterSpacing: 0,
           ),
         ),
-        child: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label, maxLines: 1),
+        ),
       ),
     );
   }
@@ -311,7 +321,7 @@ class SocialAuthButton extends StatelessWidget {
 
   final String label;
   final Widget icon;
-  final VoidCallback? onPressed;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -346,23 +356,17 @@ class SocialAuthButton extends StatelessWidget {
 }
 
 class AuthCheck extends StatelessWidget {
-  const AuthCheck({
-    required this.value,
-    required this.onTap,
-    this.label = 'Seçili',
-    super.key,
-  });
+  const AuthCheck({required this.value, required this.onTap, super.key});
 
   final bool value;
   final VoidCallback onTap;
-  final String label;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
       toggled: value,
-      label: label,
+      label: 'Beni hatırla',
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
@@ -397,6 +401,8 @@ class DividerLabel extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: AppColors.muted, fontSize: 18),
           ),
         ),

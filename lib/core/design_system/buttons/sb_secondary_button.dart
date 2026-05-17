@@ -72,7 +72,7 @@ class SBSecondaryButton extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border.all(
               color: isDisabled ? AppColors.line : AppColors.blue,
-              width: 2,
+              width: 1.3,
             ),
             borderRadius: BorderRadius.circular(SBDimensions.radiusMd),
           ),
@@ -84,7 +84,7 @@ class SBSecondaryButton extends StatelessWidget {
               child: Container(
                 padding: EdgeInsets.symmetric(
                   horizontal: SBSpacing.lg,
-                  vertical: SBSpacing.md,
+                  vertical: 0,
                 ),
                 child: loading
                     ? Center(
@@ -121,6 +121,7 @@ class SBSecondaryButton extends StatelessWidget {
                                 letterSpacing: 0,
                               ),
                               overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                               textAlign: TextAlign.center,
                             ),
                           ),
