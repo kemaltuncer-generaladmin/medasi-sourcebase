@@ -194,12 +194,44 @@ async function ensureStorageRoots(userId: string) {
     await audit(userId, "ensure_storage_roots", "storage_root", null, {
       rootKeys: missing.map((root) => root.root_key),
     });
+    await ensureGcsRootMarkers(definitions);
     return await dbSelect(
       `storage_roots?owner_user_id=eq.${userId}&select=*&order=created_at.asc`,
     );
   }
+  await ensureGcsRootMarkers(definitions);
   return existing;
 }
+
+async function ensureGcsRootMarkers(
+  definitions: ReturnType<typeof storageRootDefinitions>,
+) {
+  let gcs: GcsRuntime | null = null;
+  try {
+    gcs = getGcsConfig();
+  } catch (_error) {
+    return;
+  }
+  await Promise.all(
+    definitions.map(async (root) => {
+      const markerName = `${root.gcs_prefix}.keep`;
+      const uploadUrl = await createGcsV4SignedPutUrl({
+        bucket: gcs.bucket,
+        objectName: markerName,
+        contentType: "text/plain",
+        serviceAccountJson: gcs.serviceAccountJson,
+        expiresInSeconds: 300,
+      });
+      await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "content-type": "text/plain" },
+        body: "",
+      }).catch(() => undefined);
+    }),
+  );
+}
+
+type GcsRuntime = ReturnType<typeof getGcsConfig>;
 
 function storageRootDefinitions(userId: string) {
   const base = `user/${userId}`;
