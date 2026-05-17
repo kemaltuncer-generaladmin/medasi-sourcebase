@@ -81,6 +81,34 @@ class SourceBaseDriveApi {
     );
   }
 
+  Future<Map<String, dynamic>> renameCourse({
+    required String courseId,
+    required String title,
+  }) {
+    return invoke(
+      'rename_course',
+      payload: {'courseId': courseId, 'title': title},
+    );
+  }
+
+  Future<Map<String, dynamic>> renameSection({
+    required String sectionId,
+    required String title,
+  }) {
+    return invoke(
+      'rename_section',
+      payload: {'sectionId': sectionId, 'title': title},
+    );
+  }
+
+  Future<Map<String, dynamic>> deleteCourse(String courseId) {
+    return invoke('delete_course', payload: {'courseId': courseId});
+  }
+
+  Future<Map<String, dynamic>> deleteSection(String sectionId) {
+    return invoke('delete_section', payload: {'sectionId': sectionId});
+  }
+
   Future<Map<String, dynamic>> createGeneratedOutput({
     required String fileId,
     required GeneratedKind kind,

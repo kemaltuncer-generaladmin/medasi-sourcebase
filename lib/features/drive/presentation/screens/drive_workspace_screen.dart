@@ -194,6 +194,101 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
     });
   }
 
+  Future<void> _renameCourse(DriveCourse course) async {
+    final title = await _textDialog(
+      title: 'Dersi Yeniden Adlandır',
+      label: 'Ders adı',
+      initialValue: course.title,
+    );
+    if (title == null || title.trim().isEmpty || title.trim() == course.title) {
+      return;
+    }
+    await _runAction('Ders güncelleniyor...', () async {
+      final renamed = await repository.renameCourse(
+        courseId: course.id,
+        title: title.trim(),
+      );
+      _replaceCourse(
+        course.copyWith(
+          title: renamed.title,
+          sections: [
+            for (final section in course.sections)
+              section.copyWith(
+                files: [
+                  for (final file in section.files)
+                    file.copyWith(courseTitle: renamed.title),
+                ],
+              ),
+          ],
+          description: renamed.description,
+          updatedLabel: renamed.updatedLabel,
+        ),
+      );
+      _showSnack('Ders adı güncellendi.');
+    });
+  }
+
+  Future<void> _renameSection(DriveSection section) async {
+    final title = await _textDialog(
+      title: 'Bölümü Yeniden Adlandır',
+      label: 'Bölüm adı',
+      initialValue: section.title,
+    );
+    if (title == null ||
+        title.trim().isEmpty ||
+        title.trim() == section.title) {
+      return;
+    }
+    await _runAction('Bölüm güncelleniyor...', () async {
+      final renamed = await repository.renameSection(
+        sectionId: section.id,
+        title: title.trim(),
+      );
+      _replaceSection(
+        section.copyWith(
+          title: renamed.title,
+          files: [
+            for (final file in section.files)
+              file.copyWith(sectionTitle: renamed.title),
+          ],
+        ),
+      );
+      _showSnack('Bölüm adı güncellendi.');
+    });
+  }
+
+  Future<void> _deleteCourse(DriveCourse course) async {
+    final confirmed = await _confirmDestructive(
+      title: 'Dersi Sil',
+      message:
+          '${course.title} dersi, içindeki ${course.sections.length} bölüm ve '
+          '${course.fileCount} dosya silinecek.',
+      actionLabel: 'Dersi Sil',
+    );
+    if (!confirmed) return;
+    await _runAction('Ders siliniyor...', () async {
+      await repository.deleteCourse(course.id);
+      _removeCourse(course.id);
+      _showSnack('${course.title} silindi.');
+    });
+  }
+
+  Future<void> _deleteSection(DriveSection section) async {
+    final confirmed = await _confirmDestructive(
+      title: 'Bölümü Sil',
+      message:
+          '${section.title} bölümü ve içindeki ${section.files.length} dosya '
+          'silinecek.',
+      actionLabel: 'Bölümü Sil',
+    );
+    if (!confirmed) return;
+    await _runAction('Bölüm siliniyor...', () async {
+      await repository.deleteSection(section.id);
+      _removeSection(section.id);
+      _showSnack('${section.title} silindi.');
+    });
+  }
+
   Future<void> _uploadFile() async {
     final target = await _ensureUploadTarget();
     if (target == null) return;
@@ -324,13 +419,130 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
   }
 
   void _replaceCourse(DriveCourse updated) {
+    final updatedFiles = {
+      for (final section in updated.sections)
+        for (final file in section.files) file.id: file,
+    };
     setState(() {
       data = data.copyWith(
         courses: [
           for (final course in data.courses)
             if (course.id == updated.id) updated else course,
         ],
+        recentFiles: [
+          for (final file in data.recentFiles) updatedFiles[file.id] ?? file,
+        ],
+        uploads: [
+          for (final task in data.uploads)
+            UploadTask(
+              file: updatedFiles[task.file.id] ?? task.file,
+              status: task.status,
+              progress: task.progress,
+              errorLabel: task.errorLabel,
+            ),
+        ],
+        collections: [
+          for (final bundle in data.collections)
+            CollectionBundle(
+              file: updatedFiles[bundle.file.id] ?? bundle.file,
+              outputs: bundle.outputs,
+              subject: updatedFiles.containsKey(bundle.file.id)
+                  ? updated.title
+                  : bundle.subject,
+              previewKind: bundle.previewKind,
+            ),
+        ],
       );
+    });
+  }
+
+  void _replaceSection(DriveSection updated) {
+    final course = _primaryCourse;
+    if (course == null) return;
+    _replaceCourse(
+      course.copyWith(
+        sections: [
+          for (final section in course.sections)
+            if (section.id == updated.id) updated else section,
+        ],
+      ),
+    );
+  }
+
+  void _removeCourse(String courseId) {
+    DriveCourse? removed;
+    for (final course in data.courses) {
+      if (course.id == courseId) {
+        removed = course;
+        break;
+      }
+    }
+    final removedFileIds = {
+      for (final section in removed?.sections ?? const <DriveSection>[])
+        for (final file in section.files) file.id,
+    };
+    final courses = data.courses
+        .where((course) => course.id != courseId)
+        .toList();
+    setState(() {
+      data = data.copyWith(
+        courses: courses,
+        recentFiles: data.recentFiles
+            .where((file) => !removedFileIds.contains(file.id))
+            .toList(),
+        uploads: data.uploads
+            .where((task) => !removedFileIds.contains(task.file.id))
+            .toList(),
+        collections: data.collections
+            .where((bundle) => !removedFileIds.contains(bundle.file.id))
+            .toList(),
+      );
+      selectedCourseId = courses.firstOrNull?.id;
+      selectedSectionId = courses.firstOrNull?.sections.firstOrNull?.id;
+      selectedFileId =
+          courses.firstOrNull?.sections.firstOrNull?.files.firstOrNull?.id;
+      route = WorkspaceRouteKey.home;
+    });
+  }
+
+  void _removeSection(String sectionId) {
+    final course = _primaryCourse;
+    if (course == null) return;
+    final removed = course.sections.firstWhere(
+      (section) => section.id == sectionId,
+      orElse: () => const DriveSection(
+        id: '',
+        title: '',
+        status: DriveItemStatus.completed,
+        files: [],
+      ),
+    );
+    final removedFileIds = {for (final file in removed.files) file.id};
+    final sections = course.sections
+        .where((section) => section.id != sectionId)
+        .toList();
+    setState(() {
+      data = data.copyWith(
+        courses: [
+          for (final item in data.courses)
+            if (item.id == course.id)
+              course.copyWith(sections: sections)
+            else
+              item,
+        ],
+        recentFiles: data.recentFiles
+            .where((file) => !removedFileIds.contains(file.id))
+            .toList(),
+        uploads: data.uploads
+            .where((task) => !removedFileIds.contains(task.file.id))
+            .toList(),
+        collections: data.collections
+            .where((bundle) => !removedFileIds.contains(bundle.file.id))
+            .toList(),
+      );
+      selectedSectionId = sections.firstOrNull?.id;
+      selectedFileId = sections.firstOrNull?.files.firstOrNull?.id;
+      route = WorkspaceRouteKey.course;
     });
   }
 
@@ -417,6 +629,32 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
         ],
       ),
     );
+  }
+
+  Future<bool> _confirmDestructive({
+    required String title,
+    required String message,
+    required String actionLabel,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(actionLabel),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
   }
 
   int get _selectedNavIndex {
@@ -530,6 +768,8 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
                   onOpenCourse: _openCourse,
                   onOpenFile: _openFile,
                   onCreateCourse: _createCourse,
+                  onRenameCourse: _renameCourse,
+                  onDeleteCourse: _deleteCourse,
                   onOpenUploads: _uploadFile,
                   onOpenUploadsPage: () => _go(WorkspaceRouteKey.uploads),
                   onOpenCollections: () => _go(WorkspaceRouteKey.collections),
@@ -543,8 +783,13 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
                           onSearch: _openGlobalFileSearch,
                           onBack: () => _go(WorkspaceRouteKey.home),
                           onOpenSection: _openSection,
+                          onOpenFile: _openFile,
                           onCreateSection: _createSection,
                           onOpenUploads: _uploadFile,
+                          onRenameCourse: () => _renameCourse(course),
+                          onDeleteCourse: () => _deleteCourse(course),
+                          onRenameSection: _renameSection,
+                          onDeleteSection: _deleteSection,
                         ),
                 WorkspaceRouteKey.folder =>
                   (course == null || section == null)

@@ -4,14 +4,19 @@ import '../../../../core/theme/app_colors.dart';
 import '../../data/drive_models.dart';
 import '../widgets/drive_ui.dart';
 
-class CourseDetailScreen extends StatelessWidget {
+class CourseDetailScreen extends StatefulWidget {
   const CourseDetailScreen({
     required this.course,
     required this.onSearch,
     required this.onBack,
     required this.onOpenSection,
+    required this.onOpenFile,
     required this.onCreateSection,
     required this.onOpenUploads,
+    required this.onRenameCourse,
+    required this.onDeleteCourse,
+    required this.onRenameSection,
+    required this.onDeleteSection,
     super.key,
   });
 
@@ -19,18 +24,38 @@ class CourseDetailScreen extends StatelessWidget {
   final VoidCallback onSearch;
   final VoidCallback onBack;
   final ValueChanged<DriveSection> onOpenSection;
+  final ValueChanged<DriveFile> onOpenFile;
   final VoidCallback onCreateSection;
   final VoidCallback onOpenUploads;
+  final VoidCallback onRenameCourse;
+  final VoidCallback onDeleteCourse;
+  final ValueChanged<DriveSection> onRenameSection;
+  final ValueChanged<DriveSection> onDeleteSection;
+
+  @override
+  State<CourseDetailScreen> createState() => _CourseDetailScreenState();
+}
+
+enum _CourseDetailTab { sections, files, details }
+
+enum _CourseMenuAction { addSection, upload, rename, delete }
+
+enum _SectionMenuAction { open, upload, rename, delete }
+
+class _CourseDetailScreenState extends State<CourseDetailScreen> {
+  var _selectedTab = _CourseDetailTab.sections;
 
   @override
   Widget build(BuildContext context) {
+    final course = widget.course;
+    final allFiles = [for (final section in course.sections) ...section.files];
     return WorkspaceScroll(
       children: [
-        DriveTopBar(title: 'Drive', onSearch: onSearch, showMore: false),
+        DriveTopBar(title: 'Drive', onSearch: widget.onSearch, showMore: false),
         Row(
           children: [
             IconButton(
-              onPressed: onBack,
+              onPressed: widget.onBack,
               icon: const Icon(Icons.arrow_back_rounded, size: 32),
               color: AppColors.navy,
             ),
@@ -45,10 +70,57 @@ class CourseDetailScreen extends StatelessWidget {
                 ),
               ),
             ),
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.more_horiz_rounded, size: 31),
-              color: AppColors.navy,
+            PopupMenuButton<_CourseMenuAction>(
+              tooltip: 'Ders işlemleri',
+              icon: const Icon(
+                Icons.more_horiz_rounded,
+                size: 31,
+                color: AppColors.navy,
+              ),
+              onSelected: (action) {
+                switch (action) {
+                  case _CourseMenuAction.addSection:
+                    widget.onCreateSection();
+                  case _CourseMenuAction.upload:
+                    widget.onOpenUploads();
+                  case _CourseMenuAction.rename:
+                    widget.onRenameCourse();
+                  case _CourseMenuAction.delete:
+                    widget.onDeleteCourse();
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: _CourseMenuAction.addSection,
+                  child: _MenuItem(
+                    icon: Icons.create_new_folder_outlined,
+                    label: 'Bölüm Ekle',
+                  ),
+                ),
+                PopupMenuItem(
+                  value: _CourseMenuAction.upload,
+                  child: _MenuItem(
+                    icon: Icons.cloud_upload_outlined,
+                    label: 'Dosya Yükle',
+                  ),
+                ),
+                PopupMenuItem(
+                  value: _CourseMenuAction.rename,
+                  child: _MenuItem(
+                    icon: Icons.edit_outlined,
+                    label: 'Yeniden Adlandır',
+                  ),
+                ),
+                PopupMenuDivider(),
+                PopupMenuItem(
+                  value: _CourseMenuAction.delete,
+                  child: _MenuItem(
+                    icon: Icons.delete_outline_rounded,
+                    label: 'Dersi Sil',
+                    destructive: true,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -96,7 +168,7 @@ class CourseDetailScreen extends StatelessWidget {
                           child: SBSecondaryButton(
                             label: 'Bölüm Ekle',
                             icon: Icons.create_new_folder_outlined,
-                            onPressed: onCreateSection,
+                            onPressed: widget.onCreateSection,
                             size: SBButtonSize.small,
                           ),
                         ),
@@ -105,7 +177,7 @@ class CourseDetailScreen extends StatelessWidget {
                           child: SBPrimaryButton(
                             label: 'Dosya Yükle',
                             icon: Icons.cloud_upload_outlined,
-                            onPressed: onOpenUploads,
+                            onPressed: widget.onOpenUploads,
                             size: SBButtonSize.small,
                           ),
                         ),
@@ -118,28 +190,59 @@ class CourseDetailScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        _SegmentedTabs(),
+        _SegmentedTabs(
+          selected: _selectedTab,
+          onSelected: (tab) => setState(() => _selectedTab = tab),
+        ),
         const SizedBox(height: 18),
-        for (final section in course.sections) ...[
-          _SectionCard(section: section, onTap: () => onOpenSection(section)),
-          const SizedBox(height: 14),
-        ],
+        switch (_selectedTab) {
+          _CourseDetailTab.sections => _SectionsTab(
+            sections: course.sections,
+            onOpenSection: widget.onOpenSection,
+            onOpenUploads: widget.onOpenUploads,
+            onRenameSection: widget.onRenameSection,
+            onDeleteSection: widget.onDeleteSection,
+          ),
+          _CourseDetailTab.files => _FilesTab(
+            files: allFiles,
+            onOpenFile: widget.onOpenFile,
+            onOpenUploads: widget.onOpenUploads,
+          ),
+          _CourseDetailTab.details => _DetailsTab(course: course),
+        },
       ],
     );
   }
 }
 
 class _SegmentedTabs extends StatelessWidget {
+  const _SegmentedTabs({required this.selected, required this.onSelected});
+
+  final _CourseDetailTab selected;
+  final ValueChanged<_CourseDetailTab> onSelected;
+
   @override
   Widget build(BuildContext context) {
     return GlassPanel(
       padding: const EdgeInsets.all(4),
       radius: 12,
       child: Row(
-        children: const [
-          _TabChip(label: 'Bölümler', selected: true),
-          _TabChip(label: 'Dosyalar'),
-          _TabChip(label: 'Ayrıntılar'),
+        children: [
+          _TabChip(
+            label: 'Bölümler',
+            selected: selected == _CourseDetailTab.sections,
+            onTap: () => onSelected(_CourseDetailTab.sections),
+          ),
+          _TabChip(
+            label: 'Dosyalar',
+            selected: selected == _CourseDetailTab.files,
+            onTap: () => onSelected(_CourseDetailTab.files),
+          ),
+          _TabChip(
+            label: 'Ayrıntılar',
+            selected: selected == _CourseDetailTab.details,
+            onTap: () => onSelected(_CourseDetailTab.details),
+          ),
         ],
       ),
     );
@@ -147,32 +250,41 @@ class _SegmentedTabs extends StatelessWidget {
 }
 
 class _TabChip extends StatelessWidget {
-  const _TabChip({required this.label, this.selected = false});
+  const _TabChip({
+    required this.label,
+    required this.onTap,
+    this.selected = false,
+  });
 
   final String label;
+  final VoidCallback onTap;
   final bool selected;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Container(
-        height: 40,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: selected
-              ? const Border(
-                  bottom: BorderSide(color: AppColors.blue, width: 2),
-                )
-              : null,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? AppColors.blue : AppColors.navy,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: selected
+                ? const Border(
+                    bottom: BorderSide(color: AppColors.blue, width: 2),
+                  )
+                : null,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? AppColors.blue : AppColors.navy,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),
@@ -180,11 +292,234 @@ class _TabChip extends StatelessWidget {
   }
 }
 
+class _SectionsTab extends StatelessWidget {
+  const _SectionsTab({
+    required this.sections,
+    required this.onOpenSection,
+    required this.onOpenUploads,
+    required this.onRenameSection,
+    required this.onDeleteSection,
+  });
+
+  final List<DriveSection> sections;
+  final ValueChanged<DriveSection> onOpenSection;
+  final VoidCallback onOpenUploads;
+  final ValueChanged<DriveSection> onRenameSection;
+  final ValueChanged<DriveSection> onDeleteSection;
+
+  @override
+  Widget build(BuildContext context) {
+    if (sections.isEmpty) {
+      return const GlassPanel(
+        padding: EdgeInsets.all(22),
+        child: EmptyState(
+          message: 'Bu derste henüz bölüm yok.',
+          subMessage: 'Bölüm ekleyerek dosyalarınızı düzenlemeye başlayın.',
+        ),
+      );
+    }
+    return Column(
+      children: [
+        for (final section in sections) ...[
+          _SectionCard(
+            section: section,
+            onTap: () => onOpenSection(section),
+            onOpenUploads: onOpenUploads,
+            onRename: () => onRenameSection(section),
+            onDelete: () => onDeleteSection(section),
+          ),
+          const SizedBox(height: 14),
+        ],
+      ],
+    );
+  }
+}
+
+class _FilesTab extends StatelessWidget {
+  const _FilesTab({
+    required this.files,
+    required this.onOpenFile,
+    required this.onOpenUploads,
+  });
+
+  final List<DriveFile> files;
+  final ValueChanged<DriveFile> onOpenFile;
+  final VoidCallback onOpenUploads;
+
+  @override
+  Widget build(BuildContext context) {
+    if (files.isEmpty) {
+      return GlassPanel(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          children: [
+            const EmptyState(
+              message: 'Bu derste henüz dosya yok.',
+              subMessage: 'PDF, DOCX veya PPT yükleyerek başlayın.',
+            ),
+            const SizedBox(height: 16),
+            SBPrimaryButton(
+              label: 'Dosya Yükle',
+              icon: Icons.cloud_upload_outlined,
+              onPressed: onOpenUploads,
+              size: SBButtonSize.small,
+              fullWidth: false,
+            ),
+          ],
+        ),
+      );
+    }
+    return GlassPanel(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (final file in files)
+            InkWell(
+              onTap: () => onOpenFile(file),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                child: Row(
+                  children: [
+                    FileKindBadge(kind: file.kind, plain: true),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            file.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.navy,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(file.sectionTitle),
+                              const MetaDot(),
+                              Text(file.sizeLabel),
+                              const MetaDot(),
+                              Text(file.updatedLabel),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    StatusPill(status: file.status, compact: true),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppColors.muted,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailsTab extends StatelessWidget {
+  const _DetailsTab({required this.course});
+
+  final DriveCourse course;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DetailRow(label: 'Ders adı', value: course.title),
+          _DetailRow(label: 'Durum', value: _statusLabel(course.status)),
+          _DetailRow(label: 'Bölüm sayısı', value: '${course.sections.length}'),
+          _DetailRow(label: 'Dosya sayısı', value: '${course.fileCount}'),
+          _DetailRow(label: 'Son güncelleme', value: course.updatedLabel),
+          const SizedBox(height: 10),
+          const Text(
+            'Açıklama',
+            style: TextStyle(
+              color: AppColors.muted,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            course.description,
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 16,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 128,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: AppColors.navy,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.section, required this.onTap});
+  const _SectionCard({
+    required this.section,
+    required this.onTap,
+    required this.onOpenUploads,
+    required this.onRename,
+    required this.onDelete,
+  });
 
   final DriveSection section;
   final VoidCallback onTap;
+  final VoidCallback onOpenUploads;
+  final VoidCallback onRename;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -234,9 +569,56 @@ class _SectionCard extends StatelessWidget {
                       ),
                       _SectionStatus(status: section.status),
                       const SizedBox(width: 6),
-                      const Icon(
-                        Icons.more_vert_rounded,
-                        color: AppColors.muted,
+                      PopupMenuButton<_SectionMenuAction>(
+                        tooltip: 'Bölüm işlemleri',
+                        icon: const Icon(
+                          Icons.more_vert_rounded,
+                          color: AppColors.muted,
+                        ),
+                        onSelected: (action) {
+                          switch (action) {
+                            case _SectionMenuAction.open:
+                              onTap();
+                            case _SectionMenuAction.upload:
+                              onOpenUploads();
+                            case _SectionMenuAction.rename:
+                              onRename();
+                            case _SectionMenuAction.delete:
+                              onDelete();
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: _SectionMenuAction.open,
+                            child: _MenuItem(
+                              icon: Icons.folder_open_outlined,
+                              label: 'Bölümü Aç',
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: _SectionMenuAction.upload,
+                            child: _MenuItem(
+                              icon: Icons.cloud_upload_outlined,
+                              label: 'Dosya Yükle',
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: _SectionMenuAction.rename,
+                            child: _MenuItem(
+                              icon: Icons.edit_outlined,
+                              label: 'Yeniden Adlandır',
+                            ),
+                          ),
+                          PopupMenuDivider(),
+                          PopupMenuItem(
+                            value: _SectionMenuAction.delete,
+                            child: _MenuItem(
+                              icon: Icons.delete_outline_rounded,
+                              label: 'Bölümü Sil',
+                              destructive: true,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -286,6 +668,43 @@ class _SectionCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MenuItem extends StatelessWidget {
+  const _MenuItem({
+    required this.icon,
+    required this.label,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = destructive ? AppColors.red : AppColors.navy;
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: TextStyle(color: color, fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
+  }
+}
+
+String _statusLabel(DriveItemStatus status) {
+  return switch (status) {
+    DriveItemStatus.completed => 'Aktif',
+    DriveItemStatus.processing => 'İşleniyor',
+    DriveItemStatus.uploading => 'Yükleniyor',
+    DriveItemStatus.failed => 'Hata',
+    DriveItemStatus.draft => 'Taslak',
+  };
 }
 
 class _SectionStatus extends StatelessWidget {

@@ -21,6 +21,8 @@ class DriveHomeScreen extends StatelessWidget {
     required this.onOpenCourse,
     required this.onOpenFile,
     required this.onCreateCourse,
+    required this.onRenameCourse,
+    required this.onDeleteCourse,
     required this.onOpenUploads,
     required this.onOpenUploadsPage,
     required this.onOpenCollections,
@@ -33,6 +35,8 @@ class DriveHomeScreen extends StatelessWidget {
   final ValueChanged<DriveCourse> onOpenCourse;
   final ValueChanged<DriveFile> onOpenFile;
   final VoidCallback onCreateCourse;
+  final ValueChanged<DriveCourse> onRenameCourse;
+  final ValueChanged<DriveCourse> onDeleteCourse;
   final VoidCallback onOpenUploads;
   final VoidCallback onOpenUploadsPage;
   final VoidCallback onOpenCollections;
@@ -117,6 +121,8 @@ class DriveHomeScreen extends StatelessWidget {
                       _CourseRow(
                         course: course,
                         onTap: () => onOpenCourse(course),
+                        onRename: () => onRenameCourse(course),
+                        onDelete: () => onDeleteCourse(course),
                       ),
                   ],
                 )
@@ -352,10 +358,17 @@ class _QuickAction extends StatelessWidget {
 }
 
 class _CourseRow extends StatelessWidget {
-  const _CourseRow({required this.course, required this.onTap});
+  const _CourseRow({
+    required this.course,
+    required this.onTap,
+    required this.onRename,
+    required this.onDelete,
+  });
 
   final DriveCourse course;
   final VoidCallback onTap;
+  final VoidCallback onRename;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -408,12 +421,82 @@ class _CourseRow extends StatelessWidget {
                 ),
                 _CourseStatus(status: course.status),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.navy),
+                PopupMenuButton<_CourseMenuAction>(
+                  tooltip: 'Ders işlemleri',
+                  icon: const Icon(
+                    Icons.more_vert_rounded,
+                    color: AppColors.muted,
+                  ),
+                  onSelected: (action) {
+                    switch (action) {
+                      case _CourseMenuAction.open:
+                        onTap();
+                      case _CourseMenuAction.rename:
+                        onRename();
+                      case _CourseMenuAction.delete:
+                        onDelete();
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: _CourseMenuAction.open,
+                      child: _MenuItem(
+                        icon: Icons.open_in_new_rounded,
+                        label: 'Dersi Aç',
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: _CourseMenuAction.rename,
+                      child: _MenuItem(
+                        icon: Icons.edit_outlined,
+                        label: 'Yeniden Adlandır',
+                      ),
+                    ),
+                    PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: _CourseMenuAction.delete,
+                      child: _MenuItem(
+                        icon: Icons.delete_outline_rounded,
+                        label: 'Dersi Sil',
+                        destructive: true,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+enum _CourseMenuAction { open, rename, delete }
+
+class _MenuItem extends StatelessWidget {
+  const _MenuItem({
+    required this.icon,
+    required this.label,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = destructive ? AppColors.red : AppColors.navy;
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: TextStyle(color: color, fontWeight: FontWeight.w600),
+        ),
+      ],
     );
   }
 }

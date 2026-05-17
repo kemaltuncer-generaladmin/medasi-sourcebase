@@ -50,6 +50,14 @@ Deno.serve(async (request) => {
         return success(await createCourse(user.id, payload));
       case "create_section":
         return success(await createSection(user.id, payload));
+      case "rename_course":
+        return success(await renameCourse(user.id, payload));
+      case "rename_section":
+        return success(await renameSection(user.id, payload));
+      case "delete_course":
+        return success(await deleteCourse(user.id, payload));
+      case "delete_section":
+        return success(await deleteSection(user.id, payload));
       case "create_upload_session":
         return success(await createUploadSession(user.id, payload));
       case "complete_upload":
@@ -206,6 +214,62 @@ async function createSection(userId: string, payload: JsonMap) {
   }]);
   await audit(userId, "create_section", "section", row.id, { courseId, title });
   return { row };
+}
+
+async function renameCourse(userId: string, payload: JsonMap) {
+  const courseId = requireString(payload.courseId, "courseId");
+  const title = requireString(payload.title, "title");
+  await assertOwned(userId, "courses", courseId);
+  const [row] = await dbPatchReturning(
+    "courses",
+    `id=eq.${courseId}&owner_user_id=eq.${userId}`,
+    { title, subject: title, updated_at: new Date().toISOString() },
+  );
+  await audit(userId, "rename_course", "course", courseId, { title });
+  return { row };
+}
+
+async function renameSection(userId: string, payload: JsonMap) {
+  const sectionId = requireString(payload.sectionId, "sectionId");
+  const title = requireString(payload.title, "title");
+  await assertOwned(userId, "sections", sectionId);
+  const [row] = await dbPatchReturning(
+    "sections",
+    `id=eq.${sectionId}&owner_user_id=eq.${userId}`,
+    { title, updated_at: new Date().toISOString() },
+  );
+  await audit(userId, "rename_section", "section", sectionId, { title });
+  return { row };
+}
+
+async function deleteCourse(userId: string, payload: JsonMap) {
+  const courseId = requireString(payload.courseId, "courseId");
+  await assertOwned(userId, "courses", courseId);
+  const fileRows = await dbSelect(
+    `drive_files?course_id=eq.${courseId}&owner_user_id=eq.${userId}&select=id`,
+  );
+  const fileIds = fileRows.map((row) => String(row.id)).filter(Boolean);
+  if (fileIds.length > 0) {
+    await deleteFiles(userId, { fileIds });
+  }
+  await dbDelete("courses", `id=eq.${courseId}&owner_user_id=eq.${userId}`);
+  await audit(userId, "delete_course", "course", courseId, { fileIds });
+  return { deletedId: courseId, deletedFileIds: fileIds };
+}
+
+async function deleteSection(userId: string, payload: JsonMap) {
+  const sectionId = requireString(payload.sectionId, "sectionId");
+  await assertOwned(userId, "sections", sectionId);
+  const fileRows = await dbSelect(
+    `drive_files?section_id=eq.${sectionId}&owner_user_id=eq.${userId}&select=id`,
+  );
+  const fileIds = fileRows.map((row) => String(row.id)).filter(Boolean);
+  if (fileIds.length > 0) {
+    await deleteFiles(userId, { fileIds });
+  }
+  await dbDelete("sections", `id=eq.${sectionId}&owner_user_id=eq.${userId}`);
+  await audit(userId, "delete_section", "section", sectionId, { fileIds });
+  return { deletedId: sectionId, deletedFileIds: fileIds };
 }
 
 async function createUploadSession(userId: string, payload: JsonMap) {

@@ -44,6 +44,38 @@ class DriveRepository {
     );
   }
 
+  Future<DriveCourse> renameCourse({
+    required String courseId,
+    required String title,
+  }) async {
+    final response = await api.renameCourse(courseId: courseId, title: title);
+    final row = _requiredDataRow(response, 'Ders yeniden adlandırılamadı.');
+    return _courseFromRow(row, const [], const []);
+  }
+
+  Future<DriveSection> renameSection({
+    required String sectionId,
+    required String title,
+  }) async {
+    final response = await api.renameSection(
+      sectionId: sectionId,
+      title: title,
+    );
+    return _sectionFromRow(
+      _requiredDataRow(response, 'Bölüm yeniden adlandırılamadı.'),
+      const [],
+      null,
+    );
+  }
+
+  Future<void> deleteCourse(String courseId) async {
+    await api.deleteCourse(courseId);
+  }
+
+  Future<void> deleteSection(String sectionId) async {
+    await api.deleteSection(sectionId);
+  }
+
   Future<DriveFile> completeUpload({
     required PickedDriveFile file,
     required String objectName,
