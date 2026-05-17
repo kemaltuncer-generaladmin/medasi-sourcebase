@@ -154,73 +154,76 @@ class _ChatBubble extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 20),
       child: Align(
         alignment: message.isAi ? Alignment.centerLeft : Alignment.centerRight,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (message.isAi) ...[
-              Container(
-                width: 38,
-                height: 38,
-                decoration: const BoxDecoration(
-                  color: AppColors.selectedBlue,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.psychology_rounded,
-                  color: AppColors.blue,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-            ],
-            Flexible(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: message.isAi ? Colors.white : AppColors.blue,
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(20),
-                    topRight: const Radius.circular(20),
-                    bottomLeft: Radius.circular(message.isAi ? 4 : 20),
-                    bottomRight: Radius.circular(message.isAi ? 20 : 4),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 680),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (message.isAi) ...[
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    color: AppColors.selectedBlue,
+                    shape: BoxShape.circle,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.navy.withValues(alpha: .06),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
+                  child: const Icon(
+                    Icons.psychology_rounded,
+                    color: AppColors.blue,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: message.isAi ? Colors.white : AppColors.blue,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(20),
+                      topRight: const Radius.circular(20),
+                      bottomLeft: Radius.circular(message.isAi ? 4 : 20),
+                      bottomRight: Radius.circular(message.isAi ? 20 : 4),
                     ),
-                  ],
-                ),
-                child: Text(
-                  message.text,
-                  style: TextStyle(
-                    color: message.isAi ? AppColors.navy : Colors.white,
-                    fontSize: 16,
-                    height: 1.4,
-                    fontWeight: FontWeight.w500,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.navy.withValues(alpha: .06),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    message.text,
+                    style: TextStyle(
+                      color: message.isAi ? AppColors.navy : Colors.white,
+                      fontSize: 16,
+                      height: 1.4,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
-            ),
-            if (!message.isAi) ...[
-              const SizedBox(width: 12),
-              Container(
-                width: 38,
-                height: 38,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE2E8F0),
-                  shape: BoxShape.circle,
+              if (!message.isAi) ...[
+                const SizedBox(width: 12),
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE2E8F0),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.person_rounded,
+                    color: Color(0xFF64748B),
+                    size: 22,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.person_rounded,
-                  color: Color(0xFF64748B),
-                  size: 22,
-                ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

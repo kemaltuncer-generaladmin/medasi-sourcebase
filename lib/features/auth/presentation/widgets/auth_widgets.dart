@@ -23,6 +23,15 @@ class AuthScreenFrame extends StatelessWidget {
                 final viewInsets = MediaQuery.viewInsetsOf(context);
                 final width = MediaQuery.sizeOf(context).width;
                 final horizontalPadding = width < 390 ? 20.0 : 36.0;
+                final useCard = constraints.maxWidth >= 700;
+                final content = Semantics(
+                  container: true,
+                  explicitChildNodes: true,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: children,
+                  ),
+                );
                 return Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 480),
@@ -38,16 +47,32 @@ class AuthScreenFrame extends StatelessWidget {
                       ),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight - 80,
+                          minHeight: useCard ? 0 : constraints.maxHeight - 80,
                         ),
-                        child: Semantics(
-                          container: true,
-                          explicitChildNodes: true,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: children,
-                          ),
-                        ),
+                        child: useCard
+                            ? Container(
+                                padding: const EdgeInsets.all(26),
+                                decoration: BoxDecoration(
+                                  color: AppColors.white.withValues(
+                                    alpha: .88,
+                                  ),
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: AppColors.softLine,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.navy.withValues(
+                                        alpha: .08,
+                                      ),
+                                      blurRadius: 30,
+                                      offset: const Offset(0, 16),
+                                    ),
+                                  ],
+                                ),
+                                child: content,
+                              )
+                            : content,
                       ),
                     ),
                   ),

@@ -724,7 +724,11 @@ class _ToolGrid extends StatelessWidget {
     ];
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth > 760 ? 5 : 2;
+        final columns = constraints.maxWidth >= 900
+            ? 5
+            : constraints.maxWidth >= 640
+            ? 3
+            : 2;
         final gap = 12.0;
         final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
         return Wrap(
