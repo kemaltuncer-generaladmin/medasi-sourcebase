@@ -393,6 +393,15 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
     }
   }
 
+  Future<void> _uploadToSection(DriveCourse course, DriveSection section) async {
+    setState(() {
+      selectedCourseId = course.id;
+      selectedSectionId = section.id;
+      selectedFileId = section.files.firstOrNull?.id;
+    });
+    await _uploadFile();
+  }
+
   Future<void> _generateFromFile(
     GeneratedKind kind, [
     DriveFile? source,
@@ -1062,6 +1071,8 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
                           onOpenFile: _openFile,
                           onCreateSection: _createSection,
                           onOpenUploads: _uploadFile,
+                          onUploadToSection: (section) =>
+                              _uploadToSection(course, section),
                           onRenameCourse: () => _renameCourse(course),
                           onDeleteCourse: () => _deleteCourse(course),
                           onRenameSection: _renameSection,
@@ -1079,6 +1090,8 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
                           onOpenUploads: _uploadFile,
                           onOpenCollections: () =>
                               _go(WorkspaceRouteKey.collections),
+                          onGenerateFromFile: (file, kind) =>
+                              _generateFromFile(kind, file),
                         ),
                 WorkspaceRouteKey.fileDetail =>
                   file == null
@@ -1088,6 +1101,8 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
                           onSearch: _openGlobalFileSearch,
                           onBack: () => _go(WorkspaceRouteKey.folder),
                           onGenerate: _generateFromFile,
+                          onOpenCollections: () =>
+                              _go(WorkspaceRouteKey.collections),
                         ),
                 WorkspaceRouteKey.search => DriveSearchScreen(
                   files: _allFiles,

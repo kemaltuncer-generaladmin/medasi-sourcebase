@@ -10,6 +10,7 @@ class FileDetailScreen extends StatefulWidget {
     required this.onSearch,
     required this.onBack,
     required this.onGenerate,
+    required this.onOpenCollections,
     super.key,
   });
 
@@ -17,6 +18,7 @@ class FileDetailScreen extends StatefulWidget {
   final VoidCallback onSearch;
   final VoidCallback onBack;
   final ValueChanged<GeneratedKind> onGenerate;
+  final VoidCallback onOpenCollections;
 
   @override
   State<FileDetailScreen> createState() => _FileDetailScreenState();
@@ -24,17 +26,6 @@ class FileDetailScreen extends StatefulWidget {
 
 class _FileDetailScreenState extends State<FileDetailScreen> {
   int _previewIndex = 0;
-
-  void _showNotImplemented(String feature) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature özelliği yakında aktif olacak.'),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +55,8 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
                       children: [
                         Text(
                           file.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: AppColors.navy,
                             fontSize: 24,
@@ -242,9 +235,7 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
         SectionTitle(
           title: 'Üretilenler',
           actionLabel: hasGenerated ? 'Tümünü Gör' : null,
-          onAction: hasGenerated
-              ? () => _showNotImplemented('Tüm çıktılar')
-              : null,
+          onAction: hasGenerated ? widget.onOpenCollections : null,
         ),
         GlassPanel(
           padding: EdgeInsets.zero,

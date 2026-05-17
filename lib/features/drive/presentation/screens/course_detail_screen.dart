@@ -13,6 +13,7 @@ class CourseDetailScreen extends StatefulWidget {
     required this.onOpenFile,
     required this.onCreateSection,
     required this.onOpenUploads,
+    required this.onUploadToSection,
     required this.onRenameCourse,
     required this.onDeleteCourse,
     required this.onRenameSection,
@@ -27,6 +28,7 @@ class CourseDetailScreen extends StatefulWidget {
   final ValueChanged<DriveFile> onOpenFile;
   final VoidCallback onCreateSection;
   final VoidCallback onOpenUploads;
+  final ValueChanged<DriveSection> onUploadToSection;
   final VoidCallback onRenameCourse;
   final VoidCallback onDeleteCourse;
   final ValueChanged<DriveSection> onRenameSection;
@@ -82,6 +84,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
             onCreateSection: widget.onCreateSection,
             onOpenSection: widget.onOpenSection,
             onOpenUploads: widget.onOpenUploads,
+            onUploadToSection: widget.onUploadToSection,
             onRenameSection: widget.onRenameSection,
             onDeleteSection: widget.onDeleteSection,
           ),
@@ -512,6 +515,7 @@ class _SectionsTab extends StatelessWidget {
     required this.onCreateSection,
     required this.onOpenSection,
     required this.onOpenUploads,
+    required this.onUploadToSection,
     required this.onRenameSection,
     required this.onDeleteSection,
   });
@@ -520,6 +524,7 @@ class _SectionsTab extends StatelessWidget {
   final VoidCallback onCreateSection;
   final ValueChanged<DriveSection> onOpenSection;
   final VoidCallback onOpenUploads;
+  final ValueChanged<DriveSection> onUploadToSection;
   final ValueChanged<DriveSection> onRenameSection;
   final ValueChanged<DriveSection> onDeleteSection;
 
@@ -582,7 +587,7 @@ class _SectionsTab extends StatelessWidget {
                   section: section,
                   index: index,
                   onTap: () => onOpenSection(section),
-                  onOpenUploads: onOpenUploads,
+                  onOpenUploads: () => onUploadToSection(section),
                   onRename: () => onRenameSection(section),
                   onDelete: () => onDeleteSection(section),
                 );
