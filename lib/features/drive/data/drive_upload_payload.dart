@@ -12,4 +12,16 @@ class PickedDriveFile {
   final String contentType;
   final int sizeBytes;
   final Uint8List bytes;
+
+  bool get hasSupportedExtension {
+    final lower = name.toLowerCase();
+    return lower.endsWith('.pdf') ||
+        lower.endsWith('.ppt') ||
+        lower.endsWith('.pptx') ||
+        lower.endsWith('.doc') ||
+        lower.endsWith('.docx') ||
+        lower.endsWith('.zip');
+  }
+
+  bool get hasReadableContent => sizeBytes > 0 && bytes.isNotEmpty;
 }

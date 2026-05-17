@@ -10,6 +10,7 @@ class UploadsScreen extends StatelessWidget {
     required this.onSearch,
     required this.onBack,
     required this.onNewFile,
+    required this.onRetryUpload,
     super.key,
   });
 
@@ -17,6 +18,7 @@ class UploadsScreen extends StatelessWidget {
   final VoidCallback onSearch;
   final VoidCallback onBack;
   final VoidCallback onNewFile;
+  final ValueChanged<UploadTask> onRetryUpload;
 
   @override
   Widget build(BuildContext context) {
@@ -40,12 +42,16 @@ class UploadsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 18),
-            const Text(
-              'Yüklemeler',
-              style: TextStyle(
-                color: AppColors.navy,
-                fontSize: 34,
-                fontWeight: FontWeight.w800,
+            const Expanded(
+              child: Text(
+                'Yüklemeler',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 34,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
@@ -133,7 +139,10 @@ class UploadsScreen extends StatelessWidget {
           )
         else
           for (final upload in uploads) ...[
-            _UploadRow(upload: upload),
+            _UploadRow(
+              upload: upload,
+              onRetry: () => onRetryUpload(upload),
+            ),
             const SizedBox(height: 12),
           ],
       ],
@@ -244,70 +253,103 @@ class _UploadFilter extends StatelessWidget {
 }
 
 class _UploadRow extends StatelessWidget {
-  const _UploadRow({required this.upload});
+  const _UploadRow({required this.upload, required this.onRetry});
 
   final UploadTask upload;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     final file = upload.file;
     return GlassPanel(
       padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          FileKindBadge(kind: file.kind, large: true, plain: true),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  file.title,
-                  style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 520;
+          final details = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                file.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${file.sizeLabel}  •  ${file.pageLabel}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.muted, fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.folder_outlined,
+                    color: AppColors.muted,
+                    size: 20,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${file.sizeLabel}  •  ${file.pageLabel}',
-                  style: const TextStyle(color: AppColors.muted, fontSize: 16),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.folder_outlined,
-                      color: AppColors.muted,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
                       '${file.courseTitle}  ›  ${file.sectionTitle}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.muted,
                         fontSize: 15,
                       ),
                     ),
+                  ),
+                ],
+              ),
+            ],
+          );
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    FileKindBadge(kind: file.kind, large: true, plain: true),
+                    const SizedBox(width: 14),
+                    Expanded(child: details),
                   ],
                 ),
+                const SizedBox(height: 14),
+                _UploadState(upload: upload, onRetry: onRetry),
               ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          SizedBox(width: 140, child: _UploadState(upload: upload)),
-          const Icon(Icons.more_vert_rounded, color: AppColors.muted),
-        ],
+            );
+          }
+          return Row(
+            children: [
+              FileKindBadge(kind: file.kind, large: true, plain: true),
+              const SizedBox(width: 18),
+              Expanded(child: details),
+              const SizedBox(width: 10),
+              SizedBox(
+                width: 140,
+                child: _UploadState(upload: upload, onRetry: onRetry),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
 class _UploadState extends StatelessWidget {
-  const _UploadState({required this.upload});
+  const _UploadState({required this.upload, required this.onRetry});
 
   final UploadTask upload;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -336,7 +378,7 @@ class _UploadState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: onRetry,
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('Tekrar Dene'),
               style: OutlinedButton.styleFrom(

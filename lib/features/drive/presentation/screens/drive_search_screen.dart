@@ -103,7 +103,8 @@ class _DriveSearchScreenState extends State<DriveSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final results = _results;
+    final showResults = _hasFilters;
+    final results = showResults ? _results : const <DriveFile>[];
     return WorkspaceScroll(
       children: [
         DriveTopBar(
@@ -242,7 +243,17 @@ class _DriveSearchScreenState extends State<DriveSearchScreen> {
           ),
         ),
         const SizedBox(height: 18),
-        if (results.isEmpty)
+        if (!showResults)
+          const GlassPanel(
+            padding: EdgeInsets.all(22),
+            child: EmptyState(
+              icon: Icons.search_rounded,
+              message: 'Drive içinde arama yapın.',
+              subMessage:
+                  'Dosya, ders veya bölüm adı yazarak sonuçları listeleyin.',
+            ),
+          )
+        else if (results.isEmpty)
           const GlassPanel(
             padding: EdgeInsets.all(22),
             child: EmptyState(

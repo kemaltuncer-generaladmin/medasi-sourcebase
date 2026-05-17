@@ -14,6 +14,7 @@ class SourceBaseBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     const items = [
       _BottomItem(Icons.psychology_outlined, 'Merkezi AI'),
       _BottomItem(Icons.folder_rounded, 'Drive Ekranı'),
@@ -25,12 +26,12 @@ class SourceBaseBottomNav extends StatelessWidget {
     return Positioned(
       left: 14,
       right: 14,
-      bottom: 10,
+      bottom: bottomInset + 10,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 500),
           child: Container(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 18),
+            padding: EdgeInsets.fromLTRB(12, 12, 12, bottomInset > 0 ? 12 : 18),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: .96),
               borderRadius: BorderRadius.circular(24),

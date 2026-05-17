@@ -16,14 +16,18 @@ class DriveRepository {
 
     final response = await api.invoke('drive_bootstrap');
     final data = response['data'];
-    if (data is Map<String, dynamic>) {
-      return _workspaceFromJson(data);
+    if (data is Map) {
+      return _workspaceFromJson(Map<String, dynamic>.from(data));
     }
     throw StateError('Drive workspace response is empty.');
   }
 
-  Future<GcsUploadSession> createUploadSession(DriveUploadDraft draft) {
-    return api.createUploadSession(draft);
+  Future<GcsUploadSession> createUploadSession(DriveUploadDraft draft) async {
+    final session = await api.createUploadSession(draft);
+    if (!session.isUsable) {
+      throw StateError('Yükleme bağlantısı alınamadı. Lütfen tekrar deneyin.');
+    }
+    return session;
   }
 
   Future<DriveCourse> createCourse(String title) async {
@@ -130,7 +134,9 @@ DriveWorkspaceData _workspaceFromJson(Map<String, dynamic> json) {
   final rawCourses = _list(json['courses']);
   final rawSections = _list(json['sections']);
   final rawFiles = _list(json['files']);
-  final rawOutputs = _list(json['generatedOutputs']);
+  final rawOutputs = _list(
+    json['generatedOutputs'] ?? json['generated_outputs'],
+  );
 
   if (rawCourses.isEmpty) {
     return DriveWorkspaceData.empty;
@@ -202,6 +208,10 @@ DriveCourse _courseFromRow(
 ]) {
   final id = _text(row['id']);
   final title = _text(row['title'], fallback: 'Yeni Ders');
+  final updatedAt = _text(
+    row['updated_at'],
+    fallback: _text(row['created_at']),
+  );
   final sections = allSections
       .where((section) => _text(section['course_id']) == id)
       .map((section) => _sectionFromRow(section, allFiles, title, allOutputs))
@@ -214,7 +224,7 @@ DriveCourse _courseFromRow(
     iconBackground: const Color(0xFFFFEEF1),
     status: _statusFromText(_text(row['status'], fallback: 'active')),
     sections: sections,
-    updatedLabel: 'Son güncelleme bugün',
+    updatedLabel: 'Son güncelleme ${_dateLabel(updatedAt)}',
     description: _metadataText(
       row['metadata'],
       'description',
@@ -254,12 +264,16 @@ DriveFile _fileFromRow(
   return DriveFile(
     id: id,
     title: _text(row['title'], fallback: _text(row['original_filename'])),
-    kind: _kindFromText(_text(row['file_type'])),
+    kind: _kindFromText(
+      _text(row['file_type'], fallback: _text(row['mime_type'])),
+    ),
     sizeLabel: _sizeLabel(_int(row['size_bytes'])),
     pageLabel: _int(row['page_count']) > 0
         ? '${_int(row['page_count'])} sayfa'
         : 'İşleniyor',
-    updatedLabel: 'Bugün',
+    updatedLabel: _dateLabel(
+      _text(row['updated_at'], fallback: _text(row['created_at'])),
+    ),
     courseTitle: courseTitle,
     sectionTitle: sectionTitle,
     status: _statusFromText(
@@ -273,20 +287,26 @@ DriveFile _fileFromRow(
 }
 
 GeneratedOutput _outputFromRow(Map<String, dynamic> row) {
-  final kind = _generatedKindFromText(_text(row['output_type']));
+  final kind = _generatedKindFromText(
+    _text(row['output_type'], fallback: _text(row['kind'])),
+  );
   return GeneratedOutput(
     kind: kind,
     title: _text(row['title'], fallback: _generatedTitle(kind)),
     detail: '${_int(row['item_count'])} öğe',
-    updatedLabel: 'Bugün',
+    updatedLabel: _dateLabel(
+      _text(row['updated_at'], fallback: _text(row['created_at'])),
+    ),
   );
 }
 
 Map<String, dynamic> _dataRow(Map<String, dynamic> response) {
   final data = response['data'];
-  if (data is Map<String, dynamic>) {
-    final row = data['row'];
-    if (row is Map<String, dynamic>) return row;
+  if (data is Map) {
+    final dataMap = Map<String, dynamic>.from(data);
+    final row = dataMap['row'];
+    if (row is Map) return Map<String, dynamic>.from(row);
+    if (dataMap['id'] != null) return dataMap;
   }
   return const {};
 }
@@ -344,11 +364,17 @@ DriveItemStatus _statusFromText(String status) {
 }
 
 DriveFileKind _kindFromText(String kind) {
-  return switch (kind.toLowerCase()) {
-    'pdf' => DriveFileKind.pdf,
-    'ppt' || 'pptx' => DriveFileKind.pptx,
-    'doc' => DriveFileKind.doc,
-    'zip' => DriveFileKind.zip,
+  final normalized = kind.toLowerCase();
+  return switch (normalized) {
+    'pdf' || 'application/pdf' => DriveFileKind.pdf,
+    'ppt' ||
+    'pptx' ||
+    'application/vnd.ms-powerpoint' ||
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation' =>
+      DriveFileKind.pptx,
+    'doc' || 'application/msword' => DriveFileKind.doc,
+    'zip' || 'application/zip' || 'application/x-zip-compressed' =>
+      DriveFileKind.zip,
     _ => DriveFileKind.docx,
   };
 }
@@ -365,6 +391,19 @@ String _sizeLabel(int bytes) {
   final mb = bytes / (1024 * 1024);
   if (mb >= 1) return '${mb.toStringAsFixed(mb >= 10 ? 1 : 1)} MB';
   return '${(bytes / 1024).toStringAsFixed(0)} KB';
+}
+
+String _dateLabel(String raw) {
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) return raw.isEmpty ? 'Bugün' : raw;
+  final local = parsed.toLocal();
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final date = DateTime(local.year, local.month, local.day);
+  if (date == today) return 'Bugün';
+  if (date == today.subtract(const Duration(days: 1))) return 'Dün';
+  return '${local.day.toString().padLeft(2, '0')}.'
+      '${local.month.toString().padLeft(2, '0')}.${local.year}';
 }
 
 String? _jobTypeForGeneratedKind(GeneratedKind kind) {
