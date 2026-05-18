@@ -12,12 +12,16 @@ class SourceBaseBottomNav extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onChanged;
 
+  static const double navHeight = 76;
+  static const double navTopGap = 8;
+  static const double contentBuffer = 36;
+
   static double bottomOffset(BuildContext context) {
-    return MediaQuery.viewPaddingOf(context).bottom + 8;
+    return MediaQuery.viewPaddingOf(context).bottom + navTopGap;
   }
 
   static double contentBottomPadding(BuildContext context) {
-    return bottomOffset(context) + 86;
+    return bottomOffset(context) + navHeight + contentBuffer;
   }
 
   @override
@@ -38,6 +42,7 @@ class SourceBaseBottomNav extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 500),
           child: Container(
+            height: navHeight,
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: .96),

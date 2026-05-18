@@ -99,33 +99,41 @@ class SBSecondaryButton extends StatelessWidget {
                           ),
                         ),
                       )
-                    : Row(
-                        mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (icon != null) ...[
-                            Icon(
-                              icon,
-                              size: _iconSize,
-                              color: isDisabled ? AppColors.muted : AppColors.blue,
-                            ),
-                            SizedBox(width: SBSpacing.sm),
-                          ],
-                          Flexible(
-                            child: Text(
-                              label,
-                              style: TextStyle(
-                                fontSize: _fontSize,
-                                fontWeight: FontWeight.w700,
-                                color: isDisabled ? AppColors.muted : AppColors.blue,
-                                letterSpacing: 0,
+                    : ExcludeSemantics(
+                        child: Row(
+                          mainAxisSize: fullWidth
+                              ? MainAxisSize.max
+                              : MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (icon != null) ...[
+                              Icon(
+                                icon,
+                                size: _iconSize,
+                                color: isDisabled
+                                    ? AppColors.muted
+                                    : AppColors.blue,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              textAlign: TextAlign.center,
+                              SizedBox(width: SBSpacing.sm),
+                            ],
+                            Flexible(
+                              child: Text(
+                                label,
+                                style: TextStyle(
+                                  fontSize: _fontSize,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDisabled
+                                      ? AppColors.muted
+                                      : AppColors.blue,
+                                  letterSpacing: 0,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                textAlign: TextAlign.center,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
               ),
             ),

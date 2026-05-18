@@ -552,41 +552,41 @@ class _BaseForceHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final titleBlock = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: AppColors.navy,
-            fontSize: 44,
-            fontWeight: FontWeight.w900,
-            height: 1.04,
-            letterSpacing: 0,
-          ),
-        ),
-        const SizedBox(height: 14),
-        Text(
-          subtitle,
-          style: const TextStyle(
-            color: AppColors.muted,
-            fontSize: 20,
-            height: 1.42,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        if (actions.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          Wrap(spacing: 10, runSpacing: 10, children: actions),
-        ],
-      ],
-    );
-
     return LayoutBuilder(
       builder: (context, constraints) {
+        final compact = constraints.maxWidth < 620;
+        final titleBlock = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                color: AppColors.navy,
+                fontSize: compact ? 36 : 44,
+                fontWeight: FontWeight.w900,
+                height: 1.04,
+                letterSpacing: 0,
+              ),
+            ),
+            SizedBox(height: compact ? 10 : 14),
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: AppColors.muted,
+                fontSize: compact ? 17 : 20,
+                height: compact ? 1.28 : 1.42,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            if (actions.isNotEmpty) ...[
+              SizedBox(height: compact ? 16 : 24),
+              Wrap(spacing: 10, runSpacing: 10, children: actions),
+            ],
+          ],
+        );
         if (constraints.maxWidth < 620) {
           return Container(
-            margin: EdgeInsets.only(bottom: tight ? 18 : 26),
+            margin: EdgeInsets.only(bottom: tight ? 12 : 18),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [Color(0x00FFFFFF), Color(0xFFEAF5FF)],
@@ -598,17 +598,18 @@ class _BaseForceHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: EdgeInsets.only(top: tight ? 8 : 22),
+                  padding: EdgeInsets.only(top: tight ? 4 : 12),
                   child: titleBlock,
                 ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: SizedBox(
-                    width: tight ? 190 : 225,
-                    height: tight ? 132 : 162,
-                    child: _BaseForceHeroArt(kind: art),
+                if (!tight)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: SizedBox(
+                      width: 176,
+                      height: 104,
+                      child: _BaseForceHeroArt(kind: art),
+                    ),
                   ),
-                ),
               ],
             ),
           );
@@ -894,6 +895,7 @@ class _BaseForceHome extends StatelessWidget {
       title: 'BaseForce',
       subtitle: 'Kaynaklarını seç, üretim merkezlerinden\nbirini başlat.',
       onSearch: onSearch,
+      heroTight: true,
       actions: [
         _HeroAction(
           label: 'Drive’dan Seç',
@@ -2544,42 +2546,45 @@ class _FactoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 420;
     return _BasePanel(
-      padding: const EdgeInsets.fromLTRB(12, 20, 12, 14),
+      padding: EdgeInsets.fromLTRB(12, compact ? 14 : 20, 12, 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _RoundGeneratedIcon(kind: kind),
-          const SizedBox(height: 16),
+          _RoundGeneratedIcon(kind: kind, size: compact ? 54 : 64),
+          SizedBox(height: compact ? 10 : 16),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
               color: AppColors.navy,
-              fontSize: 18,
+              fontSize: compact ? 16 : 18,
               height: 1.14,
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: compact ? 8 : 12),
           SizedBox(
-            height: 42,
+            height: compact ? 34 : 42,
             child: Text(
               subtitle,
-              maxLines: 3,
+              maxLines: compact ? 2 : 3,
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.muted,
-                fontSize: 12.5,
+                fontSize: compact ? 12 : 12.5,
                 height: 1.25,
               ),
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: compact ? 10 : 14),
           SizedBox(
             width: double.infinity,
-            height: 42,
+            height: compact ? 40 : 42,
             child: ElevatedButton(
               onPressed: onTap,
               style: ElevatedButton.styleFrom(

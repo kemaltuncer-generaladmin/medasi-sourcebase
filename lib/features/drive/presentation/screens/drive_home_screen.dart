@@ -154,8 +154,14 @@ class _HeroPanel extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 680;
+          final mobile = constraints.maxWidth < 430;
           return GlassPanel(
-            padding: EdgeInsets.fromLTRB(28, 28, 22, compact ? 22 : 26),
+            padding: EdgeInsets.fromLTRB(
+              mobile ? 22 : 28,
+              mobile ? 22 : 28,
+              mobile ? 20 : 22,
+              mobile ? 20 : (compact ? 22 : 26),
+            ),
             radius: 20,
             child: Stack(
               children: [
@@ -188,8 +194,8 @@ class _HeroPanel extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      const FittedBox(
+                      SizedBox(height: mobile ? 14 : 20),
+                      FittedBox(
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerLeft,
                         child: Text(
@@ -197,41 +203,41 @@ class _HeroPanel extends StatelessWidget {
                           maxLines: 1,
                           style: TextStyle(
                             color: AppColors.navy,
-                            fontSize: 46,
+                            fontSize: mobile ? 38 : 46,
                             fontWeight: FontWeight.w900,
                             height: 1.05,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      const Text(
+                      SizedBox(height: mobile ? 10 : 16),
+                      Text(
                         'Derslerini oluştur, bölümler ekle ve\nmateryallerini öğrenme araçlarına dönüştür.',
                         style: TextStyle(
                           color: AppColors.muted,
-                          fontSize: 20,
-                          height: 1.42,
+                          fontSize: mobile ? 17 : 20,
+                          height: mobile ? 1.28 : 1.42,
                         ),
                       ),
-                      if (compact) ...[
-                        const SizedBox(height: 12),
-                        const Align(
+                      if (compact && !mobile) ...[
+                        const SizedBox(height: 10),
+                        Align(
                           alignment: Alignment.centerRight,
                           child: SizedBox(
-                            width: 180,
-                            height: 112,
-                            child: _StackHeroArt(),
+                            width: 156,
+                            height: 88,
+                            child: const _StackHeroArt(),
                           ),
                         ),
                       ],
-                      const SizedBox(height: 28),
+                      SizedBox(height: mobile ? 18 : 28),
                       SizedBox(
-                        width: 218,
+                        width: mobile ? double.infinity : 218,
                         child: SBPrimaryButton(
                           label: 'Kaynak Oluştur',
                           icon: Icons.add_rounded,
                           onPressed: onUpload,
-                          size: SBButtonSize.large,
-                          fullWidth: false,
+                          size: mobile ? SBButtonSize.medium : SBButtonSize.large,
+                          fullWidth: mobile,
                         ),
                       ),
                     ],
