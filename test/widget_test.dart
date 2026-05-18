@@ -68,6 +68,17 @@ class AppShellForTest extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(home: child);
+    return MaterialApp(
+      home: child,
+      routes: {
+        '/login': (_) =>
+            const Scaffold(body: Center(child: Text('Login test placeholder'))),
+        '/drive': (_) =>
+            const Scaffold(body: Center(child: Text('Drive test placeholder'))),
+        '/profile-setup': (_) => const Scaffold(
+          body: Center(child: Text('Profile setup test placeholder')),
+        ),
+      },
+    );
   }
 }

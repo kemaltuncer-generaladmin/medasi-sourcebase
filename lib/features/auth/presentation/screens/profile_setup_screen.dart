@@ -4,6 +4,7 @@ import '../../../drive/presentation/screens/drive_workspace_screen.dart';
 import '../../data/sourcebase_auth_backend.dart';
 import '../widgets/auth_widgets.dart';
 import 'login_screen.dart';
+import 'verify_email_screen.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -23,6 +24,26 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      if (SourceBaseAuthBackend.currentUser == null) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          LoginScreen.route,
+          (_) => false,
+        );
+        return;
+      }
+      if (!SourceBaseAuthBackend.currentUserHasVerifiedEmail) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          VerifyEmailScreen.route,
+          (_) => false,
+        );
+      }
+    });
     final metadata = SourceBaseAuthBackend.currentUser?.userMetadata ?? {};
     final faculty = metadata['sourcebase_faculty']?.toString().trim() ?? '';
     final savedDepartment =
@@ -64,6 +85,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       Navigator.pushNamedAndRemoveUntil(
         context,
         LoginScreen.route,
+        (_) => false,
+      );
+      return;
+    }
+    if (!SourceBaseAuthBackend.currentUserHasVerifiedEmail) {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        VerifyEmailScreen.route,
         (_) => false,
       );
       return;

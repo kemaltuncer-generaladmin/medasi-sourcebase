@@ -47,19 +47,19 @@ class AuthScreenFrame extends StatelessWidget {
                       ),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          minHeight: useCard ? 0 : constraints.maxHeight - 80,
+                          minHeight: useCard
+                              ? 0
+                              : (constraints.maxHeight > 72
+                                    ? constraints.maxHeight - 72
+                                    : 0),
                         ),
                         child: useCard
                             ? Container(
                                 padding: const EdgeInsets.all(26),
                                 decoration: BoxDecoration(
-                                  color: AppColors.white.withValues(
-                                    alpha: .88,
-                                  ),
+                                  color: AppColors.white.withValues(alpha: .88),
                                   borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(
-                                    color: AppColors.softLine,
-                                  ),
+                                  border: Border.all(color: AppColors.softLine),
                                   boxShadow: [
                                     BoxShadow(
                                       color: AppColors.navy.withValues(
@@ -390,13 +390,14 @@ class AuthCheck extends StatelessWidget {
   });
 
   final bool value;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final String? label;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
+      enabled: onTap != null,
       toggled: value,
       label: label ?? 'Beni hatırla',
       child: GestureDetector(

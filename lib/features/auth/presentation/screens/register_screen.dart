@@ -21,7 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final repeatPasswordController = TextEditingController();
-  bool terms = true;
+  bool terms = false;
   bool obscureOne = true;
   bool obscureTwo = true;
   bool loading = false;
@@ -178,7 +178,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           children: [
             AuthCheck(
               value: terms,
-              onTap: () => setState(() => terms = !terms),
+              onTap: loading ? null : () => setState(() => terms = !terms),
               label: 'Kullanım koşullarını kabul ediyorum',
             ),
             const SizedBox(width: 12),
