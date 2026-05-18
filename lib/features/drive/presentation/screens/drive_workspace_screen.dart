@@ -411,6 +411,10 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
       _showSnack('Üretim için önce Drive’dan bir dosya seçin.');
       return;
     }
+    if (file.status != DriveItemStatus.completed) {
+      _showSnack('Üretim için dosyanın yüklenip işlenmesi tamamlanmalı.');
+      return;
+    }
     await _runAction('Üretim başlatılıyor...', () async {
       final output = await repository.createGeneratedOutput(
         file: file,
@@ -1103,6 +1107,10 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
                           onGenerate: _generateFromFile,
                           onOpenCollections: () =>
                               _go(WorkspaceRouteKey.collections),
+                          onOpenBaseForce: () =>
+                              _go(WorkspaceRouteKey.baseForce),
+                          onOpenSourceLab: () =>
+                              _go(WorkspaceRouteKey.sourceLab),
                         ),
                 WorkspaceRouteKey.search => DriveSearchScreen(
                   files: _allFiles,

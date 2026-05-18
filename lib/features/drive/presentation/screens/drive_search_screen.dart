@@ -109,8 +109,9 @@ class _DriveSearchScreenState extends State<DriveSearchScreen> {
       children: [
         DriveTopBar(
           title: 'Dosya Arama',
-          onSearch: () {},
+          onSearch: widget.onBack,
           onBack: widget.onBack,
+          showSearch: false,
         ),
         _SearchInput(
           controller: _queryController,
