@@ -52,8 +52,8 @@ export function getAllowedOrigin() {
 }
 
 export function getGcsConfig(): GcsConfig {
-  const bucket = envValue("SOURCEBASE_GCS_BUCKET", "GCS_BUCKET");
-  const serviceAccountJson = firstEnv(
+  const bucket = canonicalFirst("SOURCEBASE_GCS_BUCKET", "GCS_BUCKET");
+  const serviceAccountJson = canonicalFirst(
     "SOURCEBASE_GCS_SERVICE_ACCOUNT_JSON",
     "GOOGLE_SERVICE_ACCOUNT_JSON",
     "GOOGLE_SERVICE_ACCOUNT_JSON_BASE64",
@@ -80,7 +80,7 @@ export function getGcsConfig(): GcsConfig {
 export function getVertexConfig(): VertexConfig {
   const supabaseUrl = getSupabaseUrl();
   const serviceRoleKey = getSupabaseServiceRoleKey();
-  const vertexServiceAccountJson = firstEnv(
+  const vertexServiceAccountJson = canonicalFirst(
     "VERTEX_SERVICE_ACCOUNT_JSON",
     "SOURCEBASE_VERTEX_SERVICE_ACCOUNT_JSON",
     "GOOGLE_VERTEX_SERVICE_ACCOUNT_JSON",
@@ -128,12 +128,12 @@ export function getVertexConfig(): VertexConfig {
 }
 
 export function runtimeConfigStatus() {
-  const gcsServiceJson = firstEnv(
+  const gcsServiceJson = canonicalFirst(
     "SOURCEBASE_GCS_SERVICE_ACCOUNT_JSON",
     "GOOGLE_SERVICE_ACCOUNT_JSON",
     "GOOGLE_SERVICE_ACCOUNT_JSON_BASE64",
   );
-  const vertexServiceJson = firstEnv(
+  const vertexServiceJson = canonicalFirst(
     "VERTEX_SERVICE_ACCOUNT_JSON",
     "SOURCEBASE_VERTEX_SERVICE_ACCOUNT_JSON",
     "GOOGLE_VERTEX_SERVICE_ACCOUNT_JSON",
@@ -146,7 +146,7 @@ export function runtimeConfigStatus() {
     gcs: {
       provider: "gcs",
       bucketConfigured: Boolean(
-        envValue("SOURCEBASE_GCS_BUCKET", "GCS_BUCKET"),
+        canonicalFirst("SOURCEBASE_GCS_BUCKET", "GCS_BUCKET"),
       ),
       serviceAccountConfigured: Boolean(gcsServiceJson),
     },
@@ -210,6 +210,17 @@ function firstEnv(...names: string[]) {
     return stripWrappingQuotes(value);
   }
   return "";
+}
+
+function canonicalFirst(canonical: string, ...aliases: string[]) {
+  if (hasEnv(canonical)) {
+    return firstEnv(canonical);
+  }
+  return firstEnv(...aliases);
+}
+
+function hasEnv(name: string) {
+  return Deno.env.get(name) !== undefined;
 }
 
 function stripWrappingQuotes(value: string) {
