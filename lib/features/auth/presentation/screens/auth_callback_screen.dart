@@ -5,6 +5,7 @@ import '../../data/sourcebase_auth_backend.dart';
 import '../widgets/auth_widgets.dart';
 import 'login_screen.dart';
 import 'profile_setup_screen.dart';
+import 'verify_email_screen.dart';
 
 class AuthCallbackScreen extends StatefulWidget {
   const AuthCallbackScreen({super.key});
@@ -158,6 +159,9 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
   String get _route {
     if (SourceBaseAuthBackend.currentUser == null) {
       return LoginScreen.route;
+    }
+    if (!SourceBaseAuthBackend.currentUserHasVerifiedEmail) {
+      return VerifyEmailScreen.route;
     }
     if (SourceBaseAuthBackend.currentUserNeedsSourceBaseProfile) {
       return ProfileSetupScreen.route;

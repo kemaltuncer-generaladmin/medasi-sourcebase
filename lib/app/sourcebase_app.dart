@@ -80,6 +80,9 @@ class _SourceBaseAppState extends State<SourceBaseApp> {
     if (SourceBaseAuthBackend.currentUser == null) {
       return LoginScreen.route;
     }
+    if (!SourceBaseAuthBackend.currentUserHasVerifiedEmail) {
+      return VerifyEmailScreen.route;
+    }
     if (SourceBaseAuthBackend.currentUserNeedsSourceBaseProfile) {
       return ProfileSetupScreen.route;
     }

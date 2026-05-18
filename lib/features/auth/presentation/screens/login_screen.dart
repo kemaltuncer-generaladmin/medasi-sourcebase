@@ -8,6 +8,7 @@ import '../widgets/auth_widgets.dart';
 import 'forgot_password_screen.dart';
 import 'profile_setup_screen.dart';
 import 'register_screen.dart';
+import 'verify_email_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -88,6 +89,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   String get _postLoginRoute {
+    if (!SourceBaseAuthBackend.currentUserHasVerifiedEmail) {
+      return VerifyEmailScreen.route;
+    }
     if (SourceBaseAuthBackend.currentUserNeedsSourceBaseProfile) {
       return ProfileSetupScreen.route;
     }
