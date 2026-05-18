@@ -1166,6 +1166,8 @@ class _StorePackageTile extends StatefulWidget {
   State<_StorePackageTile> createState() => _StorePackageTileState();
 }
 
+final bool _storePaymentsEnabled = false;
+
 class _StorePackageTileState extends State<_StorePackageTile> {
   bool _buying = false;
   String? _buyError;
@@ -1269,6 +1271,7 @@ class _StorePackageTileState extends State<_StorePackageTile> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 430;
+          final paymentsDisabled = !_storePaymentsEnabled;
           final leading = Container(
             width: 46,
             height: 46,
@@ -1323,7 +1326,8 @@ class _StorePackageTileState extends State<_StorePackageTile> {
             width: compact ? double.infinity : 124,
             height: 42,
             child: FilledButton(
-              onPressed: _buying || !widget.package.canPurchase
+              onPressed:
+                  _buying || !widget.package.canPurchase || paymentsDisabled
                   ? null
                   : _purchase,
               style: FilledButton.styleFrom(
@@ -1393,6 +1397,18 @@ class _StorePackageTileState extends State<_StorePackageTile> {
                     color: AppColors.muted,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+              if (paymentsDisabled && widget.package.canPurchase) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Ödeme yakında aktif olacak.',
+                  style: TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
                   ),
                 ),
               ],
