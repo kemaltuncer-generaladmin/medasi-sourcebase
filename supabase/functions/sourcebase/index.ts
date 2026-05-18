@@ -353,7 +353,7 @@ async function createCourse(userId: string, payload: JsonMap) {
 }
 
 async function createSection(userId: string, payload: JsonMap) {
-  const courseId = requireString(payload.courseId, "courseId");
+  const courseId = requireUuid(payload.courseId, "courseId");
   const title = validateDisplayText(
     requireString(payload.title, "title"),
     "title",
@@ -371,7 +371,7 @@ async function createSection(userId: string, payload: JsonMap) {
 }
 
 async function renameCourse(userId: string, payload: JsonMap) {
-  const courseId = requireString(payload.courseId, "courseId");
+  const courseId = requireUuid(payload.courseId, "courseId");
   const title = validateDisplayText(
     requireString(payload.title, "title"),
     "title",
@@ -388,7 +388,7 @@ async function renameCourse(userId: string, payload: JsonMap) {
 }
 
 async function renameSection(userId: string, payload: JsonMap) {
-  const sectionId = requireString(payload.sectionId, "sectionId");
+  const sectionId = requireUuid(payload.sectionId, "sectionId");
   const title = validateDisplayText(
     requireString(payload.title, "title"),
     "title",
@@ -405,7 +405,7 @@ async function renameSection(userId: string, payload: JsonMap) {
 }
 
 async function deleteCourse(userId: string, payload: JsonMap) {
-  const courseId = requireString(payload.courseId, "courseId");
+  const courseId = requireUuid(payload.courseId, "courseId");
   await assertOwned(userId, "courses", courseId);
   const fileRows = await dbSelect(
     `drive_files?course_id=eq.${courseId}&owner_user_id=eq.${userId}&select=id`,
@@ -420,7 +420,7 @@ async function deleteCourse(userId: string, payload: JsonMap) {
 }
 
 async function deleteSection(userId: string, payload: JsonMap) {
-  const sectionId = requireString(payload.sectionId, "sectionId");
+  const sectionId = requireUuid(payload.sectionId, "sectionId");
   await assertOwned(userId, "sections", sectionId);
   const fileRows = await dbSelect(
     `drive_files?section_id=eq.${sectionId}&owner_user_id=eq.${userId}&select=id`,
@@ -437,8 +437,8 @@ async function deleteSection(userId: string, payload: JsonMap) {
 async function createUploadSession(userId: string, payload: JsonMap) {
   const fileName = requireString(payload.fileName, "fileName");
   const contentType = requireString(payload.contentType, "contentType");
-  const courseId = requireString(payload.courseId, "courseId");
-  const sectionId = requireString(payload.sectionId, "sectionId");
+  const courseId = requireUuid(payload.courseId, "courseId");
+  const sectionId = requireUuid(payload.sectionId, "sectionId");
   const sizeBytes = Number(payload.sizeBytes ?? 0);
 
   const fileInfo = validateUploadFile(fileName, contentType, sizeBytes);
@@ -479,8 +479,8 @@ async function createUploadSession(userId: string, payload: JsonMap) {
 
 async function completeUpload(userId: string, payload: JsonMap) {
   const objectName = requireString(payload.objectName, "objectName");
-  const courseId = requireString(payload.courseId, "courseId");
-  const sectionId = requireString(payload.sectionId, "sectionId");
+  const courseId = requireUuid(payload.courseId, "courseId");
+  const sectionId = requireUuid(payload.sectionId, "sectionId");
   const fileName = requireString(payload.fileName, "fileName");
   const contentType = requireString(payload.contentType, "contentType");
   const sizeBytes = Number(payload.sizeBytes ?? 0);
@@ -603,7 +603,7 @@ async function completeUpload(userId: string, payload: JsonMap) {
 }
 
 async function renameFile(userId: string, payload: JsonMap) {
-  const fileId = requireString(payload.fileId, "fileId");
+  const fileId = requireUuid(payload.fileId, "fileId");
   const title = requireString(payload.title, "title");
   await assertOwned(userId, "drive_files", fileId);
   const [row] = await dbPatchReturning(
@@ -616,9 +616,9 @@ async function renameFile(userId: string, payload: JsonMap) {
 }
 
 async function moveFiles(userId: string, payload: JsonMap) {
-  const fileIds = requireStringList(payload.fileIds, "fileIds");
-  const courseId = requireString(payload.courseId, "courseId");
-  const sectionId = requireString(payload.sectionId, "sectionId");
+  const fileIds = requireUuidList(payload.fileIds, "fileIds");
+  const courseId = requireUuid(payload.courseId, "courseId");
+  const sectionId = requireUuid(payload.sectionId, "sectionId");
   await assertOwned(userId, "courses", courseId);
   await assertOwned(userId, "sections", sectionId);
   await assertSectionInCourse(userId, sectionId, courseId);
@@ -641,7 +641,7 @@ async function moveFiles(userId: string, payload: JsonMap) {
 }
 
 async function deleteFiles(userId: string, payload: JsonMap) {
-  const fileIds = requireStringList(payload.fileIds, "fileIds");
+  const fileIds = requireUuidList(payload.fileIds, "fileIds");
   await assertFilesOwned(userId, fileIds);
   const rows = await dbSelect(
     `drive_files?id=in.(${
@@ -669,7 +669,7 @@ async function deleteFiles(userId: string, payload: JsonMap) {
 }
 
 async function retryFileProcessing(userId: string, payload: JsonMap) {
-  const fileId = requireString(payload.fileId, "fileId");
+  const fileId = requireUuid(payload.fileId, "fileId");
   await assertOwned(userId, "drive_files", fileId);
   await dbPatch(
     "drive_files",
@@ -705,7 +705,7 @@ async function retryFileProcessing(userId: string, payload: JsonMap) {
 }
 
 async function addToCollection(userId: string, payload: JsonMap) {
-  const fileIds = requireStringList(payload.fileIds, "fileIds");
+  const fileIds = requireUuidList(payload.fileIds, "fileIds");
   await assertFilesOwned(userId, fileIds);
   const existingRows = await dbSelect(
     `drive_files?id=in.(${
@@ -729,11 +729,11 @@ async function addToCollection(userId: string, payload: JsonMap) {
 }
 
 async function createGeneratedOutput(userId: string, payload: JsonMap) {
-  const fileId = requireString(payload.fileId, "fileId");
+  const fileId = requireUuid(payload.fileId, "fileId");
   const kind = normalizeGeneratedOutputKind(
     requireString(payload.kind, "kind"),
   );
-  const jobId = optionalString(payload.jobId);
+  const jobId = optionalUuid(payload.jobId, "jobId");
   await ensureStorageRoots(userId);
   await assertOwned(userId, "drive_files", fileId);
   const job = jobId
@@ -1192,6 +1192,38 @@ function requireStringList(value: unknown, name: string) {
     );
   }
   return list;
+}
+
+function requireUuid(value: unknown, name: string) {
+  const text = requireString(value, name);
+  if (!isUuid(text)) {
+    throw new SafeError("INVALID_PAYLOAD", `${name} geçersiz.`, 400);
+  }
+  return text;
+}
+
+function optionalUuid(value: unknown, name: string) {
+  const text = optionalString(value);
+  if (!text) return undefined;
+  if (!isUuid(text)) {
+    throw new SafeError("INVALID_PAYLOAD", `${name} geçersiz.`, 400);
+  }
+  return text;
+}
+
+function requireUuidList(value: unknown, name: string) {
+  const list = Array.from(new Set(requireStringList(value, name)));
+  for (const item of list) {
+    if (!isUuid(item)) {
+      throw new SafeError("INVALID_PAYLOAD", `${name} geçersiz.`, 400);
+    }
+  }
+  return list;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    .test(value);
 }
 
 function validateDisplayText(text: string, name: string, maxLength: number) {
