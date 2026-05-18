@@ -11,6 +11,13 @@ Deno.test("extractPdf reads text-based PDF fixture", async () => {
   assert(result.text.includes("SourceBase ingestion"));
 });
 
+Deno.test("extractPdf decodes ToUnicode CMap text PDF fixture", async () => {
+  await ensureFixtures();
+  const bytes = await Deno.readFile(`${fixtureDir}/valid_cmap_pdf.pdf`);
+  const result = await extractPdf(bytes.buffer);
+  assert(result.text.includes("CMap text PDF"));
+});
+
 Deno.test("extractPdf returns OCR-required error for image/scanned PDF fixture", async () => {
   await ensureFixtures();
   const bytes = await Deno.readFile(`${fixtureDir}/scanned_or_image_pdf.pdf`);
@@ -73,6 +80,10 @@ async function ensureFixtures() {
     ])),
   );
   await Deno.writeFile(
+    `${fixtureDir}/valid_cmap_pdf.pdf`,
+    encodeText(minimalCMapPdf("CMap text PDF")),
+  );
+  await Deno.writeFile(
     `${fixtureDir}/scanned_or_image_pdf.pdf`,
     encodeText(minimalScannedPdf()),
   );
@@ -105,6 +116,54 @@ async function ensureFixtures() {
     `${fixtureDir}/old_format_doc.doc`,
     encodeText("Legacy DOC placeholder fixture"),
   );
+}
+
+function minimalCMapPdf(text: string) {
+  const codes = [...text].map((char, index) => ({
+    code: (index + 1).toString(16).padStart(4, "0").toUpperCase(),
+    unicode: char.charCodeAt(0).toString(16).padStart(4, "0").toUpperCase(),
+  }));
+  const encodedText = codes.map((item) => item.code).join("");
+  const cmap = `/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+${codes.length} beginbfchar
+${codes.map((item) => `<${item.code}> <${item.unicode}>`).join("\n")}
+endbfchar
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end`;
+  return `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type0 /BaseFont /ABCDEE+Custom /Encoding /Identity-H /ToUnicode 6 0 R >>
+endobj
+5 0 obj
+<< /Length ${encodedText.length + 40} >>
+stream
+BT
+/F1 12 Tf
+72 720 Td
+<${encodedText}> Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Length ${cmap.length} >>
+stream
+${cmap}
+endstream
+endobj
+%%EOF`;
 }
 
 function minimalTextPdf(lines: string[]) {

@@ -139,8 +139,14 @@ async function extractTextFromDriveFile(userId: string, fileId: string) {
     fileName: String(file.original_filename ?? file.title ?? objectName),
     contentType: String(file.mime_type ?? ""),
   });
-  const fileType = String(file.file_type ?? "") ||
-    normalizedFileType.type;
+  const storedFileType = String(file.file_type ?? "").trim().toLowerCase();
+  const storedFileTypeInfo = normalizeSourceFileType({
+    fileName: storedFileType.includes("/") ? "" : `source.${storedFileType}`,
+    contentType: storedFileType.includes("/") ? storedFileType : "",
+  });
+  const fileType = normalizedFileType.type !== "unknown"
+    ? normalizedFileType.type
+    : storedFileTypeInfo.type;
   if (!bucket || !objectName || !objectName.startsWith(`user/${userId}/`)) {
     throw new SafeError(
       "FILE_STORAGE_INVALID",
@@ -871,7 +877,7 @@ async function assertDriveFileOwned(userId: string, fileId: string) {
     );
   }
   const response = await fetch(
-    `${supabaseUrl}/rest/v1/drive_files?id=eq.${fileId}&owner_user_id=eq.${userId}&select=id&limit=1`,
+    `${supabaseUrl}/rest/v1/drive_files?id=eq.${fileId}&owner_user_id=eq.${userId}&select=id,status,ai_status,size_bytes&limit=1`,
     {
       headers: {
         apikey: serviceKey,
@@ -886,6 +892,45 @@ async function assertDriveFileOwned(userId: string, fileId: string) {
   const rows = await response.json();
   if (!Array.isArray(rows) || rows.length === 0) {
     throw new SafeError("FILE_NOT_FOUND", "Dosya bulunamadı.", 404);
+  }
+  const row = rows[0];
+  const status = String(row.status ?? "").toLowerCase();
+  const aiStatus = String(row.ai_status ?? "").toLowerCase();
+  const sizeBytes = Number(row.size_bytes ?? 0);
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    throw new SafeError(
+      "FILE_OBJECT_EMPTY",
+      "Yüklenen dosya boş görünüyor.",
+      400,
+    );
+  }
+  if (status === "draft" || aiStatus === "draft") {
+    throw new SafeError(
+      "FILE_NOT_READY",
+      "Taslak kaynaklarla üretim başlatılamaz.",
+      400,
+    );
+  }
+  if (status === "failed" || aiStatus === "failed" || aiStatus === "error") {
+    throw new SafeError(
+      "FILE_NOT_READY",
+      "Bu dosyada işleme hatası var.",
+      400,
+    );
+  }
+  if (aiStatus && aiStatus !== "ready" && aiStatus !== "completed") {
+    throw new SafeError(
+      "FILE_NOT_READY",
+      "Bu dosya henüz işleniyor.",
+      400,
+    );
+  }
+  if (!aiStatus && status !== "ready" && status !== "completed") {
+    throw new SafeError(
+      "FILE_NOT_READY",
+      "Bu dosya henüz işleniyor.",
+      400,
+    );
   }
 }
 

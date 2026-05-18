@@ -47,10 +47,9 @@ class _FolderScreenState extends State<FolderScreen> {
       case _FolderSort.newest:
         return files;
       case _FolderSort.name:
-        return files
-          ..sort(
-            (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
-          );
+        return files..sort(
+          (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+        );
       case _FolderSort.kind:
         return files..sort((a, b) => a.kind.name.compareTo(b.kind.name));
       case _FolderSort.size:
@@ -90,12 +89,17 @@ class _FolderScreenState extends State<FolderScreen> {
     final candidates = selectedFiles.isNotEmpty
         ? selectedFiles
         : widget.section.files;
-    if (candidates.isEmpty) return null;
+    final readyCandidates = candidates
+        .where((file) => file.status == DriveItemStatus.completed)
+        .toList();
+    if (readyCandidates.isEmpty) return null;
     if (preferredKind != null) {
-      return candidates.where((file) => file.kind == preferredKind).firstOrNull
-          ?? candidates.first;
+      return readyCandidates
+              .where((file) => file.kind == preferredKind)
+              .firstOrNull ??
+          readyCandidates.first;
     }
-    return candidates.first;
+    return readyCandidates.first;
   }
 
   void _generate(GeneratedKind kind, {DriveFileKind? preferredKind}) {
@@ -103,7 +107,7 @@ class _FolderScreenState extends State<FolderScreen> {
     if (file == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Üretim için önce bu bölüme dosya yükleyin.'),
+          content: Text('Üretim için hazır ve işlenmiş bir dosya seçin.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -208,10 +212,7 @@ class _FolderScreenState extends State<FolderScreen> {
           onSortChanged: (sort) => setState(() => _sort = sort),
         ),
         const SizedBox(height: 18),
-        if (!_gridView) ...[
-          _HeaderRow(),
-          const SizedBox(height: 10),
-        ],
+        if (!_gridView) ...[_HeaderRow(), const SizedBox(height: 10)],
         if (widget.section.files.isEmpty)
           const GlassPanel(
             child: EmptyState(

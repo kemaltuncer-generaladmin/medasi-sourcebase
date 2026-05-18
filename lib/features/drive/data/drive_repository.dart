@@ -388,7 +388,11 @@ DriveItemStatus _statusFromText(String status) {
 DriveItemStatus _fileStatusFromRow(Map<String, dynamic> row) {
   final aiStatus = _text(row['ai_status']);
   final storageStatus = _text(row['status']);
+  if (_int(row['size_bytes']) <= 0) return DriveItemStatus.failed;
   if (aiStatus.isNotEmpty) return _statusFromText(aiStatus);
+  if (storageStatus.trim().toLowerCase() == 'uploaded') {
+    return DriveItemStatus.processing;
+  }
   return _statusFromText(storageStatus);
 }
 

@@ -1,0 +1,14 @@
+appId: com.medasi.sourcebase
+name: Agent 1 Drive ingestion smoke
+---
+- launchApp
+- tapOn:
+    text: "Drive"
+    optional: true
+- assertVisible:
+    text: "Drive"
+- tapOn:
+    text: "Yukle"
+    optional: true
+- assertVisible:
+    text: "Drive"
