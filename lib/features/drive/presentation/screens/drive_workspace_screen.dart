@@ -36,6 +36,8 @@ enum WorkspaceRouteKey {
   store,
 }
 
+enum _UploadPhase { idle, selecting, uploading, completing, success, error }
+
 class DriveWorkspaceScreen extends StatefulWidget {
   const DriveWorkspaceScreen({super.key});
 
@@ -57,6 +59,7 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
   bool loading = true;
   bool busy = false;
   String? errorMessage;
+  _UploadPhase uploadPhase = _UploadPhase.idle;
 
   @override
   void initState() {
@@ -322,24 +325,36 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
     final (:course, :section) = target;
     String? tempUploadId;
     DriveFile? tempFile;
-    setState(() => busy = true);
+    setState(() {
+      busy = true;
+      uploadPhase = _UploadPhase.selecting;
+    });
     try {
       final picked = await uploadService.pickFile();
-      if (picked == null) return;
+      if (picked == null) {
+        setState(() => uploadPhase = _UploadPhase.idle);
+        return;
+      }
       final validationError = _pickedFileError(picked);
       if (validationError != null) {
         _showSnack(validationError);
+        setState(() => uploadPhase = _UploadPhase.error);
         return;
       }
       final placeholder = _uploadPlaceholder(picked, course, section);
       tempFile = placeholder;
       tempUploadId = placeholder.id;
+      _addFileToSection(placeholder);
       _upsertUploadTask(
         placeholder,
         status: DriveItemStatus.uploading,
         progress: .02,
       );
-      _showSnack('Dosya yükleniyor...');
+      setState(() {
+        route = WorkspaceRouteKey.uploads;
+        uploadPhase = _UploadPhase.uploading;
+      });
+      _showSnack(_uploadPhaseMessage(uploadPhase));
       final draft = DriveUploadDraft(
         fileName: picked.name,
         contentType: picked.contentType,
@@ -347,49 +362,69 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
         courseId: course.id,
         sectionId: section.id,
       );
-      final session = await repository.createUploadSession(draft);
-      await uploadService.uploadBytes(
-        uploadUrl: session.uploadUrl,
-        headers: session.headers,
-        file: picked,
-        onProgress: (progress) => _updateUploadTask(
-          placeholder.id,
-          status: DriveItemStatus.uploading,
-          progress: progress.clamp(0, 1).toDouble(),
+      final session = await _uploadStep(
+        phase: _UploadPhase.uploading,
+        code: 'upload-session',
+        action: () => repository.createUploadSession(draft),
+      );
+      await _uploadStep<void>(
+        phase: _UploadPhase.uploading,
+        code: 'storage-upload',
+        action: () => uploadService.uploadBytes(
+          uploadUrl: session.uploadUrl,
+          headers: session.headers,
+          file: picked,
+          onProgress: (progress) => _updateUploadTask(
+            placeholder.id,
+            status: DriveItemStatus.uploading,
+            progress: progress.clamp(0, 1).toDouble(),
+          ),
         ),
       );
+      setState(() => uploadPhase = _UploadPhase.completing);
       _updateUploadTask(
         placeholder.id,
         status: DriveItemStatus.processing,
         progress: 1,
       );
-      final uploaded = await repository.completeUpload(
-        file: picked,
-        objectName: session.objectName,
-        courseId: course.id,
-        sectionId: section.id,
-        courseTitle: course.title,
-        sectionTitle: section.title,
+      _showSnack(_uploadPhaseMessage(uploadPhase));
+      final uploaded = await _uploadStep(
+        phase: _UploadPhase.completing,
+        code: 'complete-upload',
+        action: () => repository.completeUpload(
+          file: picked,
+          objectName: session.objectName,
+          courseId: course.id,
+          sectionId: section.id,
+          courseTitle: course.title,
+          sectionTitle: section.title,
+        ),
       );
-      _removeUploadTask(placeholder.id);
       selectedCourseId = course.id;
       selectedSectionId = section.id;
       selectedFileId = uploaded.id;
-      _addFileToSection(uploaded);
-      setState(() => route = WorkspaceRouteKey.uploads);
+      _replaceLocalUpload(placeholder.id, uploaded);
+      setState(() {
+        route = WorkspaceRouteKey.uploads;
+        uploadPhase = _UploadPhase.success;
+      });
       _showSnack('${picked.name} Drive alanına yüklendi.');
+      await _reconcileWorkspace(preferredFileId: uploaded.id);
     } catch (error) {
       if (tempUploadId != null && tempFile != null) {
-        _upsertUploadTask(
-          tempFile.copyWith(status: DriveItemStatus.failed),
-          status: DriveItemStatus.failed,
-          progress: 0,
-          errorLabel: _friendlyError(error),
-        );
+        _markLocalUploadFailed(tempUploadId, tempFile, error);
       }
+      if (mounted) setState(() => uploadPhase = _UploadPhase.error);
       _showSnack(_friendlyError(error));
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) {
+        setState(() {
+          busy = false;
+          if (uploadPhase == _UploadPhase.success) {
+            uploadPhase = _UploadPhase.idle;
+          }
+        });
+      }
     }
   }
 
@@ -400,6 +435,32 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
       selectedFileId = section.files.firstOrNull?.id;
     });
     await _uploadFile();
+  }
+
+  Future<T> _uploadStep<T>({
+    required _UploadPhase phase,
+    required String code,
+    required Future<T> Function() action,
+  }) async {
+    if (mounted) {
+      setState(() => uploadPhase = phase);
+    }
+    try {
+      return await action();
+    } catch (error) {
+      throw StateError('${_friendlyError(error)} Kod: $code');
+    }
+  }
+
+  String _uploadPhaseMessage(_UploadPhase phase) {
+    return switch (phase) {
+      _UploadPhase.idle => 'Yükleme beklemede.',
+      _UploadPhase.selecting => 'Dosya seçiliyor...',
+      _UploadPhase.uploading => 'Dosya yükleniyor...',
+      _UploadPhase.completing => 'Yükleme tamamlanıyor...',
+      _UploadPhase.success => 'Dosya Drive alanına eklendi.',
+      _UploadPhase.error => 'Yükleme tamamlanamadı. Tekrar deneyin.',
+    };
   }
 
   Future<void> _generateFromFile(
@@ -633,7 +694,10 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
     final course = _primaryCourse;
     final section = _primarySection;
     if (course == null || section == null) return;
-    final updatedSection = section.copyWith(files: [file, ...section.files]);
+    final dedupedFiles = section.files
+        .where((existing) => existing.id != file.id)
+        .toList();
+    final updatedSection = section.copyWith(files: [file, ...dedupedFiles]);
     final updatedCourse = course.copyWith(
       sections: [
         for (final item in course.sections)
@@ -646,17 +710,98 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
           for (final item in data.courses)
             if (item.id == course.id) updatedCourse else item,
         ],
-        recentFiles: [file, ...data.recentFiles],
+        recentFiles: [
+          file,
+          ...data.recentFiles.where((existing) => existing.id != file.id),
+        ],
         uploads: [
           UploadTask(
             file: file,
             status: file.status,
             progress: file.status == DriveItemStatus.uploading ? .98 : 1,
           ),
-          ...data.uploads,
+          ...data.uploads.where((task) => task.file.id != file.id),
         ],
       );
     });
+  }
+
+  void _replaceLocalUpload(String localId, DriveFile uploaded) {
+    final courses = data.courses.map((course) {
+      return course.copyWith(
+        sections: course.sections.map((section) {
+          return section.copyWith(
+            files: [
+              for (final file in section.files)
+                if (file.id == localId)
+                  uploaded
+                else if (file.id != uploaded.id)
+                  file,
+            ],
+          );
+        }).toList(),
+      );
+    }).toList();
+    setState(() {
+      data = data.copyWith(
+        courses: courses,
+        recentFiles: [
+          uploaded,
+          for (final file in data.recentFiles)
+            if (file.id != localId && file.id != uploaded.id) file,
+        ],
+        uploads: [
+          UploadTask(file: uploaded, status: uploaded.status, progress: 1),
+          for (final task in data.uploads)
+            if (task.file.id != localId && task.file.id != uploaded.id) task,
+        ],
+      );
+    });
+  }
+
+  void _markLocalUploadFailed(
+    String localId,
+    DriveFile file,
+    Object error,
+  ) {
+    final failed = file.copyWith(
+      id: localId,
+      status: DriveItemStatus.failed,
+      pageLabel: 'Yüklenemedi',
+    );
+    _replaceFile(failed);
+    _upsertUploadTask(
+      failed,
+      status: DriveItemStatus.failed,
+      progress: 0,
+      errorLabel: _friendlyError(error),
+    );
+  }
+
+  Future<void> _reconcileWorkspace({String? preferredFileId}) async {
+    try {
+      final loaded = await repository.loadWorkspace();
+      if (!mounted) return;
+      setState(() {
+        data = loaded;
+        if (preferredFileId != null) {
+          selectedFileId = preferredFileId;
+          for (final course in loaded.courses) {
+            for (final section in course.sections) {
+              if (section.files.any((file) => file.id == preferredFileId)) {
+                selectedCourseId = course.id;
+                selectedSectionId = section.id;
+              }
+            }
+          }
+        }
+        _syncSelection(loaded);
+      });
+    } catch (_) {
+      _showSnack(
+        'Dosya yüklendi, ancak liste yenilenemedi. Kod: workspace-refresh',
+      );
+    }
   }
 
   DriveFile _uploadPlaceholder(
@@ -723,12 +868,26 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
   }) {
     if (!mounted) return;
     setState(() {
+      DriveFile updateFile(DriveFile file) {
+        if (file.id != fileId) return file;
+        return _fileWithUploadStatus(file, status);
+      }
       data = data.copyWith(
+        courses: [
+          for (final course in data.courses)
+            course.copyWith(
+              sections: [
+                for (final section in course.sections)
+                  section.copyWith(files: section.files.map(updateFile).toList()),
+              ],
+            ),
+        ],
+        recentFiles: data.recentFiles.map(updateFile).toList(),
         uploads: [
           for (final task in data.uploads)
             if (task.file.id == fileId)
               UploadTask(
-                file: task.file.copyWith(status: status),
+                file: _fileWithUploadStatus(task.file, status),
                 status: status,
                 progress: progress.clamp(0, 1).toDouble(),
                 errorLabel: task.errorLabel,
@@ -738,6 +897,16 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
         ],
       );
     });
+  }
+
+  DriveFile _fileWithUploadStatus(DriveFile file, DriveItemStatus status) {
+    final pageLabel = switch (status) {
+      DriveItemStatus.uploading => 'Yükleniyor',
+      DriveItemStatus.processing => 'İşleniyor',
+      DriveItemStatus.failed => 'Yüklenemedi',
+      _ => file.pageLabel,
+    };
+    return file.copyWith(status: status, pageLabel: pageLabel);
   }
 
   void _removeUploadTask(String fileId) {

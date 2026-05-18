@@ -41,10 +41,18 @@ class DriveUploadService {
     try {
       final request = await client.putUrl(Uri.parse(uploadUrl));
       headers.forEach(request.headers.set);
+      if (!headers.keys.any((key) => key.toLowerCase() == 'content-type')) {
+        request.headers.set(HttpHeaders.contentTypeHeader, file.contentType);
+      }
       request.contentLength = file.bytes.length;
       request.add(file.bytes);
       onProgress?.call(.9);
-      final response = await request.close();
+      final response = await request.close().timeout(
+        const Duration(minutes: 2),
+        onTimeout: () {
+          throw StateError('GCS upload failed: timeout');
+        },
+      );
       final ok = response.statusCode >= 200 && response.statusCode < 300;
       await response.drain<void>();
       if (!ok) {

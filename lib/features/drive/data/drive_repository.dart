@@ -261,6 +261,8 @@ DriveFile _fileFromRow(
   List<Map<String, dynamic>> allOutputs,
 ) {
   final id = _text(row['id']);
+  final status = _fileStatusFromRow(row);
+  final pageCount = _int(row['page_count']);
   return DriveFile(
     id: id,
     title: _text(row['title'], fallback: _text(row['original_filename'])),
@@ -268,17 +270,13 @@ DriveFile _fileFromRow(
       _text(row['file_type'], fallback: _text(row['mime_type'])),
     ),
     sizeLabel: _sizeLabel(_int(row['size_bytes'])),
-    pageLabel: _int(row['page_count']) > 0
-        ? '${_int(row['page_count'])} sayfa'
-        : 'İşleniyor',
+    pageLabel: _pageLabelForFile(status, pageCount),
     updatedLabel: _dateLabel(
       _text(row['updated_at'], fallback: _text(row['created_at'])),
     ),
     courseTitle: courseTitle,
     sectionTitle: sectionTitle,
-    status: _statusFromText(
-      _text(row['ai_status'], fallback: _text(row['status'])),
-    ),
+    status: status,
     generated: allOutputs
         .where((output) => _text(output['source_file_id']) == id)
         .map(_outputFromRow)
@@ -350,7 +348,8 @@ String _metadataText(Object? raw, String key, {required String fallback}) {
 }
 
 DriveItemStatus _statusFromText(String status) {
-  return switch (status) {
+  final normalized = status.trim().toLowerCase();
+  return switch (normalized) {
     'completed' ||
     'uploaded' ||
     'ready' ||
@@ -360,6 +359,24 @@ DriveItemStatus _statusFromText(String status) {
     'failed' || 'error' => DriveItemStatus.failed,
     'draft' => DriveItemStatus.draft,
     _ => DriveItemStatus.completed,
+  };
+}
+
+DriveItemStatus _fileStatusFromRow(Map<String, dynamic> row) {
+  final aiStatus = _text(row['ai_status']);
+  final storageStatus = _text(row['status']);
+  if (aiStatus.isNotEmpty) return _statusFromText(aiStatus);
+  return _statusFromText(storageStatus);
+}
+
+String _pageLabelForFile(DriveItemStatus status, int pageCount) {
+  if (pageCount > 0) return '$pageCount sayfa';
+  return switch (status) {
+    DriveItemStatus.completed => 'Sayfa bilgisi yok',
+    DriveItemStatus.processing => 'İşleniyor',
+    DriveItemStatus.uploading => 'Yükleniyor',
+    DriveItemStatus.failed => 'İşlenemedi',
+    DriveItemStatus.draft => 'Taslak',
   };
 }
 

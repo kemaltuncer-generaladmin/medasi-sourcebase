@@ -14,12 +14,20 @@ class DriveUploadService {
   Future<PickedDriveFile?> pickFile() async {
     final input = html.FileUploadInputElement()
       ..accept = '.pdf,.ppt,.pptx,.doc,.docx,.zip,application/pdf'
-      ..multiple = false;
+      ..multiple = false
+      ..style.display = 'none';
+    html.document.body?.appendChild(input);
     final picked = Completer<PickedDriveFile?>();
+
+    void cleanup() {
+      input.remove();
+    }
+
     html.window.onFocus.first.then((_) {
-      Timer(const Duration(milliseconds: 350), () {
+      Timer(const Duration(seconds: 8), () {
         if (!picked.isCompleted && (input.files?.isEmpty ?? true)) {
           picked.complete(null);
+          cleanup();
         }
       });
     });
@@ -27,6 +35,7 @@ class DriveUploadService {
       final file = input.files?.isNotEmpty == true ? input.files!.first : null;
       if (file == null) {
         if (!picked.isCompleted) picked.complete(null);
+        cleanup();
         return;
       }
       final reader = html.FileReader();
@@ -36,6 +45,7 @@ class DriveUploadService {
         if (!picked.isCompleted) {
           picked.completeError(StateError('Dosya okunamadı.'));
         }
+        cleanup();
         return;
       }
       final result = reader.result;
@@ -54,6 +64,7 @@ class DriveUploadService {
           ),
         );
       }
+      cleanup();
     });
     input.click();
     return picked.future;
@@ -68,12 +79,18 @@ class DriveUploadService {
     onProgress?.call(0);
     final request = html.HttpRequest();
     request.open('PUT', uploadUrl);
+    var hasContentType = false;
     for (final entry in headers.entries) {
       try {
         request.setRequestHeader(entry.key, entry.value);
+        hasContentType =
+            hasContentType || entry.key.toLowerCase() == 'content-type';
       } catch (_) {
         // browser may block cross-origin header
       }
+    }
+    if (!hasContentType && file.contentType.trim().isNotEmpty) {
+      request.setRequestHeader('Content-Type', file.contentType);
     }
     final completed = Completer<void>();
     request.upload.onProgress.listen((event) {
@@ -101,8 +118,14 @@ class DriveUploadService {
         completed.completeError(StateError('GCS upload failed.'));
       }
     });
-    request.send(file.bytes);
-    await completed.future;
+    request.send(html.Blob([file.bytes], file.contentType));
+    await completed.future.timeout(
+      const Duration(minutes: 2),
+      onTimeout: () {
+        request.abort();
+        throw StateError('GCS upload failed: timeout');
+      },
+    );
   }
 
   String _fallbackContentType(String fileName) {
