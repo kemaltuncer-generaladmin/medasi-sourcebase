@@ -57,7 +57,7 @@ export async function processFileExtraction(
   userId: string,
   payload: Record<string, unknown>,
 ): Promise<unknown> {
-  const fileId = requireString(payload.fileId, "fileId");
+  const fileId = requireUuid(payload.fileId, "fileId");
 
   const extractionResult = await extractTextFromDriveFile(userId, fileId);
 
@@ -198,8 +198,11 @@ export async function createGenerationJob(
   userId: string,
   payload: Record<string, unknown>,
 ): Promise<unknown> {
-  const fileId = payload.fileId?.toString().trim() || undefined;
+  const fileId = optionalUuid(payload.fileId, "fileId");
   const jobType = normalizeJobType(requireString(payload.jobType, "jobType"));
+  if (fileId) {
+    await assertDriveFileOwned(userId, fileId);
+  }
   const explicitSourceText = sanitizeSourceText(
     payload.sourceText?.toString() ?? "",
   );
@@ -277,7 +280,7 @@ export async function getJobStatus(
   userId: string,
   payload: Record<string, unknown>,
 ): Promise<unknown> {
-  const jobId = requireString(payload.jobId, "jobId");
+  const jobId = requireUuid(payload.jobId, "jobId");
 
   const processor = createJobProcessor();
   const job = await processor.getJobStatus(userId, jobId);
@@ -303,7 +306,7 @@ export async function getGeneratedContent(
   userId: string,
   payload: Record<string, unknown>,
 ): Promise<unknown> {
-  const jobId = requireString(payload.jobId, "jobId");
+  const jobId = requireUuid(payload.jobId, "jobId");
 
   const processor = createJobProcessor();
   const job = await processor.getJobStatus(userId, jobId);
@@ -365,7 +368,7 @@ export async function cancelJob(
   userId: string,
   payload: Record<string, unknown>,
 ): Promise<unknown> {
-  const jobId = requireString(payload.jobId, "jobId");
+  const jobId = requireUuid(payload.jobId, "jobId");
 
   const processor = createJobProcessor();
   await processor.cancelJob(userId, jobId);
@@ -384,7 +387,7 @@ export async function retryJob(
   userId: string,
   payload: Record<string, unknown>,
 ): Promise<unknown> {
-  const jobId = requireString(payload.jobId, "jobId");
+  const jobId = requireUuid(payload.jobId, "jobId");
 
   const processor = createJobProcessor();
   const oldJob = await processor.getJobStatus(userId, jobId);
@@ -477,6 +480,57 @@ function normalizeJobType(jobType: string): GenerationType {
   return normalized;
 }
 
+function requireUuid(value: unknown, name: string) {
+  const text = requireString(value, name);
+  if (!isUuid(text)) {
+    throw new SafeError("INVALID_PAYLOAD", `${name} geçersiz.`, 400);
+  }
+  return text;
+}
+
+function optionalUuid(value: unknown, name: string) {
+  const text = value?.toString().trim() ?? "";
+  if (!text) return undefined;
+  if (!isUuid(text)) {
+    throw new SafeError("INVALID_PAYLOAD", `${name} geçersiz.`, 400);
+  }
+  return text;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    .test(value);
+}
+
+async function assertDriveFileOwned(userId: string, fileId: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) {
+    throw new SafeError(
+      "CONFIG_ERROR",
+      "Sunucu yapılandırması eksik.",
+      500,
+    );
+  }
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/drive_files?id=eq.${fileId}&owner_user_id=eq.${userId}&select=id&limit=1`,
+    {
+      headers: {
+        apikey: serviceKey,
+        authorization: `Bearer ${serviceKey}`,
+        "accept-profile": "sourcebase",
+      },
+    },
+  );
+  if (!response.ok) {
+    throw new SafeError("FILE_NOT_FOUND", "Dosya bulunamadı.", 404);
+  }
+  const rows = await response.json();
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new SafeError("FILE_NOT_FOUND", "Dosya bulunamadı.", 404);
+  }
+}
+
 function boundedNumber(
   value: unknown,
   fallback: number | undefined,
@@ -543,10 +597,15 @@ async function buildOwnedFileContext(
     : Array.isArray(payload.contextFileIds)
     ? payload.contextFileIds
     : [];
-  const fileIds = rawIds
+  const parsedIds = rawIds
     .map((item) => item?.toString().trim() ?? "")
-    .filter(Boolean)
-    .slice(0, MAX_CONTEXT_FILES);
+    .filter((item) => item.length > 0);
+  for (const fileId of parsedIds) {
+    if (!isUuid(fileId)) {
+      throw new SafeError("INVALID_PAYLOAD", "fileIds geçersiz.", 400);
+    }
+  }
+  const fileIds = Array.from(new Set(parsedIds)).slice(0, MAX_CONTEXT_FILES);
   if (fileIds.length === 0) return "";
 
   const chunks: string[] = [];
