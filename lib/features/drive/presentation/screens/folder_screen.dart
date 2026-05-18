@@ -61,7 +61,9 @@ class _FolderScreenState extends State<FolderScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$feature özelliği yakında aktif olacak.'),
+        content: Text(
+          '$feature bu sürümde henüz bağlanmadı. Dosya detayından devam edebilirsiniz.',
+        ),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),
@@ -70,6 +72,9 @@ class _FolderScreenState extends State<FolderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final firstFile = widget.section.files.isNotEmpty
+        ? widget.section.files.first
+        : null;
     return WorkspaceScroll(
       children: [
         DriveTopBar(title: 'Drive', onSearch: widget.onSearch),
@@ -191,16 +196,24 @@ class _FolderScreenState extends State<FolderScreen> {
                 color: AppColors.purple,
                 title: 'Bu bölüm için sınav sabahı özeti üret',
                 subtitle:
-                    'Önemli noktaları çıkarıp hızlı bir özet hazırlayabilirsin.',
-                onTap: () => _showNotImplemented('Özet üretimi'),
+                    firstFile == null
+                        ? 'Özet üretmek için önce bu bölüme dosya yükleyin.'
+                        : 'Dosya detayına gidip özet üretimini başlatın.',
+                onTap: firstFile == null
+                    ? widget.onOpenUploads
+                    : () => widget.onOpenFile(firstFile),
               ),
               const SizedBox(height: 10),
               _SuggestionRow(
                 icon: Icons.style_outlined,
                 color: Color(0xFF21C56B),
                 title: 'Yüklediğin PDF dosyalarından flashcard üret',
-                subtitle: 'Ders çalışma verimliliğini artırmak için uygundur.',
-                onTap: () => _showNotImplemented('Flashcard üretimi'),
+                subtitle: firstFile == null
+                    ? 'Flashcard üretmek için önce PDF veya not yükleyin.'
+                    : 'Dosya detayına gidip flashcard üretimini başlatın.',
+                onTap: firstFile == null
+                    ? widget.onOpenUploads
+                    : () => widget.onOpenFile(firstFile),
               ),
             ],
           ),
@@ -291,7 +304,9 @@ class _Toolbar extends StatelessWidget {
   void _showGridNotImplemented(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Grid görünümü yakında aktif olacak.'),
+        content: Text(
+          'Grid görünümü bu sürümde liste olarak sunuluyor. Dosyaları aşağıdan açabilirsiniz.',
+        ),
         behavior: SnackBarBehavior.floating,
         duration: Duration(seconds: 2),
       ),

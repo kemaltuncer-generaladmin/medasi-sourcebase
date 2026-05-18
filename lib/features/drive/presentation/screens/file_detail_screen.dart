@@ -29,7 +29,9 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$feature özelliği yakında aktif olacak.'),
+        content: Text(
+          '$feature bu sürümde henüz bağlı değil. Dosyadan üretim aksiyonlarıyla devam edebilirsiniz.',
+        ),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),
@@ -251,10 +253,8 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
         ),
         SectionTitle(
           title: 'Üretilenler',
-          actionLabel: hasGenerated ? 'Tümünü Gör' : null,
-          onAction: hasGenerated
-              ? () => _showNotImplemented('Tüm çıktılar')
-              : null,
+          actionLabel: null,
+          onAction: null,
         ),
         GlassPanel(
           padding: EdgeInsets.zero,

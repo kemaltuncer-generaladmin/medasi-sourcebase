@@ -51,8 +51,14 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = SourceBaseAuthBackend.currentUser;
-    final displayName = user?.userMetadata?['display_name'] ?? 'Kullanıcı';
-    final email = user?.email ?? 'E-posta tanımlı değil';
+    final displayName =
+        user?.userMetadata?['display_name']?.toString().trim().isNotEmpty ==
+            true
+        ? user!.userMetadata!['display_name'].toString().trim()
+        : 'Kullanıcı';
+    final email = user?.email?.trim().isNotEmpty == true
+        ? user!.email!.trim()
+        : 'E-posta tanımlı değil';
 
     return WorkspaceScroll(
       children: [

@@ -102,7 +102,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
 
   void _openQueuePreview(String detail) {
     _toast(
-      'Ayarlar kaydedildi; canlı üretim bağlantısı henüz etkin değil.\n$detail',
+      'Ayarlar hazırlandı; canlı üretim bağlantısı henüz etkin değil.\n$detail',
     );
     _open(BaseForceView.queue);
   }
@@ -1880,7 +1880,7 @@ class _ComparisonFactoryScreen extends StatelessWidget {
                   _TopicButton(label: 'NSTEMI'),
                   _TopicButton(label: 'Kalp Yetmezliği'),
                   _TopicButton(
-                    label: '',
+                    label: 'Daha fazla',
                     icon: Icons.keyboard_arrow_down_rounded,
                   ),
                 ],
@@ -2238,7 +2238,10 @@ class _AllGenerationsScreen extends StatelessWidget {
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
-            onPressed: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
+            onPressed: () => _showBaseForceToast(
+              context,
+              'Sıralama bu sürümde en yeni olarak sabit.',
+            ),
             child: const Text(
               'Sırala:  En Yeni ⌄',
               style: TextStyle(
@@ -3987,41 +3990,33 @@ class _TagChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: outlined ? Colors.white : color.withValues(alpha: .10),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: outlined
-                ? AppColors.blue.withValues(alpha: .35)
-                : color.withValues(alpha: .12),
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: outlined ? Colors.white : color.withValues(alpha: .10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: outlined
+              ? AppColors.blue.withValues(alpha: .35)
+              : color.withValues(alpha: .12),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, color: AppColors.blue, size: 18),
-              const SizedBox(width: 6),
-            ],
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w800,
-                fontSize: 15,
-              ),
-            ),
-            if (!outlined) ...[
-              const SizedBox(width: 8),
-              Icon(Icons.close_rounded, color: color, size: 16),
-            ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, color: AppColors.blue, size: 18),
+            const SizedBox(width: 6),
           ],
-        ),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -4984,9 +4979,8 @@ class _ComparisonSourceLine extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Kaynağı kaldır',
-            onPressed: () =>
-                _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
+            tooltip: 'Kaynak kaldırma bu sürümde bağlı değil',
+            onPressed: null,
             icon: const Icon(Icons.close_rounded, color: AppColors.navy),
             visualDensity: VisualDensity.compact,
           ),
@@ -5020,8 +5014,11 @@ class _TopicButtonState extends State<_TopicButton> {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        if (widget.label.isEmpty) {
-          _showBaseForceToast(context, 'Bu özellik henüz hazır değil.');
+        if (widget.icon != null) {
+          _showBaseForceToast(
+            context,
+            'Ek konu seçimi bu sürümde henüz bağlanmadı.',
+          );
           return;
         }
         setState(() => selected = !selected);
@@ -5113,47 +5110,40 @@ class _DropdownBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.line),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 13,
-                    ),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 13,
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      color: AppColors.navy,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: AppColors.muted,
-            ),
-          ],
-        ),
+          ),
+          const Icon(Icons.lock_outline_rounded, color: AppColors.muted),
+        ],
       ),
     );
   }
@@ -6163,8 +6153,8 @@ class _MoreMenuButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      tooltip: 'Diğer işlemler',
-      onPressed: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
+      tooltip: 'Diğer işlemler bu sürümde bağlı değil',
+      onPressed: null,
       icon: Icon(Icons.more_vert_rounded, color: color),
       visualDensity: VisualDensity.compact,
     );

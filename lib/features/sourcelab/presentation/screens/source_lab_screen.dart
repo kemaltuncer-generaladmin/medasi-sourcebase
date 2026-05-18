@@ -280,10 +280,16 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
           SourceLabView.clinicalResult => _ClinicalScenarioResult(
             onBack: _back,
             onSearch: widget.onSearch,
-            onSave: () => _toast('Bu özellik henüz hazır değil.'),
-            onExport: () => _toast('Bu özellik henüz hazır değil.'),
+            onSave: () => _toast(
+              'Vaka kaydetme bu sürümde canlı kayıt servisine bağlı değil.',
+            ),
+            onExport: () => _toast(
+              'Vaka dışa aktarma bu sürümde canlı kayıt servisine bağlı değil.',
+            ),
             onRegenerate: () => _open(SourceLabView.clinicalBuilder),
-            onComplete: () => _toast('Bu özellik henüz hazır değil.'),
+            onComplete: () => _toast(
+              'Vaka tamamlama durumu canlı takip servisine bağlı değil.',
+            ),
           ),
           SourceLabView.planBuilder => _LearningPlanBuilder(
             selectedSources: selectedSources,
@@ -309,9 +315,15 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             planDays: planDays,
             planGoal: planGoal,
             onBack: _back,
-            onSave: () => _toast('Bu özellik henüz hazır değil.'),
-            onCalendar: () => _toast('Bu özellik henüz hazır değil.'),
-            onExport: () => _toast('Bu özellik henüz hazır değil.'),
+            onSave: () => _toast(
+              'Plan kaydetme bu sürümde canlı kayıt servisine bağlı değil.',
+            ),
+            onCalendar: () => _toast(
+              'Takvim aktarımı bu sürümde canlı takvim servisine bağlı değil.',
+            ),
+            onExport: () => _toast(
+              'Plan dışa aktarma bu sürümde canlı kayıt servisine bağlı değil.',
+            ),
             onRegenerate: () => _open(SourceLabView.planBuilder),
           ),
           SourceLabView.podcastBuilder => _PodcastBuilder(
@@ -339,11 +351,18 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onTogglePlay: () =>
                 setState(() => podcastPlaying = !podcastPlaying),
             onPosition: (value) => setState(() => podcastPosition = value),
-            onSpeed: () => _toast('Bu özellik henüz hazır değil.'),
-            onShare: () => _toast('Bu özellik henüz hazır değil.'),
-            onExport: () => _toast('Bu özellik henüz hazır değil.'),
+            onSpeed: () =>
+                _toast('Oynatma hızı bu sürümde sabit tutuluyor.'),
+            onShare: () => _toast(
+              'Podcast paylaşımı bu sürümde canlı paylaşım servisine bağlı değil.',
+            ),
+            onExport: () => _toast(
+              'Podcast dışa aktarma bu sürümde canlı kayıt servisine bağlı değil.',
+            ),
             onRegenerate: () => _open(SourceLabView.podcastBuilder),
-            onSave: () => _toast('Bu özellik henüz hazır değil.'),
+            onSave: () => _toast(
+              'Podcast kaydetme bu sürümde canlı kayıt servisine bağlı değil.',
+            ),
             onSkipBack: () {
               setState(() {
                 podcastPosition = math.max(0, podcastPosition - .08);
@@ -354,7 +373,8 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
                 podcastPosition = math.min(1, podcastPosition + .08);
               });
             },
-            onVolume: () => _toast('Bu özellik henüz hazır değil.'),
+            onVolume: () =>
+                _toast('Ses düzeyi bu sürümde cihaz kontrolüyle yönetiliyor.'),
           ),
           SourceLabView.infographicBuilder => _InfographicBuilder(
             selectedSources: selectedSources,
@@ -377,9 +397,15 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
           SourceLabView.infographicResult => _InfographicResult(
             onBack: _back,
             onSearch: widget.onSearch,
-            onSave: () => _toast('Bu özellik henüz hazır değil.'),
-            onPng: () => _toast('Bu özellik henüz hazır değil.'),
-            onPdf: () => _toast('Bu özellik henüz hazır değil.'),
+            onSave: () => _toast(
+              'İnfografik kaydetme bu sürümde canlı kayıt servisine bağlı değil.',
+            ),
+            onPng: () => _toast(
+              'PNG dışa aktarma bu sürümde canlı dosya servisine bağlı değil.',
+            ),
+            onPdf: () => _toast(
+              'PDF dışa aktarma bu sürümde canlı dosya servisine bağlı değil.',
+            ),
             onRegenerate: () => _open(SourceLabView.infographicBuilder),
           ),
           SourceLabView.mindMapBuilder => _MindMapBuilder(
@@ -413,8 +439,12 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
           ),
           SourceLabView.mindMapResult => _MindMapResult(
             onBack: _back,
-            onSave: () => _toast('Bu özellik henüz hazır değil.'),
-            onExport: () => _toast('Bu özellik henüz hazır değil.'),
+            onSave: () => _toast(
+              'Zihin haritası kaydetme bu sürümde canlı kayıt servisine bağlı değil.',
+            ),
+            onExport: () => _toast(
+              'Zihin haritası dışa aktarma bu sürümde canlı dosya servisine bağlı değil.',
+            ),
             onRegenerate: () => _open(SourceLabView.mindMapBuilder),
           ),
             },
@@ -881,32 +911,32 @@ class _RecentActivitiesPanel extends StatelessWidget {
           _ActivityRow(
             icon: Icons.check_circle_outline_rounded,
             color: AppColors.green,
-            title: 'Öğrenme planınız güncellendi',
-            subtitle: 'Yeni özellikler eklendi',
+            title: 'Öğrenme planı önizlemesi',
+            subtitle: 'Plan aracını açıp kaynaklarla oluşturun',
             time: '2 saat önce',
             onTap: () => onOpenTool(_ToolKind.plan),
           ),
           _ActivityRow(
             icon: Icons.keyboard_voice_outlined,
             color: AppColors.purple,
-            title: 'Podcast özeti oluşturuldu',
-            subtitle: 'Kardiyovasküler Sistem.pptx',
+            title: 'Podcast özeti önizlemesi',
+            subtitle: 'Drive kaynaklarından üretime hazır',
             time: '5 saat önce',
             onTap: () => onOpenTool(_ToolKind.podcast),
           ),
           _ActivityRow(
             icon: Icons.insert_chart_outlined_rounded,
             color: AppColors.blue,
-            title: 'İnfografik oluşturuldu',
-            subtitle: 'Yeni kaynak yüklendi',
+            title: 'İnfografik önizlemesi',
+            subtitle: 'Görsel yoğunluğu seçerek hazırlayın',
             time: '1 gün önce',
             onTap: () => onOpenTool(_ToolKind.infographic),
           ),
           _ActivityRow(
             icon: Icons.star_border_rounded,
             color: AppColors.orange,
-            title: 'Klinik senaryo taslağı kaydedildi',
-            subtitle: 'Akut MI - Vaka Senaryosu',
+            title: 'Klinik senaryo taslağı',
+            subtitle: 'Kaynak seçimiyle tamamlanabilir',
             time: '1 gün önce',
             onTap: () => onOpenTool(_ToolKind.clinical),
           ),
@@ -1173,13 +1203,15 @@ class _ClinicalScenarioResult extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _QuestionTitle('Bu bölüm henüz hazır değil.'),
+              const _QuestionTitle(
+                'Canlı klinik soru üretimi bağlanınca vaka soruları burada görünecek.',
+              ),
               const SizedBox(height: 18),
               for (final answer in const [
-                ('A.', 'Bu bölüm henüz hazır değil.', false),
-                ('B.', 'Bu bölüm henüz hazır değil.', false),
-                ('C.', 'Bu bölüm henüz hazır değil.', false),
-                ('D.', 'Bu bölüm henüz hazır değil.', false),
+                ('A.', 'Seçenek önizlemesi', false),
+                ('B.', 'Seçenek önizlemesi', false),
+                ('C.', 'Seçenek önizlemesi', false),
+                ('D.', 'Seçenek önizlemesi', false),
               ])
                 _AnswerRow(
                   prefix: answer.$1,
@@ -5472,8 +5504,8 @@ class _LearningPointsStrip extends StatelessWidget {
         _InlineHeader(
           icon: Icons.school_outlined,
           title: 'Öğrenme Noktaları',
-          action: 'Tümünü gör',
-          onAction: () => _showLabSnack(context, 'Bu bölüm henüz hazır değil.'),
+          action: null,
+          onAction: null,
         ),
         Wrap(
           spacing: 14,
@@ -6171,7 +6203,7 @@ class _TodayGoalCard extends StatelessWidget {
                   ),
                   TextSpan(
                     text:
-                        'Konu Başlığı\nBu bölüm henüz hazır değil.',
+                        'Kaynak seçimi tamamlandığında bugün çalışılacak konu burada netleşir.',
                   ),
                 ],
               ),
@@ -6842,7 +6874,21 @@ class _VolumeControl extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _ControlButton(label: '', onTap: onTap),
+        SizedBox(
+          width: 78,
+          height: 58,
+          child: OutlinedButton(
+            onPressed: onTap,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.blue,
+              side: const BorderSide(color: AppColors.line),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Icon(Icons.volume_up_rounded, size: 24),
+          ),
+        ),
         const SizedBox(height: 6),
         SizedBox(
           width: 72,
@@ -6952,7 +6998,10 @@ class _PodcastNotesPanel extends StatelessWidget {
             icon: Icons.notes_rounded,
             title: 'Notlar',
             action: 'Kritik Noktalar',
-            onAction: () => _showLabSnack(context, 'Bu bölüm henüz hazır değil.'),
+            onAction: () => _showLabSnack(
+              context,
+              'Kritik noktalar kaynaklardan üretim tamamlanınca görünür.',
+            ),
           ),
           for (final note in const [
             (
