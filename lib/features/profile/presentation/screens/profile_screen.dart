@@ -149,6 +149,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           builder: (context, snapshot) {
             final loading = snapshot.connectionState == ConnectionState.waiting;
             final profile = snapshot.data;
+            final isMobile = MediaQuery.sizeOf(context).width < 600;
             if (loading && profile == null) {
               return const _StatePanel(
                 icon: Icons.person_search_rounded,
@@ -173,6 +174,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _ProfileHeader(profile: current, onEdit: _openProfileSetup),
+                if (isMobile) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SBSecondaryButton(
+                          label: 'Mağaza',
+                          icon: Icons.storefront_rounded,
+                          onPressed: widget.onOpenStore,
+                          size: SBButtonSize.small,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: SBPrimaryButton(
+                          label: _signingOut ? 'Çıkış...' : 'Çıkış Yap',
+                          icon: Icons.logout_rounded,
+                          onPressed: _signingOut ? null : () => _signOut(context),
+                          loading: _signingOut,
+                          size: SBButtonSize.small,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 if (!current.isComplete) ...[
                   const SizedBox(height: 12),
                   _ProfileCompletionPanel(onComplete: _openProfileSetup),

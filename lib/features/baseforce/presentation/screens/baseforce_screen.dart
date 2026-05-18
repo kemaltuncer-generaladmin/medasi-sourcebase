@@ -8,7 +8,6 @@ import '../../../../core/widgets/sourcebase_brand.dart';
 import '../../../drive/data/drive_models.dart';
 import '../../../drive/data/sourcebase_drive_api.dart';
 import '../../../drive/presentation/widgets/drive_ui.dart';
-import '../../../drive/presentation/widgets/sourcebase_bottom_nav.dart';
 
 enum BaseForceView {
   home,
@@ -787,7 +786,7 @@ class _BaseForcePage extends StatelessWidget {
     final horizontalPadding = MediaQuery.sizeOf(context).width < 390 ? 16.0 : 32.0;
     final topPadding = MediaQuery.viewPaddingOf(context).top + 12;
     final bottomPadding = isMobile
-        ? SourceBaseBottomNav.contentBottomPadding(context)
+        ? mobileBottomSafePadding(context, extra: 20)
         : 48.0;
     return Center(
       child: ConstrainedBox(

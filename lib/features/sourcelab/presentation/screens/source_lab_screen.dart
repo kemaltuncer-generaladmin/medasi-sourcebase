@@ -3041,6 +3041,8 @@ class _LabScroll extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final horizontalPadding = width < 420 ? 16.0 : 26.0;
+    final isMobile = width < 600;
+    final bottomPadding = isMobile ? mobileBottomSafePadding(context, extra: 18) : 72.0;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 940),
@@ -3050,7 +3052,7 @@ class _LabScroll extends StatelessWidget {
             horizontalPadding,
             16,
             horizontalPadding,
-            142,
+            bottomPadding,
           ),
           children: [
             for (final child in children) ...[

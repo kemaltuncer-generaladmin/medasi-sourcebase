@@ -14,7 +14,7 @@ class SourceBaseBottomNav extends StatelessWidget {
 
   static const double navHeight = 76;
   static const double navTopGap = 8;
-  static const double contentBuffer = 104;
+  static const double contentBuffer = 132;
 
   static double bottomOffset(BuildContext context) {
     return MediaQuery.viewPaddingOf(context).bottom + navTopGap;

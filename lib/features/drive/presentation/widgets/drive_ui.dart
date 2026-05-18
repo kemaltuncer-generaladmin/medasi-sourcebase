@@ -88,6 +88,11 @@ class WorkspaceScroll extends StatelessWidget {
   }
 }
 
+double mobileBottomSafePadding(BuildContext context, {double extra = 0}) {
+  final base = SourceBaseBottomNav.contentBottomPadding(context);
+  return base + extra;
+}
+
 class DriveTopBar extends StatelessWidget {
   const DriveTopBar({
     required this.title,

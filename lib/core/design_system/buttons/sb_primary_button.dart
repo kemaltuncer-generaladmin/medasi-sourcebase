@@ -67,6 +67,7 @@ class SBPrimaryButton extends StatelessWidget {
       enabled: !isDisabled,
       label: label,
       hint: loading ? 'Yükleniyor' : null,
+      excludeSemantics: true,
       child: SizedBox(
         width: fullWidth ? double.infinity : null,
         height: _height,

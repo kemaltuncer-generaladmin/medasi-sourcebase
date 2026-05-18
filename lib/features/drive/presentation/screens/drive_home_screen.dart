@@ -45,13 +45,14 @@ class DriveHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasCourses = data.courses.isNotEmpty;
+    final mobile = MediaQuery.sizeOf(context).width < 430;
 
     return WorkspaceScroll(
       onRefresh: onRefresh,
       children: [
         DriveTopBar(title: 'Drive', onSearch: onSearch),
         _HeroPanel(onUpload: onOpenUploads),
-        const SizedBox(height: 16),
+        SizedBox(height: mobile ? 12 : 16),
         LayoutBuilder(
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 430;
@@ -133,7 +134,7 @@ class DriveHomeScreen extends StatelessWidget {
           onOpenUploads: onOpenUploads,
           onOpenCollections: onOpenCollections,
         ),
-        const SizedBox(height: 22),
+        SizedBox(height: mobile ? 12 : 22),
         const TrustStrip(),
       ],
     );
@@ -229,7 +230,7 @@ class _HeroPanel extends StatelessWidget {
                           ),
                         ),
                       ],
-                      SizedBox(height: mobile ? 18 : 28),
+                      SizedBox(height: mobile ? 14 : 28),
                       SizedBox(
                         width: mobile ? double.infinity : 218,
                         child: SBPrimaryButton(
