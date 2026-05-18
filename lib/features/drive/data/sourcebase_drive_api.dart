@@ -137,6 +137,10 @@ class SourceBaseDriveApi {
     return invoke('get_generated_content', payload: {'jobId': jobId});
   }
 
+  Future<Map<String, dynamic>> cancelJob(String jobId) {
+    return invoke('cancel_job', payload: {'jobId': jobId});
+  }
+
   Future<Map<String, dynamic>> centralAiChat(
     String message, {
     String? context,

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
@@ -151,7 +152,59 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
   }
 
   void _honestToast() {
-    _toast('Bu özellik henüz hazır değil.');
+    _toast('Bu aksiyon için entegrasyon bu sürümde bağlı değil.');
+  }
+
+  void _uploadGuidanceToast() {
+    _toast('Yeni dosya yüklemek için Drive > Yüklemeler ekranındaki Yeni Dosya akışını kullanın.');
+  }
+
+  Future<void> _copyLatestResult() async {
+    final result = _latestResult;
+    if (result == null) {
+      _toast('Paylaşılacak üretim sonucu yok.');
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: _plainTextForResult(result)));
+    if (!mounted) return;
+    _toast('Sonuç metni panoya kopyalandı.');
+  }
+
+  Future<void> _copyStoredGeneration(_GenerationRowData row) async {
+    final text = [
+      row.title,
+      'Tür: ${row.kind}',
+      'Kaynak: ${row.source}',
+      'Detay: ${row.count}',
+      'Zaman: ${row.time}',
+    ].join('\n');
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    _toast('Üretim bilgisi panoya kopyalandı.');
+  }
+
+  Future<void> _cancelJob(_BaseForceJobState job) async {
+    final jobId = job.jobId?.trim() ?? '';
+    if (jobId.isEmpty) {
+      _toast('Bu üretim henüz backend job id almadı; birkaç saniye sonra tekrar deneyin.');
+      return;
+    }
+    try {
+      await _api.cancelJob(jobId);
+      if (!mounted) return;
+      setState(() {
+        _updateJobValue(
+          job.localId,
+          status: _JobUiStatus.failed,
+          errorMessage: 'Üretim durduruldu.',
+          progress: 1,
+        );
+      });
+      _toast('Üretim durduruldu.');
+    } catch (error) {
+      if (!mounted) return;
+      _toast(_friendlyBaseForceError(error));
+    }
   }
 
   Future<void> _saveLatestResult() async {
@@ -399,10 +452,11 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
               'comparison' => BaseForceView.comparisonFactory,
               _ => BaseForceView.flashcardFactory,
             }),
-            onUpload: _honestToast,
+            onUpload: _uploadGuidanceToast,
           ),
           BaseForceView.flashcardFactory => _FlashcardFactoryScreen(
             data: widget.data,
+            selectedSources: selectedSources,
             onSearch: widget.onSearch,
             onBack: _backToHome,
             onPickSources: () => _open(BaseForceView.sourcePicker),
@@ -423,6 +477,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
           ),
           BaseForceView.questionFactory => _QuestionFactoryScreen(
             data: widget.data,
+            selectedSources: selectedSources,
             selectedDifficulty: selectedQuestionDifficulty,
             questionType: questionType,
             questionCount: questionCount,
@@ -440,6 +495,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
           ),
           BaseForceView.summaryFactory => _SummaryFactoryScreen(
             data: widget.data,
+            selectedSources: selectedSources,
             onSearch: widget.onSearch,
             onBack: _backToHome,
             onPickSources: () => _open(BaseForceView.sourcePicker),
@@ -459,6 +515,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
           ),
           BaseForceView.algorithmFactory => _AlgorithmFactoryScreen(
             data: widget.data,
+            selectedSources: selectedSources,
             onSearch: widget.onSearch,
             onBack: _backToHome,
             onPickSources: () => _open(BaseForceView.sourcePicker),
@@ -478,6 +535,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
           ),
           BaseForceView.comparisonFactory => _ComparisonFactoryScreen(
             data: widget.data,
+            selectedSources: selectedSources,
             onSearch: widget.onSearch,
             onBack: _backToHome,
             onPickSources: () => _open(BaseForceView.sourcePicker),
@@ -493,7 +551,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             onFilterChanged: (v) => setState(() => queueFilter = v),
             onOpenResult: _openResult,
             onRetryJob: _retryGeneration,
-            onStop: _honestToast,
+            onCancelJob: _cancelJob,
           ),
           BaseForceView.flashcardResults => _FlashcardResultsScreen(
             result: _latestResult,
@@ -503,11 +561,11 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             onSave: () {
               _saveLatestResult();
             },
-            onExport: _honestToast,
+            onExport: _copyLatestResult,
             onRegenerate: () => _open(
               _factoryViewForKind(_latestResult?.kind ?? GeneratedKind.flashcard),
             ),
-            onEdit: _honestToast,
+            onEdit: () => _toast('Düzenleme entegrasyonu bağlı değil; yeni sürüm için Yeniden Üret kullanın.'),
           ),
           BaseForceView.allGenerations => _AllGenerationsScreen(
             data: widget.data,
@@ -518,7 +576,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
             onFilter: (filter) => setState(() => selectedFilter = filter),
             onOpenResult: _openStoredGeneration,
             onRegenerate: _regenerateStoredGeneration,
-            onShare: _honestToast,
+            onShare: _copyStoredGeneration,
             onClear: () => setState(() => selectedFilter = 'Tümü'),
           ),
         },
@@ -642,6 +700,41 @@ int _baseForceContentCount(Object? content) {
     }
   }
   return content == null ? 0 : 1;
+}
+
+String _plainTextForResult(_GenerationResult result) {
+  return [
+    result.title,
+    'Kaynak: ${result.sourceTitle}',
+    'Tür: ${_baseForceKindLabel(result.kind)}',
+    '',
+    _plainTextValue(result.content),
+  ].join('\n');
+}
+
+String _plainTextValue(Object? value) {
+  if (value == null) return 'Sonuç içeriği boş.';
+  if (value is String) {
+    final text = value.trim();
+    return text.isEmpty ? 'Sonuç içeriği boş.' : text;
+  }
+  if (value is List) {
+    if (value.isEmpty) return 'Sonuç içeriği boş.';
+    return value
+        .asMap()
+        .entries
+        .map((entry) => '${entry.key + 1}. ${_plainTextValue(entry.value)}')
+        .join('\n\n');
+  }
+  if (value is Map) {
+    if (value.isEmpty) return 'Sonuç içeriği boş.';
+    return value.entries.map((entry) {
+      final key = entry.key.toString();
+      return '$key: ${_plainTextValue(entry.value)}';
+    }).join('\n');
+  }
+  final text = value.toString().trim();
+  return text.isEmpty ? 'Sonuç içeriği boş.' : text;
 }
 
 String _friendlyBaseForceError(Object error) {
@@ -1520,6 +1613,7 @@ class _SourcePickerScreen extends StatelessWidget {
 class _FlashcardFactoryScreen extends StatelessWidget {
   const _FlashcardFactoryScreen({
     required this.data,
+    required this.selectedSources,
     required this.onSearch,
     required this.onBack,
     required this.onPickSources,
@@ -1538,6 +1632,7 @@ class _FlashcardFactoryScreen extends StatelessWidget {
   });
 
   final DriveWorkspaceData data;
+  final Set<String> selectedSources;
   final VoidCallback onSearch;
   final VoidCallback onBack;
   final VoidCallback onPickSources;
@@ -1566,7 +1661,11 @@ class _FlashcardFactoryScreen extends StatelessWidget {
         _TwoPane(
           left: Column(
             children: [
-              _SourcesPanel(data: data, onPickSources: onPickSources),
+              _SourcesPanel(
+                data: data,
+                selectedSources: selectedSources,
+                onPickSources: onPickSources,
+              ),
               const SizedBox(height: 12),
               _BasePanel(
                 child: Column(
@@ -1748,6 +1847,7 @@ class _FlashcardFactoryScreen extends StatelessWidget {
 class _QuestionFactoryScreen extends StatelessWidget {
   const _QuestionFactoryScreen({
     required this.data,
+    required this.selectedSources,
     required this.selectedDifficulty,
     required this.questionType,
     required this.questionCount,
@@ -1763,6 +1863,7 @@ class _QuestionFactoryScreen extends StatelessWidget {
   });
 
   final DriveWorkspaceData data;
+  final Set<String> selectedSources;
   final String selectedDifficulty;
   final String questionType;
   final int questionCount;
@@ -1785,7 +1886,11 @@ class _QuestionFactoryScreen extends StatelessWidget {
       onSearch: onSearch,
       onBack: onBack,
       children: [
-        _SelectedSourceChips(data: data, onPickSources: onPickSources),
+        _SelectedSourceChips(
+          data: data,
+          selectedSources: selectedSources,
+          onPickSources: onPickSources,
+        ),
         const SizedBox(height: 20),
         _BasePanel(
           child: Column(
@@ -1906,6 +2011,7 @@ class _QuestionFactoryScreen extends StatelessWidget {
 class _SummaryFactoryScreen extends StatelessWidget {
   const _SummaryFactoryScreen({
     required this.data,
+    required this.selectedSources,
     required this.onSearch,
     required this.onBack,
     required this.onPickSources,
@@ -1923,6 +2029,7 @@ class _SummaryFactoryScreen extends StatelessWidget {
   });
 
   final DriveWorkspaceData data;
+  final Set<String> selectedSources;
 
   final VoidCallback onSearch;
   final VoidCallback onBack;
@@ -1951,6 +2058,7 @@ class _SummaryFactoryScreen extends StatelessWidget {
       children: [
         _SelectedSourceChips(
           data: data,
+          selectedSources: selectedSources,
           onPickSources: onPickSources,
           includeThird: true,
         ),
@@ -2022,6 +2130,7 @@ class _SummaryFactoryScreen extends StatelessWidget {
 class _AlgorithmFactoryScreen extends StatelessWidget {
   const _AlgorithmFactoryScreen({
     required this.data,
+    required this.selectedSources,
     required this.onSearch,
     required this.onBack,
     required this.onPickSources,
@@ -2039,6 +2148,7 @@ class _AlgorithmFactoryScreen extends StatelessWidget {
   });
 
   final DriveWorkspaceData data;
+  final Set<String> selectedSources;
   final VoidCallback onSearch;
   final VoidCallback onBack;
   final VoidCallback onPickSources;
@@ -2063,7 +2173,11 @@ class _AlgorithmFactoryScreen extends StatelessWidget {
       onSearch: onSearch,
       onBack: onBack,
       children: [
-        _SelectedSourceChips(data: data, onPickSources: onPickSources),
+        _SelectedSourceChips(
+          data: data,
+          selectedSources: selectedSources,
+          onPickSources: onPickSources,
+        ),
         const SizedBox(height: 14),
         _BasePanel(
           child: Column(
@@ -2187,6 +2301,7 @@ class _AlgorithmFactoryScreen extends StatelessWidget {
 class _ComparisonFactoryScreen extends StatelessWidget {
   const _ComparisonFactoryScreen({
     required this.data,
+    required this.selectedSources,
     required this.onSearch,
     required this.onBack,
     required this.onPickSources,
@@ -2195,6 +2310,7 @@ class _ComparisonFactoryScreen extends StatelessWidget {
   });
 
   final DriveWorkspaceData data;
+  final Set<String> selectedSources;
   final VoidCallback onSearch;
   final VoidCallback onBack;
   final VoidCallback onPickSources;
@@ -2203,6 +2319,9 @@ class _ComparisonFactoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final selectedFiles = data.recentFiles
+        .where((file) => selectedSources.contains(file.id))
+        .toList();
     return _BaseForcePage(
       title: 'Kar\u015F\u0131la\u015Ft\u0131rma Tablosu',
       subtitle:
@@ -2215,21 +2334,24 @@ class _ComparisonFactoryScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Seçilen Kaynaklar (2)', style: _titleStyle),
+              Text('Seçilen Kaynaklar (${selectedFiles.length})', style: _titleStyle),
               const SizedBox(height: 12),
-              for (final file in data.recentFiles.take(2))
-                _ComparisonSourceLine(
-                  source: _BFSource(
-                    id: file.id,
-                    name: file.title,
-                    kind: file.kind,
-                    size: file.sizeLabel,
-                    pages: file.pageLabel,
-                    subject: file.courseTitle,
-                    time: 'Az önce',
-                    warning: false,
+              if (selectedFiles.isEmpty)
+                _SourceRequiredNotice(onPickSources: onPickSources)
+              else
+                for (final file in selectedFiles)
+                  _ComparisonSourceLine(
+                    source: _BFSource(
+                      id: file.id,
+                      name: file.title,
+                      kind: file.kind,
+                      size: file.sizeLabel,
+                      pages: file.pageLabel,
+                      subject: file.courseTitle,
+                      time: 'Az önce',
+                      warning: false,
+                    ),
                   ),
-                ),
             ],
           ),
         ),
@@ -2307,7 +2429,7 @@ class _QueueScreen extends StatelessWidget {
     required this.onFilterChanged,
     required this.onOpenResult,
     required this.onRetryJob,
-    required this.onStop,
+    required this.onCancelJob,
   });
 
   final DriveWorkspaceData data;
@@ -2318,7 +2440,7 @@ class _QueueScreen extends StatelessWidget {
   final ValueChanged<String> onFilterChanged;
   final ValueChanged<_GenerationResult> onOpenResult;
   final ValueChanged<_BaseForceJobState> onRetryJob;
-  final VoidCallback onStop;
+  final ValueChanged<_BaseForceJobState> onCancelJob;
 
   @override
   Widget build(BuildContext context) {
@@ -2348,7 +2470,7 @@ class _QueueScreen extends StatelessWidget {
             } else if (job.status == _JobUiStatus.failed) {
               onRetryJob(job);
             } else {
-              onStop();
+              onCancelJob(job);
             }
           },
         ),
@@ -2814,7 +2936,7 @@ class _AllGenerationsScreen extends StatelessWidget {
   final ValueChanged<String> onFilter;
   final ValueChanged<_GenerationRowData> onOpenResult;
   final ValueChanged<_GenerationRowData> onRegenerate;
-  final VoidCallback onShare;
+  final ValueChanged<_GenerationRowData> onShare;
   final VoidCallback onClear;
 
   @override
@@ -2908,7 +3030,7 @@ class _AllGenerationsScreen extends StatelessWidget {
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
-            onPressed: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
+            onPressed: () => _showBaseForceToast(context, 'Sıralama şu anda en yeni üretimlere göre uygulanıyor.'),
             child: const Text(
               'Sırala:  En Yeni ⌄',
               style: TextStyle(
@@ -2932,7 +3054,7 @@ class _AllGenerationsScreen extends StatelessWidget {
             _GenerationListRow(
               data: row,
               onOpen: () => onOpenResult(row),
-              onShare: onShare,
+              onShare: () => onShare(row),
               onRegenerate: () => onRegenerate(row),
             ),
       ],
@@ -3894,13 +4016,21 @@ class _SelectedSourceChip extends StatelessWidget {
 }
 
 class _SourcesPanel extends StatelessWidget {
-  const _SourcesPanel({required this.data, required this.onPickSources});
+  const _SourcesPanel({
+    required this.data,
+    required this.selectedSources,
+    required this.onPickSources,
+  });
 
   final DriveWorkspaceData data;
+  final Set<String> selectedSources;
   final VoidCallback onPickSources;
 
   @override
   Widget build(BuildContext context) {
+    final files = data.recentFiles
+        .where((file) => selectedSources.contains(file.id))
+        .toList();
     return _BasePanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3910,23 +4040,26 @@ class _SourcesPanel extends StatelessWidget {
             title: 'Kaynaklarınız',
           ),
           const SizedBox(height: 18),
-          for (final file in data.recentFiles.take(2))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _CompactSourceTile(
-                source: _BFSource(
-                  id: file.id,
-                  name: file.title,
-                  kind: file.kind,
-                  size: file.sizeLabel,
-                  pages: file.pageLabel,
-                  subject: file.courseTitle,
-                  time: 'Az önce',
-                  warning: false,
+          if (files.isEmpty)
+            _SourceRequiredNotice(onPickSources: onPickSources)
+          else
+            for (final file in files)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _CompactSourceTile(
+                  source: _BFSource(
+                    id: file.id,
+                    name: file.title,
+                    kind: file.kind,
+                    size: file.sizeLabel,
+                    pages: file.pageLabel,
+                    subject: file.courseTitle,
+                    time: 'Az önce',
+                    warning: false,
+                  ),
+                  selected: true,
                 ),
-                selected: true,
               ),
-            ),
           InkWell(
             onTap: onPickSources,
             borderRadius: BorderRadius.circular(12),
@@ -3987,46 +4120,91 @@ class _SourcesPanel extends StatelessWidget {
 class _SelectedSourceChips extends StatelessWidget {
   const _SelectedSourceChips({
     required this.data,
+    required this.selectedSources,
     required this.onPickSources,
     this.includeThird = false,
   });
 
   final DriveWorkspaceData data;
+  final Set<String> selectedSources;
   final VoidCallback onPickSources;
   final bool includeThird;
 
   @override
   Widget build(BuildContext context) {
-    final sources = includeThird
-        ? data.recentFiles.take(3)
-        : data.recentFiles.take(2);
+    final sources = data.recentFiles
+        .where((file) => selectedSources.contains(file.id))
+        .take(includeThird ? 3 : 2)
+        .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Seçili Kaynaklar', style: _titleStyle),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            for (final file in sources)
-              _SourceChipCard(
-                source: _BFSource(
-                  id: file.id,
-                  name: file.title,
-                  kind: file.kind,
-                  size: file.sizeLabel,
-                  pages: file.pageLabel,
-                  subject: file.courseTitle,
-                  time: 'Az önce',
-                  warning: false,
+        if (sources.isEmpty)
+          _SourceRequiredNotice(onPickSources: onPickSources)
+        else
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final file in sources)
+                _SourceChipCard(
+                  source: _BFSource(
+                    id: file.id,
+                    name: file.title,
+                    kind: file.kind,
+                    size: file.sizeLabel,
+                    pages: file.pageLabel,
+                    subject: file.courseTitle,
+                    time: 'Az önce',
+                    warning: false,
+                  ),
+                  onTap: onPickSources,
                 ),
-                onTap: onPickSources,
+              _DashedAddButton(onTap: onPickSources),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _SourceRequiredNotice extends StatelessWidget {
+  const _SourceRequiredNotice({required this.onPickSources});
+
+  final VoidCallback onPickSources;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onPickSources,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.selectedBlue,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.blue.withValues(alpha: .25)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.source_outlined, color: AppColors.blue),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Üretim için önce Drive’dan bir kaynak seçin.',
+                style: TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            _DashedAddButton(onTap: onPickSources),
+            ),
           ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -4716,7 +4894,7 @@ class _TagChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
+      onTap: () => _showBaseForceToast(context, 'Bu ayar üretim isteğine backend desteği geldikten sonra bağlanacak.'),
       borderRadius: BorderRadius.circular(18),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -5714,7 +5892,7 @@ class _ComparisonSourceLine extends StatelessWidget {
           IconButton(
             tooltip: 'Kaynağı kaldır',
             onPressed: () =>
-                _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
+                _showBaseForceToast(context, 'Kaynağı değiştirmek için kaynak seçimi ekranını açın.'),
             icon: const Icon(Icons.close_rounded, color: AppColors.navy),
             visualDensity: VisualDensity.compact,
           ),
@@ -5749,7 +5927,7 @@ class _TopicButtonState extends State<_TopicButton> {
     return InkWell(
       onTap: () {
         if (widget.label.isEmpty) {
-          _showBaseForceToast(context, 'Bu özellik henüz hazır değil.');
+          _showBaseForceToast(context, 'Konu listesi backend desteği geldikten sonra genişletilecek.');
           return;
         }
         setState(() => selected = !selected);
@@ -5842,7 +6020,7 @@ class _DropdownBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
+      onTap: () => _showBaseForceToast(context, 'Bu ayar üretim isteğine backend desteği geldikten sonra bağlanacak.'),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -6884,7 +7062,7 @@ class _MoreMenuButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       tooltip: 'Diğer işlemler',
-      onPressed: () => _showBaseForceToast(context, 'Bu özellik henüz hazır değil.'),
+      onPressed: () => _showBaseForceToast(context, 'Ek üretim işlemleri backend desteği geldikten sonra bağlanacak.'),
       icon: Icon(Icons.more_vert_rounded, color: color),
       visualDensity: VisualDensity.compact,
     );

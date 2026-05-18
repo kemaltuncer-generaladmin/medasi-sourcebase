@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' hide Color, Gradient, Image, TextStyle;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
@@ -242,6 +243,17 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
     _toast('Dışa aktarma/paylaşma entegrasyonu bu sürümde bağlı değil.');
   }
 
+  Future<void> _copyLabResult() async {
+    final result = _labResult;
+    if (result == null) {
+      _toast('Paylaşılacak üretim sonucu yok.');
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: _plainTextForLabResult(result)));
+    if (!mounted) return;
+    _toast('Sonuç metni panoya kopyalandı.');
+  }
+
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
@@ -419,7 +431,7 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onSave: () {
               _saveLabResult();
             },
-            onExport: _unsupportedExport,
+            onExport: _copyLabResult,
             onRegenerate: () => _open(SourceLabView.clinicalBuilder),
             onComplete: _unsupportedExport,
           ),
@@ -454,7 +466,7 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
               _saveLabResult();
             },
             onCalendar: _unsupportedExport,
-            onExport: _unsupportedExport,
+            onExport: _copyLabResult,
             onRegenerate: () => _open(SourceLabView.planBuilder),
           ),
           SourceLabView.podcastBuilder => _PodcastBuilder(
@@ -485,8 +497,8 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onTogglePlay: () => _toast('Ses dosyası üretilmedi; metinsel podcast scripti gösteriliyor.'),
             onPosition: (value) => setState(() => podcastPosition = value),
             onSpeed: _unsupportedExport,
-            onShare: _unsupportedExport,
-            onExport: _unsupportedExport,
+            onShare: _copyLabResult,
+            onExport: _copyLabResult,
             onRegenerate: () => _open(SourceLabView.podcastBuilder),
             onSave: () {
               _saveLabResult();
@@ -530,8 +542,8 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onSave: () {
               _saveLabResult();
             },
-            onPng: _unsupportedExport,
-            onPdf: _unsupportedExport,
+            onPng: _copyLabResult,
+            onPdf: _copyLabResult,
             onRegenerate: () => _open(SourceLabView.infographicBuilder),
           ),
           SourceLabView.mindMapBuilder => _MindMapBuilder(
@@ -571,7 +583,7 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             onSave: () {
               _saveLabResult();
             },
-            onExport: _unsupportedExport,
+            onExport: _copyLabResult,
             onRegenerate: () => _open(SourceLabView.mindMapBuilder),
           ),
             },
@@ -669,6 +681,40 @@ int _sourceLabContentCount(Object? content) {
     }
   }
   return content == null ? 0 : 1;
+}
+
+String _plainTextForLabResult(_LabGenerationResult result) {
+  return [
+    result.title,
+    'Kaynak: ${result.sourceTitle}',
+    '',
+    _plainTextLabValue(result.content),
+  ].join('\n');
+}
+
+String _plainTextLabValue(Object? value) {
+  if (value == null) return 'Sonuç içeriği boş.';
+  if (value is String) {
+    final text = value.trim();
+    return text.isEmpty ? 'Sonuç içeriği boş.' : text;
+  }
+  if (value is List) {
+    if (value.isEmpty) return 'Sonuç içeriği boş.';
+    return value
+        .asMap()
+        .entries
+        .map((entry) => '${entry.key + 1}. ${_plainTextLabValue(entry.value)}')
+        .join('\n\n');
+  }
+  if (value is Map) {
+    if (value.isEmpty) return 'Sonuç içeriği boş.';
+    return value.entries.map((entry) {
+      final key = entry.key.toString();
+      return '$key: ${_plainTextLabValue(entry.value)}';
+    }).join('\n');
+  }
+  final text = value.toString().trim();
+  return text.isEmpty ? 'Sonuç içeriği boş.' : text;
 }
 
 String _sourceLabToolTitle(_ToolKind tool) {
