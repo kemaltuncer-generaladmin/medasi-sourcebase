@@ -14,6 +14,10 @@ import {
   SafeError,
 } from "../types.ts";
 import { JobProcessor } from "../services/job-processor.ts";
+import {
+  resolveTextRoute,
+  routeOptionsFromPayload,
+} from "../services/model-router.ts";
 import { VertexAIClient } from "../services/vertex-ai.ts";
 import {
   downloadFromGcs,
@@ -246,6 +250,7 @@ export async function createGenerationJob(
     "maxTokens",
     true,
   );
+  const routeOptions = routeOptionsFromPayload(payload);
 
   const processor = createJobProcessor();
   await assertJobCapacity(processor, userId, fileId, jobType);
@@ -259,6 +264,7 @@ export async function createGenerationJob(
       count,
       temperature,
       maxTokens,
+      routeOptions,
     },
   };
   const job = await processor.createQueuedJob(jobInput);
@@ -439,13 +445,28 @@ export async function centralAiChat(
     model: config.vertexModel,
     serviceAccountJson: config.vertexServiceAccountJson,
   });
-  const reply = await vertex.generateCentralAiReply(message, context);
+  const route = resolveTextRoute(
+    "central_ai_chat",
+    routeOptionsFromPayload(payload),
+    context.length + message.length,
+  );
+  const reply = await vertex.generateCentralAiReply(message, context, {
+    provider: route.provider,
+    model: route.model,
+  });
 
   return {
     message: reply.content,
     inputTokens: reply.inputTokens,
     outputTokens: reply.outputTokens,
     costEstimate: reply.costEstimate,
+    modelRoute: {
+      provider: route.provider,
+      model: route.model,
+      tier: route.tier,
+      reason: route.reason,
+      fallbackUsed: route.fallbackUsed,
+    },
   };
 }
 
