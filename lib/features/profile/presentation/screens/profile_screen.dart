@@ -54,6 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: Row(
           children: [
             Icon(icon, color: AppColors.blue),
@@ -257,6 +258,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         message:
                             'SourceBase hesap, profil, dosya ve cüzdan verilerini sadece oturum sahibi kullanıcı için gösterir. Ödeme ve bakiye güncellemeleri backend doğrulaması olmadan client tarafında yapılmaz. Destek için uygulama içi resmi destek kanalı yayınlandığında bu alana bağlanacaktır.',
                         icon: Icons.privacy_tip_outlined,
+                      ),
+                    ),
+                    _SettingsItem(
+                      icon: Icons.delete_outline_rounded,
+                      title: 'Hesap Silme',
+                      description:
+                          'Hesap silme talebi için mevcut release durumunu gösterir.',
+                      onTap: () => _showSettingsInfo(
+                        title: 'Hesap Silme',
+                        message:
+                            'Uygulama içinde otomatik hesap silme akışı henüz backend ile bağlı değil. App Store release için hesap silme veya resmi destek talebi akışının Auth/Backend tarafında tamamlanması gerekir.',
+                        icon: Icons.delete_outline_rounded,
                       ),
                     ),
                     _SettingsItem(
@@ -847,7 +860,8 @@ class _WalletPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'MedAsiCoin cüzdanı, ${balance.label}. Mağazaya git.',
+      label:
+          'MedAsiCoin cüzdanı, ${balance.label}, ${balance.rightsLabel}. Mağazaya git.',
       child: InkWell(
         onTap: onOpenStore,
         borderRadius: BorderRadius.circular(16),
@@ -893,6 +907,17 @@ class _WalletPanel extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      balance.rightsLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     if (loadFailed) ...[
                       const SizedBox(height: 6),
                       const Text(
@@ -930,11 +955,14 @@ class _WalletPanel extends StatelessWidget {
 }
 
 class _MedasiWalletBalance {
-  const _MedasiWalletBalance(this.amount);
+  const _MedasiWalletBalance(this.amount, {this.rights = 0});
 
   final double amount;
+  final int rights;
 
   String get label => '${_formatAmount(amount)} MC';
+  String get rightsLabel =>
+      rights > 0 ? '$rights kullanım hakkı' : 'Ek hak yok';
 
   static Future<_MedasiWalletBalance> loadCurrent() async {
     final client = SourceBaseAuthBackend.client;
@@ -954,16 +982,21 @@ class _MedasiWalletBalance {
   }
 
   static _MedasiWalletBalance fromProfileRow(Map<String, dynamic> row) {
-    return _MedasiWalletBalance(
-      _safeDouble(
-        row['wallet_balance'] ??
-            row['medasicoin_balance'] ??
-            row['medasi_coin_balance'] ??
-            row['coin_balance'] ??
-            row['credits'] ??
-            row['credit_balance'],
-      ),
+    final amount = _safeDouble(
+      row['wallet_balance'] ??
+          row['medasicoin_balance'] ??
+          row['medasi_coin_balance'] ??
+          row['coin_balance'] ??
+          row['credit_balance'],
     );
+    final rights = _safeInt(
+      row['remaining_rights'] ??
+          row['usage_rights'] ??
+          row['generation_rights'] ??
+          row['remaining_credits'] ??
+          row['credits'],
+    );
+    return _MedasiWalletBalance(amount, rights: rights);
   }
 
   static String _formatAmount(double value) {
@@ -1004,7 +1037,11 @@ class _MedasiCoinStoreScreenState extends State<MedasiCoinStoreScreen> {
       _packagesFuture = _MedasiCoinPackage.loadStoreProducts();
       _walletFuture = _MedasiWalletBalance.loadCurrent();
     });
-    await Future.wait([_packagesFuture, _walletFuture]);
+    try {
+      await Future.wait([_packagesFuture, _walletFuture]);
+    } catch (_) {
+      // FutureBuilder panels surface the user-facing error states.
+    }
   }
 
   void _refreshWallet() {
@@ -1470,6 +1507,19 @@ class _StoreWalletSummary extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
+                    if (!loading && !snapshot.hasError) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        balance.rightsLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
