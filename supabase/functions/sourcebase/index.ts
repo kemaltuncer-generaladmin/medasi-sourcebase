@@ -739,8 +739,22 @@ async function createGeneratedOutput(userId: string, payload: JsonMap) {
   const job = jobId
     ? await assertCompletedJobForFile(userId, jobId, fileId)
     : await findLatestCompletedJobForOutput(userId, fileId, kind);
+  if (!job) {
+    throw new SafeError(
+      "COMPLETED_JOB_REQUIRED",
+      "Kaydedilecek tamamlanmış AI üretimi bulunamadı.",
+      400,
+    );
+  }
   const jobMetadata = job && isRecord(job.metadata) ? job.metadata : {};
   const content = jobMetadata.content;
+  if (isEmptyGeneratedContent(content)) {
+    throw new SafeError(
+      "GENERATED_CONTENT_EMPTY",
+      "AI üretim sonucu boş olduğu için kaydedilemedi.",
+      400,
+    );
+  }
   const itemCount = boundedNumber(
     payload.itemCount,
     countGeneratedItems(content) ?? generatedCount(kind),
@@ -756,9 +770,9 @@ async function createGeneratedOutput(userId: string, payload: JsonMap) {
     item_count: itemCount,
     status: "ready",
     metadata: {
-      mode: job ? "ai_generation" : "manual_request",
-      jobId: job?.id ?? jobId ?? null,
-      content: content ?? null,
+      mode: "ai_generation",
+      jobId: job.id,
+      content,
     },
   }]);
   await audit(userId, "create_generated_output", "generated_output", row.id, {
@@ -1329,6 +1343,13 @@ function outputKindToJobType(kind: string) {
     mindMap: "mind_map",
   };
   return mapping[kind];
+}
+
+function isEmptyGeneratedContent(content: unknown) {
+  if (Array.isArray(content)) return content.length === 0;
+  if (isRecord(content)) return Object.keys(content).length === 0;
+  if (typeof content === "string") return content.trim().length === 0;
+  return content === null || content === undefined;
 }
 
 function countGeneratedItems(content: unknown): number | undefined {

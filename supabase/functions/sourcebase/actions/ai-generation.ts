@@ -200,6 +200,9 @@ export async function createGenerationJob(
 ): Promise<unknown> {
   const fileId = payload.fileId?.toString().trim() || undefined;
   const jobType = normalizeJobType(requireString(payload.jobType, "jobType"));
+  if (fileId) {
+    await assertDriveFileOwned(userId, fileId);
+  }
   const explicitSourceText = sanitizeSourceText(
     payload.sourceText?.toString() ?? "",
   );
@@ -475,6 +478,35 @@ function normalizeJobType(jobType: string): GenerationType {
     );
   }
   return normalized;
+}
+
+async function assertDriveFileOwned(userId: string, fileId: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) {
+    throw new SafeError(
+      "CONFIG_ERROR",
+      "Sunucu yapılandırması eksik.",
+      500,
+    );
+  }
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/drive_files?id=eq.${fileId}&owner_user_id=eq.${userId}&select=id&limit=1`,
+    {
+      headers: {
+        apikey: serviceKey,
+        authorization: `Bearer ${serviceKey}`,
+        "accept-profile": "sourcebase",
+      },
+    },
+  );
+  if (!response.ok) {
+    throw new SafeError("FILE_NOT_FOUND", "Dosya bulunamadı.", 404);
+  }
+  const rows = await response.json();
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new SafeError("FILE_NOT_FOUND", "Dosya bulunamadı.", 404);
+  }
 }
 
 function boundedNumber(
