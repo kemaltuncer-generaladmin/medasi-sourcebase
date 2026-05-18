@@ -547,8 +547,12 @@ class _AiInputArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final bottomPadding = media.viewInsets.bottom > 0
+        ? media.viewInsets.bottom + 16
+        : 134 + media.padding.bottom;
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 134),
+      padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPadding),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
