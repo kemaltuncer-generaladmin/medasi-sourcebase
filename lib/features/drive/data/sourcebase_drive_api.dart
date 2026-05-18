@@ -132,11 +132,13 @@ class SourceBaseDriveApi {
     required String fileId,
     required GeneratedKind kind,
     int? itemCount,
+    String? jobId,
   }) {
     return createGeneratedOutputByKind(
       fileId: fileId,
       kind: kind.name,
       itemCount: itemCount,
+      jobId: jobId,
     );
   }
 
@@ -144,9 +146,13 @@ class SourceBaseDriveApi {
     required String fileId,
     required String kind,
     int? itemCount,
+    String? jobId,
   }) {
     final payload = <String, dynamic>{'fileId': fileId, 'kind': kind};
     if (itemCount != null) payload['itemCount'] = itemCount;
+    if (jobId != null && jobId.trim().isNotEmpty) {
+      payload['jobId'] = jobId.trim();
+    }
     return invoke('create_generated_output', payload: payload);
   }
 

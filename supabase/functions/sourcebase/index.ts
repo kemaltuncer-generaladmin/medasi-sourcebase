@@ -61,7 +61,10 @@ const GENERATED_OUTPUT_TYPES = new Set([
   "clinical_scenario",
   "learning_plan",
   "podcast",
+  "podcast_summary",
+  "exam_morning_summary",
   "infographic",
+  "mind_map",
   "mindMap",
   "table",
 ]);
@@ -761,6 +764,14 @@ async function createGeneratedOutput(userId: string, payload: JsonMap) {
       400,
     );
   }
+  const completedJobId = job.id?.toString() ?? "";
+  if (!completedJobId) {
+    throw new SafeError(
+      "COMPLETED_JOB_REQUIRED",
+      "Kaydedilecek tamamlanmış AI üretimi bulunamadı.",
+      400,
+    );
+  }
   const itemCount = boundedNumber(
     payload.itemCount,
     countGeneratedItems(content) ?? generatedCount(kind),
@@ -768,6 +779,15 @@ async function createGeneratedOutput(userId: string, payload: JsonMap) {
     500,
     "itemCount",
   );
+  const existing = await findGeneratedOutputByJob(
+    userId,
+    fileId,
+    kind,
+    completedJobId,
+  );
+  if (existing) {
+    return { row: existing, alreadyExists: true };
+  }
   const [row] = await dbInsert("generated_outputs", [{
     owner_user_id: userId,
     source_file_id: fileId,
@@ -777,7 +797,7 @@ async function createGeneratedOutput(userId: string, payload: JsonMap) {
     status: "ready",
     metadata: {
       mode: "ai_generation",
-      jobId: job.id,
+      jobId: completedJobId,
       content,
     },
   }]);
@@ -786,6 +806,21 @@ async function createGeneratedOutput(userId: string, payload: JsonMap) {
     kind,
   });
   return { row };
+}
+
+async function findGeneratedOutputByJob(
+  userId: string,
+  fileId: string,
+  kind: string,
+  jobId: string,
+) {
+  const rows = await dbSelect(
+    `generated_outputs?owner_user_id=eq.${userId}&source_file_id=eq.${fileId}&output_type=eq.${kind}&select=*&order=created_at.desc&limit=50`,
+  );
+  return rows.find((row) => {
+    const metadata = isRecord(row.metadata) ? row.metadata : {};
+    return metadata.jobId?.toString() === jobId;
+  }) ?? null;
 }
 
 async function assertOwned(userId: string, table: string, id: string) {
@@ -1480,12 +1515,16 @@ function normalizeGeneratedOutputKind(kind: string) {
   const aliases: Record<string, string> = {
     quiz: "question",
     questions: "question",
+    examMorningSummary: "exam_morning_summary",
+    exam_morning_summary: "exam_morning_summary",
     clinicalScenario: "clinical_scenario",
     clinical_scenario: "clinical_scenario",
     learningPlan: "learning_plan",
     learning_plan: "learning_plan",
+    podcastSummary: "podcast_summary",
+    podcast_summary: "podcast_summary",
     infographic: "infographic",
-    mind_map: "mindMap",
+    mind_map: "mind_map",
     mindmap: "mindMap",
     mindMap: "mindMap",
   };
@@ -1505,12 +1544,15 @@ function outputKindToJobType(kind: string) {
     flashcard: "flashcard",
     question: "quiz",
     summary: "summary",
+    exam_morning_summary: "exam_morning_summary",
     algorithm: "algorithm",
     comparison: "comparison",
     clinical_scenario: "clinical_scenario",
     learning_plan: "learning_plan",
     podcast: "podcast",
+    podcast_summary: "podcast",
     infographic: "infographic",
+    mind_map: "mind_map",
     mindMap: "mind_map",
   };
   return mapping[kind];
@@ -1532,11 +1574,20 @@ function countGeneratedItems(content: unknown): number | undefined {
     "rows",
     "segments",
     "questions",
+    "cards",
+    "flashcards",
+    "must_know",
+    "commonly_confused",
+    "clinical_tus_tips",
+    "self_check",
     "teachingPoints",
     "objectives",
     "sessions",
     "sections",
     "branches",
+    "chapters",
+    "days",
+    "nodes",
   ];
   for (const key of candidateKeys) {
     const value = content[key];
@@ -1550,13 +1601,16 @@ function generatedTitle(kind: string) {
     flashcard: "Flashcard Seti",
     question: "Soru Seti",
     summary: "Özet",
+    exam_morning_summary: "Sınav Sabahı Özeti",
     algorithm: "Algoritma",
     comparison: "Karşılaştırma",
     clinical_scenario: "Klinik Senaryo",
     learning_plan: "Öğrenme Planı",
     podcast: "Podcast",
+    podcast_summary: "Podcast Özeti",
     infographic: "İnfografik",
     table: "Tablo",
+    mind_map: "Zihin Haritası",
     mindMap: "Zihin Haritası",
   };
   return titles[kind] ?? "Üretilen İçerik";
@@ -1567,13 +1621,16 @@ function generatedCount(kind: string) {
     flashcard: 125,
     question: 60,
     summary: 4,
+    exam_morning_summary: 1,
     algorithm: 1,
     comparison: 1,
     clinical_scenario: 1,
     learning_plan: 1,
     podcast: 1,
+    podcast_summary: 1,
     infographic: 1,
     table: 1,
+    mind_map: 1,
     mindMap: 1,
   };
   return counts[kind] ?? 1;

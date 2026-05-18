@@ -325,6 +325,7 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
         fileId: file.id,
         kind: kind,
         itemCount: _sourceLabContentCount(result.content),
+        jobId: result.jobId,
       );
       if (!mounted) return;
       _toast('Sonuç üretimler listesine kaydedildi.');
@@ -1242,12 +1243,12 @@ String? _sourceLabJobType(_ToolKind tool) {
 
 String? _sourceLabGeneratedKind(_ToolKind tool) {
   return switch (tool) {
-    _ToolKind.examMorning => GeneratedKind.summary.name,
-    _ToolKind.podcast => GeneratedKind.podcast.name,
+    _ToolKind.examMorning => 'exam_morning_summary',
+    _ToolKind.podcast => 'podcast_summary',
     _ToolKind.infographic => GeneratedKind.infographic.name,
     _ToolKind.clinical => 'clinical_scenario',
     _ToolKind.plan => 'learning_plan',
-    _ToolKind.mindMap => GeneratedKind.mindMap.name,
+    _ToolKind.mindMap => 'mind_map',
   };
 }
 

@@ -244,6 +244,8 @@ type RoutedGenerationResult<T> = GenerationResult<T> & {
   modelRoute: ReturnType<typeof safeRouteMetadata>;
 };
 
+type GeneratedOutputRow = Record<string, unknown>;
+
 export class JobProcessor {
   private vertex: VertexAIClient;
 
@@ -342,6 +344,20 @@ export class JobProcessor {
       const content = input.jobType === "infographic"
         ? await this.attachInfographicStorage(job, result.content)
         : result.content;
+      const completedAt = new Date().toISOString();
+      const completedMetadata = {
+        ...job.metadata,
+        content,
+        modelRoute: result.modelRoute,
+        completedAt,
+      };
+      await persistGeneratedOutput(this.config, {
+        job,
+        jobType: input.jobType,
+        content,
+        modelRoute: result.modelRoute,
+        completedAt,
+      });
       await updateJob(
         this.config.supabaseUrl,
         this.config.serviceRoleKey,
@@ -352,12 +368,7 @@ export class JobProcessor {
           output_tokens: result.outputTokens,
           cost_estimate: result.costEstimate,
           model: result.modelRoute.model,
-          metadata: {
-            ...job.metadata,
-            content,
-            modelRoute: result.modelRoute,
-            completedAt: new Date().toISOString(),
-          },
+          metadata: completedMetadata,
         },
       );
       await captureMedasiCoin({
@@ -374,11 +385,7 @@ export class JobProcessor {
         output_tokens: result.outputTokens,
         cost_estimate: result.costEstimate,
         model: result.modelRoute.model,
-        metadata: {
-          ...job.metadata,
-          content,
-          modelRoute: result.modelRoute,
-        },
+        metadata: completedMetadata,
       };
     } catch (error) {
       const errorCode = error instanceof SafeError ? error.code : "AI_FAILED";
@@ -642,6 +649,228 @@ function safeRouteMetadata(route: TextRoute) {
     tier: route.tier,
     reason: route.reason,
     fallbackUsed: route.fallbackUsed,
+  };
+}
+
+async function persistGeneratedOutput(
+  config: Pick<JobProcessorConfig, "supabaseUrl" | "serviceRoleKey">,
+  input: {
+    job: GenerationJob;
+    jobType: GenerationType;
+    content: unknown;
+    modelRoute: ReturnType<typeof safeRouteMetadata>;
+    completedAt: string;
+  },
+): Promise<GeneratedOutputRow | null> {
+  const fileId = input.job.source_file_id?.trim();
+  if (!fileId) return null;
+  if (isEmptyGeneratedContent(input.content)) {
+    throw new SafeError(
+      "GENERATED_CONTENT_EMPTY",
+      "AI üretim sonucu boş olduğu için kaydedilemedi.",
+      500,
+    );
+  }
+
+  const outputType = outputTypeForJob(input.jobType);
+  const existing = await findGeneratedOutputForJob(
+    config,
+    input.job.owner_user_id,
+    fileId,
+    outputType,
+    input.job.id,
+  );
+  if (existing) return existing;
+
+  const content = contentForGeneratedOutput(input.content);
+  const inserted = await sourcebaseRestJson(config, "generated_outputs", {
+    method: "POST",
+    headers: { "prefer": "return=representation" },
+    body: JSON.stringify([{
+      owner_user_id: input.job.owner_user_id,
+      source_file_id: fileId,
+      output_type: outputType,
+      title: generatedOutputTitle(outputType),
+      item_count: countGeneratedItems(content) ?? defaultGeneratedCount(
+        outputType,
+      ),
+      status: "ready",
+      metadata: {
+        mode: "ai_generation",
+        jobId: input.job.id,
+        jobType: input.jobType,
+        content,
+        modelRoute: input.modelRoute,
+        completedAt: input.completedAt,
+      },
+    }]),
+  });
+
+  if (Array.isArray(inserted) && isRecord(inserted[0])) {
+    return inserted[0];
+  }
+  throw new SafeError(
+    "GENERATED_OUTPUT_SAVE_FAILED",
+    "Üretilen içerik kaydedilemedi.",
+    500,
+  );
+}
+
+async function findGeneratedOutputForJob(
+  config: Pick<JobProcessorConfig, "supabaseUrl" | "serviceRoleKey">,
+  userId: string,
+  fileId: string,
+  outputType: string,
+  jobId: string,
+): Promise<GeneratedOutputRow | null> {
+  const query = [
+    `owner_user_id=eq.${encodeURIComponent(userId)}`,
+    `source_file_id=eq.${encodeURIComponent(fileId)}`,
+    `output_type=eq.${encodeURIComponent(outputType)}`,
+    "select=*",
+    "order=created_at.desc",
+    "limit=50",
+  ].join("&");
+  const path = `generated_outputs?${query}`;
+  const rows = await sourcebaseRestJson(config, path, { method: "GET" });
+  if (!Array.isArray(rows)) return null;
+  for (const row of rows) {
+    if (!isRecord(row)) continue;
+    const metadata = isRecord(row.metadata) ? row.metadata : {};
+    if (metadata.jobId?.toString() === jobId) return row;
+  }
+  return null;
+}
+
+async function sourcebaseRestJson(
+  config: Pick<JobProcessorConfig, "supabaseUrl" | "serviceRoleKey">,
+  path: string,
+  init: RequestInit,
+): Promise<unknown> {
+  const response = await fetch(`${config.supabaseUrl}/rest/v1/${path}`, {
+    ...init,
+    headers: {
+      "apikey": config.serviceRoleKey,
+      "authorization": `Bearer ${config.serviceRoleKey}`,
+      "content-type": "application/json",
+      "accept-profile": "sourcebase",
+      "content-profile": "sourcebase",
+      ...((init.headers as Record<string, string> | undefined) ?? {}),
+    },
+  });
+  if (!response.ok) {
+    throw new SafeError(
+      "GENERATED_OUTPUT_SAVE_FAILED",
+      "Üretilen içerik kaydedilemedi.",
+      500,
+    );
+  }
+  if (response.status === 204) return null;
+  return await response.json();
+}
+
+function outputTypeForJob(jobType: GenerationType) {
+  const mapping: Record<GenerationType, string> = {
+    flashcard: "flashcard",
+    quiz: "question",
+    summary: "summary",
+    exam_morning_summary: "exam_morning_summary",
+    algorithm: "algorithm",
+    comparison: "comparison",
+    podcast: "podcast_summary",
+    clinical_scenario: "clinical_scenario",
+    learning_plan: "learning_plan",
+    infographic: "infographic",
+    mind_map: "mind_map",
+  };
+  return mapping[jobType];
+}
+
+function generatedOutputTitle(outputType: string) {
+  const titles: Record<string, string> = {
+    flashcard: "Flashcard Seti",
+    question: "Soru Seti",
+    summary: "Özet",
+    exam_morning_summary: "Sınav Sabahı Özeti",
+    algorithm: "Algoritma",
+    comparison: "Karşılaştırma",
+    clinical_scenario: "Klinik Senaryo",
+    learning_plan: "Öğrenme Planı",
+    podcast: "Podcast Özeti",
+    podcast_summary: "Podcast Özeti",
+    infographic: "İnfografik",
+    table: "Tablo",
+    mindMap: "Zihin Haritası",
+    mind_map: "Zihin Haritası",
+  };
+  return titles[outputType] ?? "Üretilen İçerik";
+}
+
+function defaultGeneratedCount(outputType: string) {
+  const counts: Record<string, number> = {
+    flashcard: 20,
+    question: 10,
+    summary: 1,
+    exam_morning_summary: 1,
+    algorithm: 1,
+    comparison: 1,
+    clinical_scenario: 1,
+    learning_plan: 1,
+    podcast: 1,
+    podcast_summary: 1,
+    infographic: 1,
+    table: 1,
+    mindMap: 1,
+    mind_map: 1,
+  };
+  return counts[outputType] ?? 1;
+}
+
+function isEmptyGeneratedContent(content: unknown) {
+  if (Array.isArray(content)) return content.length === 0;
+  if (isRecord(content)) return Object.keys(content).length === 0;
+  if (typeof content === "string") return content.trim().length === 0;
+  return content === null || content === undefined;
+}
+
+function countGeneratedItems(content: unknown): number | undefined {
+  if (Array.isArray(content)) return content.length || undefined;
+  if (!isRecord(content)) return undefined;
+  for (const key of [
+    "cards",
+    "flashcards",
+    "questions",
+    "bulletPoints",
+    "must_know",
+    "commonly_confused",
+    "clinical_tus_tips",
+    "self_check",
+    "steps",
+    "rows",
+    "segments",
+    "chapters",
+    "days",
+    "nodes",
+    "branches",
+    "sections",
+    "teachingPoints",
+    "objectives",
+    "sessions",
+  ]) {
+    const value = content[key];
+    if (Array.isArray(value) && value.length > 0) return value.length;
+  }
+  return 1;
+}
+
+function contentForGeneratedOutput(content: unknown): unknown {
+  if (!isRecord(content)) return content;
+  const image = isRecord(content.image) ? content.image : null;
+  if (!image || !image.storageUrl) return content;
+  const { dataUrl: _dataUrl, ...safeImage } = image;
+  return {
+    ...content,
+    image: safeImage,
   };
 }
 

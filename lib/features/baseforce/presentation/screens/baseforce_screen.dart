@@ -239,6 +239,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
         fileId: result.sourceFileId!,
         kind: result.kind,
         itemCount: _baseForceContentCount(result.content),
+        jobId: result.jobId,
       );
       if (!mounted) return;
       setState(() {
@@ -454,6 +455,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
           fileId: file.id,
           kind: kind,
           itemCount: _baseForceContentCount(content),
+          jobId: jobId,
         );
         resultSaved = true;
       } catch (error) {

@@ -106,13 +106,14 @@ class DriveRepository {
   }) async {
     final jobType = _jobTypeForGeneratedKind(kind);
     int? itemCount;
+    String? jobId;
     if (jobType != null) {
       final jobResponse = await api.createGenerationJob(
         fileId: file.id,
         jobType: jobType,
         count: _defaultGenerationCount(kind),
       );
-      final jobId = _text((jobResponse['data'] as Map?)?['jobId']);
+      jobId = _text((jobResponse['data'] as Map?)?['jobId']);
       if (jobId.isEmpty) {
         throw StateError('AI üretim işi başlatılamadı.');
       }
@@ -123,6 +124,7 @@ class DriveRepository {
       fileId: file.id,
       kind: kind,
       itemCount: itemCount,
+      jobId: jobId,
     );
     return _outputFromRow(
       _requiredDataRow(response, 'Üretilen içerik kaydı alınamadı.'),
@@ -285,16 +287,33 @@ DriveFile _fileFromRow(
 }
 
 GeneratedOutput _outputFromRow(Map<String, dynamic> row) {
+  final rawType = _text(row['output_type'], fallback: _text(row['kind']));
   final kind = _generatedKindFromText(
-    _text(row['output_type'], fallback: _text(row['kind'])),
+    rawType,
   );
+  final metadata = _map(row['metadata']);
+  final content = metadata['content'];
+  final itemCount = _int(row['item_count']);
+  final status = _text(row['status'], fallback: 'ready');
   return GeneratedOutput(
+    id: _text(row['id']),
+    sourceFileId: _text(row['source_file_id']),
     kind: kind,
+    rawType: rawType,
     title: _text(row['title'], fallback: _generatedTitle(kind)),
-    detail: '${_int(row['item_count'])} öğe',
+    detail: _generatedOutputDetail(
+      rawType: rawType,
+      status: status,
+      itemCount: itemCount,
+      content: content,
+    ),
     updatedLabel: _dateLabel(
       _text(row['updated_at'], fallback: _text(row['created_at'])),
     ),
+    status: status,
+    itemCount: itemCount,
+    content: content,
+    jobId: _text(metadata['jobId']),
   );
 }
 
@@ -328,6 +347,11 @@ List<Map<String, dynamic>> _list(Object? value) {
         .toList();
   }
   return const [];
+}
+
+Map<String, dynamic> _map(Object? value) {
+  if (value is Map) return Map<String, dynamic>.from(value);
+  return const {};
 }
 
 String _text(Object? value, {String fallback = ''}) {
@@ -398,10 +422,133 @@ DriveFileKind _kindFromText(String kind) {
 }
 
 GeneratedKind _generatedKindFromText(String kind) {
-  return GeneratedKind.values.firstWhere(
-    (value) => value.name == kind,
-    orElse: () => GeneratedKind.summary,
-  );
+  final normalized = kind.trim();
+  return switch (normalized) {
+    'flashcard' || 'flashcards' => GeneratedKind.flashcard,
+    'question' || 'questions' || 'quiz' => GeneratedKind.question,
+    'algorithm' => GeneratedKind.algorithm,
+    'comparison' => GeneratedKind.comparison,
+    'table' => GeneratedKind.table,
+    'podcast' || 'podcast_summary' || 'podcastSummary' =>
+      GeneratedKind.podcast,
+    'infographic' => GeneratedKind.infographic,
+    'mind_map' || 'mindMap' || 'mindmap' => GeneratedKind.mindMap,
+    'summary' ||
+    'exam_morning_summary' ||
+    'examMorningSummary' ||
+    'clinical_scenario' ||
+    'clinicalScenario' ||
+    'learning_plan' ||
+    'learningPlan' => GeneratedKind.summary,
+    _ => GeneratedKind.summary,
+  };
+}
+
+String _generatedOutputDetail({
+  required String rawType,
+  required String status,
+  required int itemCount,
+  required Object? content,
+}) {
+  final normalizedStatus = status.trim().toLowerCase();
+  if (normalizedStatus == 'failed' || normalizedStatus == 'error') {
+    return 'Üretim tamamlanamadı';
+  }
+  if (!_isSupportedGeneratedOutputType(rawType)) {
+    return 'Sonuç oluşturuldu ancak bu görünüm henüz desteklenmiyor.';
+  }
+  final preview = _generatedContentPreview(content);
+  if (itemCount > 0 && preview.isNotEmpty) return '$itemCount öğe • $preview';
+  if (itemCount > 0) return '$itemCount öğe';
+  if (preview.isNotEmpty) return preview;
+  if (normalizedStatus == 'ready' || normalizedStatus == 'completed') {
+    return 'Sonuç oluşturuldu';
+  }
+  return 'Sonuç oluşturuldu ancak bu görünüm henüz desteklenmiyor.';
+}
+
+bool _isSupportedGeneratedOutputType(String rawType) {
+  return switch (rawType.trim()) {
+    'flashcard' ||
+    'flashcards' ||
+    'question' ||
+    'questions' ||
+    'quiz' ||
+    'summary' ||
+    'exam_morning_summary' ||
+    'examMorningSummary' ||
+    'algorithm' ||
+    'comparison' ||
+    'table' ||
+    'podcast' ||
+    'podcast_summary' ||
+    'podcastSummary' ||
+    'infographic' ||
+    'mind_map' ||
+    'mindMap' ||
+    'mindmap' ||
+    'clinical_scenario' ||
+    'clinicalScenario' ||
+    'learning_plan' ||
+    'learningPlan' => true,
+    _ => false,
+  };
+}
+
+String _generatedContentPreview(Object? content) {
+  final text = _firstGeneratedText(content).replaceAll(RegExp(r'\s+'), ' ');
+  if (text.isEmpty) return '';
+  return text.length > 120 ? '${text.substring(0, 120)}...' : text;
+}
+
+String _firstGeneratedText(Object? value) {
+  if (value is String) return value.trim();
+  if (value is List) {
+    for (final item in value) {
+      final text = _firstGeneratedText(item);
+      if (text.isNotEmpty) return text;
+    }
+    return '';
+  }
+  if (value is Map) {
+    for (final key in const [
+      'title',
+      'front',
+      'question',
+      'summary',
+      'fullText',
+      'answer',
+      'description',
+      'body',
+      'text',
+      'prompt',
+    ]) {
+      final text = _firstGeneratedText(value[key]);
+      if (text.isNotEmpty) return text;
+    }
+    for (final key in const [
+      'cards',
+      'flashcards',
+      'questions',
+      'bulletPoints',
+      'must_know',
+      'commonly_confused',
+      'clinical_tus_tips',
+      'self_check',
+      'steps',
+      'rows',
+      'segments',
+      'chapters',
+      'days',
+      'nodes',
+      'branches',
+      'sections',
+    ]) {
+      final text = _firstGeneratedText(value[key]);
+      if (text.isNotEmpty) return text;
+    }
+  }
+  return '';
 }
 
 String _sizeLabel(int bytes) {
@@ -448,14 +595,30 @@ int? _defaultGenerationCount(GeneratedKind kind) {
 int _contentItemCount(Object? content) {
   if (content is List) return content.length;
   if (content is Map) {
-    final bulletPoints = content['bulletPoints'];
-    final steps = content['steps'];
-    final rows = content['rows'];
-    final segments = content['segments'];
-    if (bulletPoints is List) return bulletPoints.length;
-    if (steps is List) return steps.length;
-    if (rows is List) return rows.length;
-    if (segments is List) return segments.length;
+    for (final key in const [
+      'cards',
+      'flashcards',
+      'questions',
+      'bulletPoints',
+      'must_know',
+      'commonly_confused',
+      'clinical_tus_tips',
+      'self_check',
+      'steps',
+      'rows',
+      'segments',
+      'chapters',
+      'days',
+      'nodes',
+      'branches',
+      'sections',
+      'teachingPoints',
+      'objectives',
+      'sessions',
+    ]) {
+      final value = content[key];
+      if (value is List && value.isNotEmpty) return value.length;
+    }
   }
   return 1;
 }

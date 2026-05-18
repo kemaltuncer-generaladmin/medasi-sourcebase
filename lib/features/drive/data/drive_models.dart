@@ -214,12 +214,28 @@ class GeneratedOutput {
     required this.title,
     required this.detail,
     required this.updatedLabel,
+    this.id = '',
+    this.sourceFileId = '',
+    this.rawType = '',
+    this.status = 'ready',
+    this.itemCount = 0,
+    this.content,
+    this.jobId,
   });
 
+  final String id;
+  final String sourceFileId;
   final GeneratedKind kind;
+  final String rawType;
   final String title;
   final String detail;
   final String updatedLabel;
+  final String status;
+  final int itemCount;
+  final Object? content;
+  final String? jobId;
+
+  bool get isReady => status == 'ready' || status == 'completed';
 }
 
 class UploadTask {

@@ -297,7 +297,7 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
           ),
         ),
         SectionTitle(
-          title: 'Üretilenler',
+          title: 'Bu kaynaktan üretilenler',
           actionLabel: hasGenerated ? 'Tümünü Gör' : null,
           onAction: hasGenerated ? widget.onOpenCollections : null,
         ),
