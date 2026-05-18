@@ -21,6 +21,11 @@ import {
 } from "./actions/ai-generation.ts";
 
 type JsonMap = Record<string, unknown>;
+type GcsObjectMetadata = {
+  name: string;
+  contentLength: number;
+  contentType: string;
+};
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 120;
@@ -511,23 +516,13 @@ async function completeUpload(userId: string, payload: JsonMap) {
     objectName,
     serviceAccountJson: gcs.serviceAccountJson,
   });
-  if (objectMetadata.contentLength !== sizeBytes) {
-    throw new SafeError(
-      "UPLOAD_SIZE_MISMATCH",
-      "Yüklenen dosya boyutu doğrulanamadı.",
-      400,
-    );
-  }
-  if (
-    objectMetadata.contentType &&
-    !isAllowedMimeForFileType(fileInfo.fileType, objectMetadata.contentType)
-  ) {
-    throw new SafeError(
-      "UPLOAD_TYPE_MISMATCH",
-      "Yüklenen dosya türü doğrulanamadı.",
-      400,
-    );
-  }
+  assertCompletedUploadMatches({
+    expectedObjectName: objectName,
+    expectedContentType: fileInfo.contentType,
+    expectedFileType: fileInfo.fileType,
+    expectedSizeBytes: sizeBytes,
+    metadata: objectMetadata,
+  });
 
   const [existingRow] = await dbSelect(
     `drive_files?owner_user_id=eq.${userId}&gcs_object_name=eq.${
@@ -1039,7 +1034,7 @@ async function getGcsObjectMetadata(input: {
   bucket: string;
   objectName: string;
   serviceAccountJson: string;
-}) {
+}): Promise<GcsObjectMetadata> {
   const token = await createGoogleAccessToken(
     input.serviceAccountJson,
     "https://www.googleapis.com/auth/devstorage.read_only",
@@ -1078,6 +1073,7 @@ async function getGcsObjectMetadata(input: {
     );
   }
   const metadata = await response.json().catch(() => ({}));
+  const name = metadata?.name?.toString() ?? "";
   const contentLength = Number(metadata?.size ?? 0);
   if (!Number.isFinite(contentLength) || contentLength <= 0) {
     throw new SafeError(
@@ -1087,6 +1083,7 @@ async function getGcsObjectMetadata(input: {
     );
   }
   return {
+    name,
     contentLength,
     contentType: metadata?.contentType?.toString().toLowerCase().trim() ?? "",
   };
@@ -1409,6 +1406,42 @@ function isAllowedMimeForFileType(fileType: string, contentType: string) {
     item.fileType === fileType
   );
   return Boolean(supported?.mimeTypes.includes(normalized));
+}
+
+function assertCompletedUploadMatches(input: {
+  expectedObjectName: string;
+  expectedContentType: string;
+  expectedFileType: string;
+  expectedSizeBytes: number;
+  metadata: GcsObjectMetadata;
+}) {
+  if (input.metadata.name !== input.expectedObjectName) {
+    throw new SafeError(
+      "UPLOAD_INVALID",
+      "Yüklenen dosya doğrulanamadı.",
+      400,
+    );
+  }
+  if (input.metadata.contentLength !== input.expectedSizeBytes) {
+    throw new SafeError(
+      "UPLOAD_INVALID",
+      "Yüklenen dosya doğrulanamadı.",
+      400,
+    );
+  }
+  const uploadedContentType = input.metadata.contentType.toLowerCase().split(
+    ";",
+  )[0].trim();
+  if (
+    uploadedContentType !== input.expectedContentType ||
+    !isAllowedMimeForFileType(input.expectedFileType, uploadedContentType)
+  ) {
+    throw new SafeError(
+      "UPLOAD_INVALID",
+      "Yüklenen dosya doğrulanamadı.",
+      400,
+    );
+  }
 }
 
 function assertUploadObjectName(
