@@ -94,16 +94,20 @@ class DriveTopBar extends StatelessWidget {
     required this.title,
     required this.onSearch,
     this.onBack,
+    this.onMore,
     this.showBrand = true,
     this.showMore = false,
+    this.showSearch = true,
     super.key,
   });
 
   final String title;
   final VoidCallback onSearch;
   final VoidCallback? onBack;
+  final VoidCallback? onMore;
   final bool showBrand;
   final bool showMore;
+  final bool showSearch;
 
   @override
   Widget build(BuildContext context) {
@@ -120,16 +124,7 @@ class DriveTopBar extends StatelessWidget {
 
     final actions = showMore
         ? IconButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context)
-                ..clearSnackBars()
-                ..showSnackBar(
-                  const SnackBar(
-                    content: Text('Diğer işlemler açıldı.'),
-                    duration: Duration(milliseconds: 1000),
-                  ),
-                );
-            },
+            onPressed: onMore,
             tooltip: 'Diğer işlemler',
             icon: const Icon(Icons.more_horiz_rounded, size: 30),
             color: AppColors.navy,
@@ -137,38 +132,21 @@ class DriveTopBar extends StatelessWidget {
         : Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (showSearch)
+                IconButton(
+                  onPressed: onSearch,
+                  tooltip: 'Ara',
+                  icon: const Icon(Icons.search_rounded, size: 34),
+                  color: AppColors.navy,
+                ),
               IconButton(
-                onPressed: onSearch,
-                tooltip: 'Ara',
-                icon: const Icon(Icons.search_rounded, size: 34),
+                onPressed: () => showSourceBaseNotifications(context),
+                tooltip: 'Bildirimler',
+                icon: const Icon(
+                  Icons.notifications_none_rounded,
+                  size: 32,
+                ),
                 color: AppColors.navy,
-              ),
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  IconButton(
-                    onPressed: () => showSourceBaseNotifications(context),
-                    tooltip: 'Bildirimler',
-                    icon: const Icon(
-                      Icons.notifications_none_rounded,
-                      size: 32,
-                    ),
-                    color: AppColors.navy,
-                  ),
-                  Positioned(
-                    top: 9,
-                    right: 10,
-                    child: Container(
-                      width: 11,
-                      height: 11,
-                      decoration: BoxDecoration(
-                        color: AppColors.blue,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.4),
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ],
           );
@@ -259,36 +237,13 @@ class _NotificationPanel extends StatefulWidget {
 
 class _NotificationPanelState extends State<_NotificationPanel> {
   bool _onlyUnread = false;
-  late List<_SourceBaseNotification> _items = _seedNotifications;
+  final List<_SourceBaseNotification> _items =
+      const <_SourceBaseNotification>[];
 
   List<_SourceBaseNotification> get _visibleItems =>
       _onlyUnread ? _items.where((item) => !item.read).toList() : _items;
 
   int get _unreadCount => _items.where((item) => !item.read).length;
-
-  void _markAllRead() {
-    setState(() {
-      _items = [for (final item in _items) item.copyWith(read: true)];
-    });
-  }
-
-  void _toggleRead(_SourceBaseNotification target) {
-    setState(() {
-      _items = [
-        for (final item in _items)
-          item.id == target.id ? item.copyWith(read: !item.read) : item,
-      ];
-    });
-  }
-
-  void _remove(_SourceBaseNotification target) {
-    setState(() {
-      _items = [
-        for (final item in _items)
-          if (item.id != target.id) item,
-      ];
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -342,7 +297,7 @@ class _NotificationPanelState extends State<_NotificationPanel> {
                       ),
                       IconButton(
                         tooltip: 'Tümünü okundu işaretle',
-                        onPressed: _unreadCount == 0 ? null : _markAllRead,
+                        onPressed: null,
                         icon: const Icon(Icons.done_all_rounded),
                       ),
                       IconButton(
@@ -388,14 +343,8 @@ class _NotificationPanelState extends State<_NotificationPanel> {
                           itemCount: _visibleItems.length,
                           separatorBuilder: (_, _) =>
                               const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
-                            final item = _visibleItems[index];
-                            return _NotificationTile(
-                              item: item,
-                              onToggleRead: () => _toggleRead(item),
-                              onRemove: () => _remove(item),
-                            );
-                          },
+                          itemBuilder: (context, index) =>
+                              _NotificationTile(item: _visibleItems[index]),
                         ),
                 ),
               ],
@@ -408,104 +357,84 @@ class _NotificationPanelState extends State<_NotificationPanel> {
 }
 
 class _NotificationTile extends StatelessWidget {
-  const _NotificationTile({
-    required this.item,
-    required this.onToggleRead,
-    required this.onRemove,
-  });
+  const _NotificationTile({required this.item});
 
   final _SourceBaseNotification item;
-  final VoidCallback onToggleRead;
-  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: item.read ? Colors.white : AppColors.selectedBlue,
       borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onToggleRead,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: item.color.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(item.icon, color: item.color),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: item.color.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.navy,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ),
-                        if (!item.read)
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: AppColors.blue,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      item.body,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        height: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 9),
-                    Row(
-                      children: [
-                        Text(
-                          item.timeLabel,
+              child: Icon(item.icon, color: item.color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: AppColors.softText,
-                            fontSize: 12,
+                            color: AppColors.navy,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
                           ),
                         ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: onToggleRead,
-                          child: Text(item.read ? 'Okunmadı yap' : 'Okundu'),
+                      ),
+                      if (!item.read)
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: AppColors.blue,
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                        IconButton(
-                          tooltip: 'Sil',
-                          onPressed: onRemove,
-                          icon: const Icon(Icons.delete_outline_rounded),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    item.body,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      height: 1.3,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 9),
+                  Row(
+                    children: [
+                      Text(
+                        item.timeLabel,
+                        style: const TextStyle(
+                          color: AppColors.softText,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const Spacer(),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -530,52 +459,7 @@ class _SourceBaseNotification {
   final String body;
   final String timeLabel;
   final bool read;
-
-  _SourceBaseNotification copyWith({bool? read}) {
-    return _SourceBaseNotification(
-      id: id,
-      icon: icon,
-      color: color,
-      title: title,
-      body: body,
-      timeLabel: timeLabel,
-      read: read ?? this.read,
-    );
-  }
 }
-
-const _seedNotifications = [
-  _SourceBaseNotification(
-    id: 'upload-complete',
-    icon: Icons.cloud_done_rounded,
-    color: AppColors.green,
-    title: 'Yükleme tamamlandı',
-    body:
-        'Son Drive dosyanız işlenmeye hazır. BaseForce ile içerik üretebilirsiniz.',
-    timeLabel: '2 dk önce',
-    read: false,
-  ),
-  _SourceBaseNotification(
-    id: 'generation-ready',
-    icon: Icons.auto_awesome_rounded,
-    color: AppColors.blue,
-    title: 'Flashcard seti hazır',
-    body:
-        'Aritmiler Final.pdf için oluşturulan kartlar koleksiyonlara eklendi.',
-    timeLabel: '18 dk önce',
-    read: false,
-  ),
-  _SourceBaseNotification(
-    id: 'storage-warning',
-    icon: Icons.folder_copy_outlined,
-    color: AppColors.orange,
-    title: 'Drive düzenleme önerisi',
-    body:
-        'Kardiyoloji klasöründe etiketsiz 3 dosya var. Aramada daha kolay bulmak için bölüm ekleyin.',
-    timeLabel: 'Bugün',
-    read: true,
-  ),
-];
 
 class GlassPanel extends StatelessWidget {
   const GlassPanel({
