@@ -38,17 +38,35 @@ const SUPPORTED_UPLOAD_TYPES: Record<
   string,
   { fileType: string; mimeTypes: string[] }
 > = {
-  pdf: { fileType: "pdf", mimeTypes: ["application/pdf"] },
+  pdf: {
+    fileType: "pdf",
+    mimeTypes: ["application/pdf", "application/octet-stream"],
+  },
   docx: {
     fileType: "docx",
     mimeTypes: [
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/zip",
+      "application/octet-stream",
+    ],
+  },
+  ppt: {
+    fileType: "ppt",
+    mimeTypes: [
+      "application/vnd.ms-powerpoint",
+      "application/mspowerpoint",
+      "application/powerpoint",
+      "application/x-mspowerpoint",
+      "application/octet-stream",
     ],
   },
   pptx: {
     fileType: "pptx",
     mimeTypes: [
       "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "application/vnd.ms-powerpoint",
+      "application/zip",
+      "application/octet-stream",
     ],
   },
 };
@@ -1402,7 +1420,8 @@ function validateUploadFile(
   sizeBytes: number,
 ) {
   const fileName = rawFileName.replace(/\s+/g, " ").trim();
-  const contentType = rawContentType.toLowerCase().split(";")[0].trim();
+  const rawNormalizedContentType = rawContentType.toLowerCase().split(";")[0]
+    .trim();
   if (
     !fileName || fileName.length > 180 || /[\\/]/.test(fileName) ||
     /[\x00-\x1F\x7F]/.test(fileName)
@@ -1428,13 +1447,14 @@ function validateUploadFile(
       400,
     );
   }
-  if (!supported.mimeTypes.includes(contentType)) {
+  if (!supported.mimeTypes.includes(rawNormalizedContentType)) {
     throw new SafeError(
       "UNSUPPORTED_MIME_TYPE",
       "Dosya MIME tipi desteklenmiyor.",
       400,
     );
   }
+  const contentType = supported.mimeTypes[0];
   return { fileName, contentType, fileType: supported.fileType };
 }
 

@@ -9,6 +9,7 @@ import { SafeError } from "../types.ts";
 
 const MAX_EXTRACTION_BYTES = 100 * 1024 * 1024;
 const MIN_EXTRACTED_TEXT_CHARS = 10;
+const ZIP_LOCAL_FILE_HEADER = 0x04034b50;
 
 export interface ExtractionResult {
   text: string;
@@ -70,6 +71,13 @@ function extractionResult(
 ): ExtractionResult & { chunks: string[] } {
   const text = sanitizeSourceText(rawText);
   if (text.length < MIN_EXTRACTED_TEXT_CHARS) {
+    if (fileType === "pdf") {
+      throw new SafeError(
+        "PDF_OCR_REQUIRED",
+        "Bu PDF tarama/görsel tabanlı görünüyor; okunabilir metin için OCR gerekiyor.",
+        400,
+      );
+    }
     throw new SafeError(
       "EXTRACTION_EMPTY",
       "Dosyadan okunabilir metin çıkarılamadı.",
@@ -177,61 +185,284 @@ async function downloadFile(url: string): Promise<ArrayBuffer> {
   }
 }
 
-/**
- * PDF'den metin çıkar (basit implementasyon)
- */
 async function extractFromPDF(
   content: ArrayBuffer,
 ): Promise<{ text: string; pageCount: number }> {
-  // Bu basit bir implementasyon - production'da pdf-parse veya benzeri kullanılmalı
-  const text = new TextDecoder().decode(content);
+  const bytes = new Uint8Array(content);
+  const raw = latin1Decode(bytes);
+  const parts = [extractPdfTextOperators(raw)];
 
-  // PDF'den basit metin çıkarımı
-  const matches = text.match(/\/Contents\s*\(([^)]+)\)/g) || [];
-  const extractedText = matches
-    .map((m) => m.replace(/\/Contents\s*\(([^)]+)\)/, "$1"))
-    .join("\n");
+  for (const stream of await extractPdfStreams(raw)) {
+    parts.push(extractPdfTextOperators(stream));
+  }
 
-  // Sayfa sayısını tahmin et
-  const pageMatches = text.match(/\/Type\s*\/Page[^s]/g) || [];
+  const pageMatches = raw.match(/\/Type\s*\/Page\b/g) || [];
   const pageCount = pageMatches.length || 1;
-
   return {
-    text: extractedText,
+    text: parts.filter(Boolean).join("\n"),
     pageCount,
   };
 }
 
-/**
- * DOCX'den metin çıkar (basit implementasyon)
- */
 async function extractFromDOCX(content: ArrayBuffer): Promise<string> {
-  // Bu basit bir implementasyon - production'da mammoth veya benzeri kullanılmalı
-  const text = new TextDecoder().decode(content);
-
-  // XML içeriğinden metin çıkar
-  const matches = text.match(/<w:t[^>]*>([^<]+)<\/w:t>/g) || [];
-  const extractedText = matches
-    .map((m) => m.replace(/<w:t[^>]*>([^<]+)<\/w:t>/, "$1"))
-    .join(" ");
-
-  return extractedText;
+  const entries = await unzipTextEntries(
+    content,
+    (name) =>
+      name === "word/document.xml" ||
+      name.startsWith("word/header") ||
+      name.startsWith("word/footer"),
+  );
+  return entries.map(extractOfficeXmlText).join("\n");
 }
 
-/**
- * PPTX'den metin çıkar (basit implementasyon)
- */
 async function extractFromPPTX(content: ArrayBuffer): Promise<string> {
-  // Bu basit bir implementasyon - production'da pptx-parser veya benzeri kullanılmalı
-  const text = new TextDecoder().decode(content);
+  const entries = await unzipTextEntries(
+    content,
+    (name) =>
+      name.startsWith("ppt/slides/slide") ||
+      name.startsWith("ppt/notesSlides/notesSlide") ||
+      name.startsWith("ppt/slideMasters/slideMaster"),
+  );
+  return entries.map(extractOfficeXmlText).join("\n\n");
+}
 
-  // XML içeriğinden metin çıkar
-  const matches = text.match(/<a:t[^>]*>([^<]+)<\/a:t>/g) || [];
-  const extractedText = matches
-    .map((m) => m.replace(/<a:t[^>]*>([^<]+)<\/a:t>/, "$1"))
-    .join("\n");
+function latin1Decode(bytes: Uint8Array) {
+  return new TextDecoder("latin1").decode(bytes);
+}
 
-  return extractedText;
+function latin1Encode(text: string) {
+  const bytes = new Uint8Array(text.length);
+  for (let i = 0; i < text.length; i++) {
+    bytes[i] = text.charCodeAt(i) & 0xff;
+  }
+  return bytes;
+}
+
+async function extractPdfStreams(raw: string): Promise<string[]> {
+  const streams: string[] = [];
+  const pattern = /(<<[\s\S]*?>>)\s*stream\r?\n?([\s\S]*?)\r?\n?endstream/g;
+  for (const match of raw.matchAll(pattern)) {
+    const dictionary = match[1] ?? "";
+    const body = stripPdfStreamBoundaries(match[2] ?? "");
+    if (dictionary.includes("/FlateDecode")) {
+      const inflated = await inflateBytes(latin1Encode(body));
+      if (inflated) streams.push(new TextDecoder().decode(inflated));
+    } else {
+      streams.push(body);
+    }
+  }
+  return streams;
+}
+
+function stripPdfStreamBoundaries(value: string) {
+  return value.replace(/^\r?\n/, "").replace(/\r?\n$/, "");
+}
+
+function extractPdfTextOperators(value: string) {
+  const textParts: string[] = [];
+
+  for (const match of value.matchAll(/(\((?:\\.|[^\\()])*\))\s*(?:Tj|'|")/g)) {
+    textParts.push(decodePdfLiteral(match[1]));
+  }
+  for (const match of value.matchAll(/<([0-9a-fA-F\s]+)>\s*Tj/g)) {
+    textParts.push(decodePdfHex(match[1]));
+  }
+  for (const match of value.matchAll(/\[([\s\S]*?)\]\s*TJ/g)) {
+    const arrayBody = match[1] ?? "";
+    for (
+      const item of arrayBody.matchAll(
+        /\((?:\\.|[^\\()])*\)|<([0-9a-fA-F\s]+)>/g,
+      )
+    ) {
+      const token = item[0];
+      textParts.push(
+        token.startsWith("(")
+          ? decodePdfLiteral(token)
+          : decodePdfHex(token.slice(1, -1)),
+      );
+    }
+    textParts.push("\n");
+  }
+
+  return textParts
+    .join(" ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function decodePdfLiteral(token: string) {
+  const body = token.startsWith("(") && token.endsWith(")")
+    ? token.slice(1, -1)
+    : token;
+  let output = "";
+  for (let i = 0; i < body.length; i++) {
+    const char = body[i];
+    if (char !== "\\") {
+      output += char;
+      continue;
+    }
+    const next = body[++i] ?? "";
+    if (next === "n") output += "\n";
+    else if (next === "r") output += "\n";
+    else if (next === "t") output += "\t";
+    else if (next === "b" || next === "f") output += " ";
+    else if (next === "\n" || next === "\r") {
+      if (next === "\r" && body[i + 1] === "\n") i++;
+    } else if (/[0-7]/.test(next)) {
+      let octal = next;
+      for (let j = 0; j < 2 && /[0-7]/.test(body[i + 1] ?? ""); j++) {
+        octal += body[++i];
+      }
+      output += String.fromCharCode(parseInt(octal, 8));
+    } else {
+      output += next;
+    }
+  }
+  return output;
+}
+
+function decodePdfHex(hex: string) {
+  const clean = hex.replace(/\s+/g, "");
+  if (!clean) return "";
+  const bytes = new Uint8Array(Math.ceil(clean.length / 2));
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2).padEnd(2, "0"), 16);
+  }
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+    let output = "";
+    for (let i = 2; i + 1 < bytes.length; i += 2) {
+      output += String.fromCharCode((bytes[i] << 8) | bytes[i + 1]);
+    }
+    return output;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+async function unzipTextEntries(
+  content: ArrayBuffer,
+  shouldRead: (name: string) => boolean,
+) {
+  const bytes = new Uint8Array(content);
+  const view = new DataView(content);
+  const entries: string[] = [];
+
+  for (const entry of zipCentralDirectoryEntries(bytes, view)) {
+    if (!shouldRead(entry.name) || !entry.name.endsWith(".xml")) continue;
+    const data = await readZipEntry(bytes, view, entry);
+    if (data) entries.push(new TextDecoder().decode(data));
+  }
+
+  return entries;
+}
+
+type ZipEntry = {
+  name: string;
+  method: number;
+  compressedSize: number;
+  localHeaderOffset: number;
+};
+
+function zipCentralDirectoryEntries(
+  bytes: Uint8Array,
+  view: DataView,
+): ZipEntry[] {
+  const eocdOffset = findEndOfCentralDirectory(view);
+  if (eocdOffset < 0) return [];
+  const entryCount = view.getUint16(eocdOffset + 10, true);
+  let offset = view.getUint32(eocdOffset + 16, true);
+  const entries: ZipEntry[] = [];
+
+  for (let i = 0; i < entryCount && offset + 46 <= bytes.length; i++) {
+    if (view.getUint32(offset, true) !== 0x02014b50) break;
+    const method = view.getUint16(offset + 10, true);
+    const compressedSize = view.getUint32(offset + 20, true);
+    const nameLength = view.getUint16(offset + 28, true);
+    const extraLength = view.getUint16(offset + 30, true);
+    const commentLength = view.getUint16(offset + 32, true);
+    const localHeaderOffset = view.getUint32(offset + 42, true);
+    const name = new TextDecoder().decode(
+      bytes.slice(offset + 46, offset + 46 + nameLength),
+    );
+    entries.push({ name, method, compressedSize, localHeaderOffset });
+    offset += 46 + nameLength + extraLength + commentLength;
+  }
+
+  return entries;
+}
+
+function findEndOfCentralDirectory(view: DataView) {
+  for (let offset = view.byteLength - 22; offset >= 0; offset--) {
+    if (view.getUint32(offset, true) === 0x06054b50) return offset;
+  }
+  return -1;
+}
+
+async function readZipEntry(
+  bytes: Uint8Array,
+  view: DataView,
+  entry: ZipEntry,
+) {
+  const offset = entry.localHeaderOffset;
+  if (
+    offset < 0 || offset + 30 > bytes.length ||
+    view.getUint32(offset, true) !== ZIP_LOCAL_FILE_HEADER
+  ) {
+    return null;
+  }
+  const localNameLength = view.getUint16(offset + 26, true);
+  const localExtraLength = view.getUint16(offset + 28, true);
+  const dataStart = offset + 30 + localNameLength + localExtraLength;
+  const dataEnd = dataStart + entry.compressedSize;
+  if (dataStart < 0 || dataEnd > bytes.length) return null;
+  const compressed = bytes.slice(dataStart, dataEnd);
+  if (entry.method === 0) return compressed;
+  if (entry.method === 8) return await inflateBytes(compressed, true);
+  return null;
+}
+
+async function inflateBytes(bytes: Uint8Array, raw = false) {
+  const formats = raw ? ["deflate-raw", "deflate"] : ["deflate", "deflate-raw"];
+  const blobPart = bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
+  for (const format of formats) {
+    try {
+      const stream = new Blob([blobPart]).stream().pipeThrough(
+        new DecompressionStream(format as CompressionFormat),
+      );
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    } catch (_error) {
+      // Try the next deflate container flavor.
+    }
+  }
+  return null;
+}
+
+function extractOfficeXmlText(xml: string) {
+  const parts: string[] = [];
+  for (
+    const match of xml.matchAll(
+      /<(?:\w+:)?t\b[^>]*>([\s\S]*?)<\/(?:\w+:)?t>/g,
+    )
+  ) {
+    parts.push(decodeXmlEntities(match[1] ?? ""));
+  }
+  if (parts.length === 0) {
+    parts.push(decodeXmlEntities(xml.replace(/<[^>]+>/g, " ")));
+  }
+  return parts.join(" ").replace(/\s{2,}/g, " ").trim();
+}
+
+function decodeXmlEntities(value: string) {
+  return value
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
 }
 
 /**

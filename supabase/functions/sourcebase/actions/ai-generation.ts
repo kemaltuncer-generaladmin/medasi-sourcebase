@@ -164,6 +164,12 @@ async function extractTextFromDriveFile(userId: string, fileId: string) {
     case "pptx":
       extractionResult = await extractPptx(fileBuffer);
       break;
+    case "ppt":
+      throw new SafeError(
+        "LEGACY_PPT_UNSUPPORTED",
+        "PPTX desteklenir; eski PPT dosyaları için lütfen dosyayı PPTX olarak kaydedip tekrar yükleyin.",
+        400,
+      );
     default:
       throw new SafeError(
         "UNSUPPORTED_FILE_TYPE",
