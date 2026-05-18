@@ -1,69 +1,66 @@
-# TUR 3 CANLI UX RAPORU - DESIGN RESPONSIVE UX
+# TUR 3 CANLI UX RAPORU - BACKEND + AI + SECURITY
 
 ## 1. Test ortamı
 - URL: https://sourcebase.medasi.com.tr
 - Test hesabı: kemal.tuncer@medasi.com.tr
-- Cihaz/viewport: iPhone 14 390x844, tablet 768x1024, desktop 1440x900
-- Tarayıcı: Google Chrome headless/CDP
-- Tarih/saat: 2026-05-18 05:04:44 +03
+- Cihaz/viewport: Desktop 1440x900, Tablet 1024x1366, iPhone 14 390x844; API testleri canlı HTTP/curl ile
+- Tarayıcı: Google Chrome headless/Playwright ile login ekranına kadar; canlı API için curl
+- Tarih/saat: 2026-05-18 05:07 +03
 
 ## 2. Gerçekten denenen akışlar
-- Canlı app shell açıldı; HTTP 200 alındı ve Flutter app boot etti.
-- iPhone 14 viewportta login ekranı açıldı.
-- Boş login denendi; kullanıcıya “E-posta adresini girmelisin.” validasyonu gösterildi.
-- Verilen test hesabı ile giriş yapıldı; canlı uygulama `#/home` Drive ana sayfasına geçti.
-- Drive ana sayfa, arama ekranı, Merkezi AI, BaseForce, SourceLab ve Profile ekranları bottom nav üzerinden açıldı.
-- Tablet ve desktop viewportta oturum açık durumdaki layout kontrol edildi.
-- Console/CDP olayları ve network failure kayıtları kontrol edildi.
+- Canlı app shell açıldı: `https://sourcebase.medasi.com.tr` HTTP 200.
+- Desktop/tablet/iPhone 14 viewportlarında login ekranı açıldı.
+- Console/pageerror/network gözlemi login ekranına kadar alındı.
+- Gerçek test hesabıyla Supabase Auth endpointine canlı login denendi: HTTP 200, access token üretildi.
+- Auth olmadan `drive_bootstrap` canlı Edge Function çağrısı denendi.
+- Auth ile `drive_bootstrap` canlı Edge Function çağrısı denendi.
+- Auth ile `create_course`, `create_section`, `create_upload_session` denendi.
+- Signed URL ile gerçek dosya PUT yapılmadan `complete_upload` denendi.
+- Auth ile `create_generation_job` denendi.
+- Auth ile `central_ai_chat` denendi.
+- QA sırasında açılan test course temizlenmeye çalışıldı.
 
 ## 3. Çalışanlar
-- Login canlı hesapla çalışıyor ve kullanıcı Drive ana sayfaya düşüyor.
-- Drive ana sayfa açılıyor; ders listesi, ana CTA’lar, empty dosya/koleksiyon mesajları görünüyor.
-- Arama ekranı açılıyor; boş sonuç state’i ve filtreler görünüyor.
-- Merkezi AI açılıyor; Drive bağlamı boşken kullanıcıya kaynak olmadığı açıklanıyor, chat input görünüyor.
-- BaseForce açılıyor; Drive’dan seç / yeni dosya yükle / üretim merkezleri görünür.
-- SourceLab açılıyor; kaynak seçimi ve hızlı başlat alanları görünür.
-- Profile açılıyor; kullanıcı bilgisi, cüzdan, istatistik ve bağlı-değil ayar state’leri görünüyor.
-- Tablet/desktopta nav rail görünüyor; içerik max-width ile kontrol altında kalıyor.
+- Login ekranı web/tablet/iPhone 14 viewportlarında açılıyor.
+- Login ekranında kırmızı runtime `pageerror` gözlenmedi.
+- Auth endpoint gerçek test hesabıyla HTTP 200 döndü.
+- Auth olmadan `drive_bootstrap` doğru şekilde HTTP 401 ve sade JSON hata döndü: `UNAUTHORIZED / Oturum gerekli.`
+- Auth ile `drive_bootstrap` HTTP 200 döndü; response anahtarları: `storage`, `ai`, `courses`, `sections`, `files`, `generatedOutputs`.
+- `create_course` HTTP 200 döndü ve test course kaydı oluşturdu.
+- `create_section` HTTP 200 döndü ve course altında section oluşturdu.
+- `create_upload_session` HTTP 200 döndü; `uploadUrl`, `objectName`, `bucket`, `expiresAt`, `headers`, `metadata` mevcut.
+- Response içinde service role, private key, access token, refresh token veya stack trace kelimeleri görülmedi.
 
 ## 4. Kırılanlar
-- iPhone 14 Drive ana sayfada ilk ekran içinde “Derslerim” ve altındaki bazı aksiyonlar bottom nav bölgesine çok yakın/arkasında kalıyor; “Tümünü Gör” semantics yüksekliği 5px olarak raporlandı.
-- iPhone 14 BaseForce’ta üretim merkezi kartlarının “Aç” butonları ilk viewportta bottom nav altında kalıyor; scroll ile erişilebilir olması muhtemel ama canlı headless testte görünür ilk aksiyon alanı güvenli değil.
-- iPhone 14 SourceLab’ta hızlı başlat kartları ve “Başlat” butonları ilk viewport dışında/bottom nav altında kalıyor; kullanıcı ilk ekranda araç başlatma aksiyonunu net göremiyor.
-- Kayıt ekranına geçiş headless tıklamada doğrulanamadı; login ekranı görünmeye devam etti. Manuel GUI ile tekrar kontrol gerekir.
-- Upload/native file picker canlı headless ortamda doğrulanamadı.
+- Release blocker: `complete_upload`, signed URL ile gerçek upload yapılmadan HTTP 200 döndü ve `drive_files` kaydı oluşturdu. Response `status: processing_failed`, `ai_status: failed`, `metadata.extractionError: Dosya indirilemedi.` içeriyor. Bu, sahte/bozuk upload'ın tamamlanmış dosya gibi DB'ye yazılabildiğini gösteriyor.
+- Release blocker: `create_generation_job` canlı ortamda HTTP 500 döndü: `VERTEX_AUTH_FAILED / Vertex AI kimlik doğrulama başarısız.`
+- Release blocker: `central_ai_chat` canlı ortamda HTTP 500 döndü: `VERTEX_AUTH_FAILED / Vertex AI kimlik doğrulama başarısız.`
+- Major issue: Canlı app shell domaininde `https://sourcebase.medasi.com.tr/functions/v1/sourcebase` HTTP 405 döndü; gerçek fonksiyon endpointi canlı bundle configinden `https://medasi.com.tr/functions/v1/sourcebase` olarak çalıştı. Bu routing/konfigürasyon ayrımı frontend/network debug için riskli.
+- Major issue: `OPTIONS https://sourcebase.medasi.com.tr/functions/v1/sourcebase` HTTP 405 döndü; `https://medasi.com.tr/functions/v1/sourcebase` response headerında `access-control-allow-origin: *` görüldü. Production CORS beklenen sıkılıkta değil.
+- Major issue: QA cleanup için `delete_course` çağrısı HTTP 500 döndü: `GCS_DELETE_FAILED / Dosya depolama alanından silinemedi.` Test course/file canlı test hesabında kalmış olabilir.
 
 ## 5. Release blocker
 - Var
-- Detay: Mobil iPhone 14’te Drive/BaseForce/SourceLab ana akışlarında kritik alt içerik ve CTA’lar bottom nav güvenli alanına çok yakın veya altında kalıyor. Bu, “mobilde ana akış kullanılamıyorsa tasarım hazır değildir” kriterine göre release blocker riskidir. Login ve Drive’a geçiş çalışıyor.
+- Detay: Upload tamamlanmadan `complete_upload` dosya kaydı açabiliyor. AI üretim ve Central AI canlı Vertex auth hatasıyla 500 dönüyor. Bu iki alan SourceBase'in ana ürün vaadi olan kaynak yükleme ve kaynaklardan AI çıktı üretme akışını canlıda bloke ediyor.
 
 ## 6. Major issue
-- Bottom nav içerik ile yarışıyor; bazı scroll içerikleri için alt güvenli padding yetersiz görünüyor.
-- Auth butonlarının semantics metni iki kez okunuyor: “Giriş Yap Giriş Yap”, “Hesap Oluştur Hesap Oluştur”.
-- SourceLab/BaseForce ilk ekran hiyerarşisi mobilde CTA’ları aşağı itiyor; kullanıcı “başlat” aksiyonunu aramak zorunda kalıyor.
-- Store/Mağaza akışı Profile içinde “Mağazaya git” semantics olarak göründü, fakat mağaza ekranı ayrıca doğrulanmadı.
+- CORS canlı fonksiyon endpointinde `*` dönüyor; production security hedefiyle uyumsuz.
+- App domainindeki `/functions/v1/sourcebase` 405 döndüğü için canlı URL altında beklenen proxy/routing net değil.
+- `delete_course` GCS delete hatası nedeniyle QA datası temizlenemedi; kullanıcı açısından dosya/course silme akışı da riskli.
 
 ## 7. Polish issue
-- Console’da kritik runtime exception görülmedi; Chrome headless kaynaklı CPU rendering warning ve GCM/deprecated endpoint gürültüsü var.
-- Password input için Chrome “Password field is not contained in a form” önerisi var; Flutter web semantics kaynaklı, kritik değil.
-- Search input’a yazma headless semantics ile net doğrulanamadı; ekran ve empty state açılıyor.
-- Login/register formunun gerçek mobil klavye davranışı headless ortamda doğrulanamadı.
+- Login ekranındaki erişilebilirlik/DOM uyarısı: `Password field is not contained in a form`. Kritik runtime hata değil.
+- Login ekranında bazı button metinleri erişilebilir isimde iki kez görünüyor: `Giriş Yap Giriş Yap`, `Hesap Oluştur Hesap Oluştur`.
 
 ## 8. Kullanıcı deneyimi kararı
-- Kısmen: Kullanıcı login olup Drive, AI, BaseForce, SourceLab ve Profile alanlarını açabiliyor. Ancak iPhone 14’te bottom nav/scroll güvenliği ve kritik CTA görünürlüğü release öncesi düzeltilmeli.
+- Evet/Hayır/Kısmen: Hayır. Kullanıcı canlıda login ekranına ulaşabiliyor ve Drive bootstrap/course/section/upload session API'leri cevap veriyor; ancak dosya upload tamamlanma güvenliği ve AI üretim/Central AI canlıda release blocker seviyesinde kırık.
 
 ## 9. Patch gerekiyor mu?
 - Evet
-- Gereken dosyalar:
-  - `lib/features/drive/presentation/widgets/drive_ui.dart`: Workspace scroll bottom padding/safe area standardı.
-  - `lib/features/drive/presentation/widgets/sourcebase_bottom_nav.dart`: bottom nav yüksekliği/safe area ve içerik çakışması kontrolü.
-  - `lib/features/drive/presentation/screens/drive_home_screen.dart`: mobil ilk viewport hiyerarşisi ve CTA görünürlüğü.
-  - `lib/features/baseforce/presentation/screens/baseforce_screen.dart`: mobil üretim merkezi kartlarının alt güvenli alanı.
-  - `lib/features/sourcelab/presentation/screens/source_lab_screen.dart`: hızlı başlat kartları ve CTA’lar için mobil scroll/safe padding.
-  - `lib/features/auth/presentation/widgets/auth_widgets.dart`: duplicate button semantics polish.
+- Gereken dosyalar: Backend/Edge Function canlı deploy içeriği ve ortam değişkenleri. Özellikle `complete_upload` canlı doğrulaması, Vertex AI credential/env, CORS/origin config ve GCS delete davranışı düzeltilmeli. Kod dosyası olarak mevcut branch'teki `supabase/functions/sourcebase/index.ts`, `supabase/functions/sourcebase/actions/ai-generation.ts`, `supabase/functions/sourcebase/services/vertex-ai.ts` ve deploy/Coolify env incelenmeli.
 
 ## 10. Kanıt / not
-- Console hatası: Kritik app runtime exception gözlenmedi. Kayıtlar: Flutter bootstrap debug, `WARNING: Falling back to CPU-only rendering. Reason: webGLVersion is -1`, Chrome password field recommendation.
-- Network hatası: Bir adet `net::ERR_ABORTED`; app boot/login akışını bozmadı.
-- Ekran gözlemi: Login başarılı; `/home` Drive açıldı. Bottom nav iPhone 14’te 767-825 bandında; Drive/BaseForce/SourceLab içerikleri bu banda ve altına taşıyor.
-- Manuel test yapılamadıysa nedeni: Test Chrome headless/CDP ile yapıldı; gerçek GUI/ekran görüntüsü, mobil sanal klavye ve native file picker/upload manuel doğrulaması yapılamadı.
+- Console hatası: Login ekranına kadar kırmızı `pageerror` yok. Console sadece Flutter boot debug ve Chrome DOM uyarısı verdi.
+- Network hatası: Login ekranına kadar failed request yok. API testlerinde `sourcebase.medasi.com.tr/functions/v1/sourcebase` 405; `create_generation_job` ve `central_ai_chat` 500; `delete_course` 500.
+- Ekran gözlemi: Desktop/tablet/iPhone 14 login ekranı açıldı; metinler ve inputlar görünür. Gerçek hesapla post-login browser UX bu makinede tamamlanamadı.
+- Manuel test yapılamadıysa nedeni: Makinede `/System/Volumes/Data` tamamen dolu, Playwright Chromium kurulumu `ENOSPC` ile başarısız oldu. Kurulu Chrome ile login sonrası otomasyon da Crashpad/ProcessSingleton yazımı sırasında `ENOSPC` nedeniyle durdu. Bu nedenle post-login browser Network testi yerine canlı Auth ve Edge Function API testleri curl ile yapıldı.

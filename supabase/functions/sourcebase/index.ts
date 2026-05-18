@@ -449,6 +449,10 @@ async function createUploadSession(userId: string, payload: JsonMap) {
 
   await ensureStorageRoots(userId);
   const gcs = getGcsConfig();
+  await assertGcsBucketPermissions({
+    bucket: gcs.bucket,
+    serviceAccountJson: gcs.serviceAccountJson,
+  });
 
   const safeName = sanitizeFileName(fileInfo.fileName);
   const sourceId = crypto.randomUUID();
@@ -457,7 +461,6 @@ async function createUploadSession(userId: string, payload: JsonMap) {
   const uploadUrl = await createGcsV4SignedPutUrl({
     bucket: gcs.bucket,
     objectName,
-    contentType: fileInfo.contentType,
     serviceAccountJson: gcs.serviceAccountJson,
     expiresInSeconds: 900,
   });
@@ -949,7 +952,7 @@ async function supabaseRest(path: string, init: RequestInit) {
 async function createGcsV4SignedPutUrl(input: {
   bucket: string;
   objectName: string;
-  contentType: string;
+  contentType?: string;
   serviceAccountJson: string;
   expiresInSeconds: number;
 }) {
@@ -971,17 +974,16 @@ async function createGcsV4SignedPutUrl(input: {
     "X-Goog-Credential": credential,
     "X-Goog-Date": timestamp,
     "X-Goog-Expires": String(input.expiresInSeconds),
-    "X-Goog-SignedHeaders": "content-type;host",
+    "X-Goog-SignedHeaders": "host",
   };
   const canonicalQuery = canonicalQueryString(query);
-  const canonicalHeaders =
-    `content-type:${input.contentType.toLowerCase()}\nhost:storage.googleapis.com\n`;
+  const canonicalHeaders = "host:storage.googleapis.com\n";
   const canonicalRequest = [
     "PUT",
     canonicalUri,
     canonicalQuery,
     canonicalHeaders,
-    "content-type;host",
+    "host",
     "UNSIGNED-PAYLOAD",
   ].join("\n");
   const stringToSign = [
@@ -1081,6 +1083,71 @@ async function getGcsObjectMetadata(input: {
     contentLength,
     contentType: metadata?.contentType?.toString().toLowerCase().trim() ?? "",
   };
+}
+
+async function assertGcsBucketPermissions(input: {
+  bucket: string;
+  serviceAccountJson: string;
+}) {
+  const token = await createGoogleAccessToken(
+    input.serviceAccountJson,
+    "https://www.googleapis.com/auth/devstorage.read_write",
+    "GCS_SERVICE_ACCOUNT_INVALID",
+    "GCS_AUTH_FAILED",
+  );
+  const requiredPermissions = [
+    "storage.objects.create",
+    "storage.objects.get",
+  ];
+  const query = requiredPermissions
+    .map((permission) => `permissions=${rfc3986Encode(permission)}`)
+    .join("&");
+  const response = await fetch(
+    `https://storage.googleapis.com/storage/v1/b/${
+      rfc3986Encode(input.bucket)
+    }/iam/testPermissions?${query}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+  if (response.status === 404) {
+    throw new SafeError(
+      "GCS_BUCKET_NOT_FOUND",
+      "Dosya depolama alanı bulunamadı.",
+      500,
+    );
+  }
+  if (response.status === 401 || response.status === 403) {
+    console.warn("GCS bucket access denied:", response.status);
+    throw new SafeError(
+      "GCS_PERMISSION_DENIED",
+      "Dosya yükleme yetkisi doğrulanamadı.",
+      500,
+    );
+  }
+  if (!response.ok) {
+    console.warn("GCS permission check failed:", response.status);
+    throw new SafeError(
+      "GCS_UPSTREAM_ERROR",
+      "Dosya depolama servisine ulaşılamadı.",
+      502,
+    );
+  }
+  const body = await response.json().catch(() => ({}));
+  const granted = Array.isArray(body?.permissions)
+    ? body.permissions.map((item: unknown) => item?.toString() ?? "")
+    : [];
+  const missing = requiredPermissions.filter((permission) =>
+    !granted.includes(permission)
+  );
+  if (missing.length > 0) {
+    console.warn("GCS permission missing:", missing.join(","));
+    throw new SafeError(
+      "GCS_PERMISSION_DENIED",
+      "Dosya yükleme yetkisi doğrulanamadı.",
+      500,
+    );
+  }
 }
 
 async function createGcsV4SignedHeadUrl(input: {
