@@ -64,6 +64,16 @@ export class VertexAIClient {
 
     try {
       const serviceAccount = JSON.parse(this.config.serviceAccountJson);
+      if (
+        !serviceAccount?.client_email || !serviceAccount?.private_key ||
+        !this.config.projectId || !this.config.location || !this.config.model
+      ) {
+        throw new SafeError(
+          "VERTEX_CONFIG_INVALID",
+          "Vertex AI yapılandırması geçersiz.",
+          500,
+        );
+      }
       const now = Math.floor(Date.now() / 1000);
       const expiry = now + 3600;
 
@@ -102,19 +112,47 @@ export class VertexAIClient {
         }),
       });
 
+      if (response.status === 400 || response.status === 401) {
+        throw new SafeError(
+          "VERTEX_AUTH_FAILED",
+          "Vertex AI kimlik doğrulama başarısız.",
+          500,
+        );
+      }
+      if (response.status === 403) {
+        throw new SafeError(
+          "VERTEX_AUTH_FORBIDDEN",
+          "Vertex AI erişim yetkisi reddedildi.",
+          500,
+        );
+      }
       if (!response.ok) {
-        throw new Error(`Token exchange failed: ${response.status}`);
+        throw new SafeError(
+          "VERTEX_UPSTREAM_ERROR",
+          "Vertex AI kimlik servisine ulaşılamadı.",
+          502,
+        );
       }
 
       const data = await response.json();
-      this.accessToken = data.access_token;
+      this.accessToken = data.access_token?.toString();
+      if (!this.accessToken) {
+        throw new SafeError(
+          "VERTEX_AUTH_FAILED",
+          "Vertex AI kimlik doğrulama başarısız.",
+          500,
+        );
+      }
       this.tokenExpiry = Date.now() + (data.expires_in * 1000) - 60000; // 1 dakika buffer
 
-      return this.accessToken!;
+      return this.accessToken;
     } catch (error) {
+      if (error instanceof SafeError) {
+        throw error;
+      }
       throw new SafeError(
-        "VERTEX_AUTH_FAILED",
-        "Vertex AI kimlik doğrulama başarısız.",
+        "VERTEX_CONFIG_INVALID",
+        "Vertex AI yapılandırması geçersiz.",
         500,
       );
     }
@@ -194,12 +232,20 @@ export class VertexAIClient {
       body: JSON.stringify(requestBody),
     });
 
-    if (!response.ok) {
-      console.error("Vertex AI error status:", response.status);
+    if (response.status === 401 || response.status === 403) {
+      console.error("Vertex AI request rejected:", response.status);
       throw new SafeError(
-        "VERTEX_API_ERROR",
-        "AI içerik üretimi başarısız.",
+        "VERTEX_AUTH_FAILED",
+        "Vertex AI kimlik doğrulama başarısız.",
         500,
+      );
+    }
+    if (!response.ok) {
+      console.error("Vertex AI upstream error:", response.status);
+      throw new SafeError(
+        "VERTEX_UPSTREAM_ERROR",
+        "AI servisine ulaşılamadı.",
+        502,
       );
     }
 
@@ -712,12 +758,20 @@ Cevabı kısa paragraflar ve gerektiğinde maddelerle ver.`;
       body: JSON.stringify(requestBody),
     });
 
-    if (!response.ok) {
-      console.error("Vertex AI Embedding error status:", response.status);
+    if (response.status === 401 || response.status === 403) {
+      console.error("Vertex AI embedding request rejected:", response.status);
       throw new SafeError(
-        "VERTEX_EMBEDDING_ERROR",
-        "Embedding üretimi başarısız.",
+        "VERTEX_AUTH_FAILED",
+        "Vertex AI kimlik doğrulama başarısız.",
         500,
+      );
+    }
+    if (!response.ok) {
+      console.error("Vertex AI embedding upstream error:", response.status);
+      throw new SafeError(
+        "VERTEX_UPSTREAM_ERROR",
+        "Embedding servisine ulaşılamadı.",
+        502,
       );
     }
 

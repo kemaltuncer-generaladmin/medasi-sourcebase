@@ -56,9 +56,10 @@ const GENERATED_OUTPUT_TYPES = new Set([
   "table",
 ]);
 
+const DEFAULT_ALLOWED_ORIGIN = "https://sourcebase.medasi.com.tr";
+
 const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("SOURCEBASE_ALLOWED_ORIGIN") ??
-    "https://sourcebase.medasi.com.tr",
+  "Access-Control-Allow-Origin": allowedCorsOrigin(),
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -495,22 +496,6 @@ async function completeUpload(userId: string, payload: JsonMap) {
   await assertSectionInCourse(userId, sectionId, courseId);
   const gcs = getGcsConfig();
 
-  const [existingRow] = await dbSelect(
-    `drive_files?owner_user_id=eq.${userId}&gcs_object_name=eq.${
-      encodeRestValue(objectName)
-    }&select=*&limit=1`,
-  );
-  if (existingRow) {
-    return {
-      row: existingRow,
-      objectName,
-      status: String(existingRow.ai_status ?? existingRow.status ?? "uploaded"),
-      nextAction: existingRow.ai_status === "ready"
-        ? "generate"
-        : "retry_file_processing",
-    };
-  }
-
   const objectMetadata = await getGcsObjectMetadata({
     bucket: gcs.bucket,
     objectName,
@@ -532,6 +517,22 @@ async function completeUpload(userId: string, payload: JsonMap) {
       "Yüklenen dosya türü doğrulanamadı.",
       400,
     );
+  }
+
+  const [existingRow] = await dbSelect(
+    `drive_files?owner_user_id=eq.${userId}&gcs_object_name=eq.${
+      encodeRestValue(objectName)
+    }&select=*&limit=1`,
+  );
+  if (existingRow) {
+    return {
+      row: existingRow,
+      objectName,
+      status: String(existingRow.ai_status ?? existingRow.status ?? "uploaded"),
+      nextAction: existingRow.ai_status === "ready"
+        ? "generate"
+        : "retry_file_processing",
+    };
   }
 
   const [row] = await dbInsert("drive_files", [{
@@ -648,11 +649,11 @@ async function deleteFiles(userId: string, payload: JsonMap) {
       fileIds.join(",")
     })&owner_user_id=eq.${userId}&select=id,gcs_bucket,gcs_object_name`,
   );
-  const gcs = getGcsConfig();
+  const gcs = safeGetGcsConfigForDelete();
   for (const row of rows) {
     const objectName = String(row.gcs_object_name ?? "");
-    const bucket = String(row.gcs_bucket ?? "") || gcs.bucket;
-    if (objectName) {
+    const bucket = String(row.gcs_bucket ?? "") || gcs?.bucket || "";
+    if (gcs && objectName && bucket) {
       await deleteGcsObject({
         bucket,
         objectName,
@@ -998,17 +999,30 @@ async function deleteGcsObject(input: {
   objectName: string;
   serviceAccountJson: string;
 }) {
-  const url = await createGcsV4SignedDeleteUrl({
-    ...input,
-    expiresInSeconds: 300,
-  });
-  const response = await fetch(url, { method: "DELETE" });
-  if (!response.ok && response.status !== 404) {
-    throw new SafeError(
-      "GCS_DELETE_FAILED",
-      "Dosya depolama alanından silinemedi.",
-      500,
+  try {
+    const token = await createGoogleAccessToken(
+      input.serviceAccountJson,
+      "https://www.googleapis.com/auth/devstorage.read_write",
+      "GCS_SERVICE_ACCOUNT_INVALID",
+      "GCS_AUTH_FAILED",
     );
+    const response = await fetch(
+      `https://storage.googleapis.com/storage/v1/b/${
+        rfc3986Encode(input.bucket)
+      }/o/${encodeURIComponent(input.objectName)}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+    if (!response.ok && response.status !== 404) {
+      console.warn("GCS delete skipped:", response.status);
+    }
+  } catch (error) {
+    const safeCode = error instanceof SafeError
+      ? error.code
+      : "GCS_DELETE_ERROR";
+    console.warn("GCS delete skipped:", safeCode);
   }
 }
 
@@ -1017,16 +1031,34 @@ async function getGcsObjectMetadata(input: {
   objectName: string;
   serviceAccountJson: string;
 }) {
-  const url = await createGcsV4SignedHeadUrl({
-    ...input,
-    expiresInSeconds: 300,
-  });
-  const response = await fetch(url, { method: "HEAD" });
+  const token = await createGoogleAccessToken(
+    input.serviceAccountJson,
+    "https://www.googleapis.com/auth/devstorage.read_only",
+    "GCS_SERVICE_ACCOUNT_INVALID",
+    "GCS_AUTH_FAILED",
+  );
+  const response = await fetch(
+    `https://storage.googleapis.com/storage/v1/b/${
+      rfc3986Encode(input.bucket)
+    }/o/${
+      encodeURIComponent(input.objectName)
+    }?fields=name,size,contentType,generation`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
   if (response.status === 404) {
     throw new SafeError(
       "UPLOAD_NOT_FOUND",
       "Yüklenen dosya depolama alanında bulunamadı.",
       400,
+    );
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new SafeError(
+      "GCS_AUTH_FAILED",
+      "Dosya depolama kimlik doğrulaması başarısız.",
+      500,
     );
   }
   if (!response.ok) {
@@ -1036,7 +1068,8 @@ async function getGcsObjectMetadata(input: {
       500,
     );
   }
-  const contentLength = Number(response.headers.get("content-length") ?? 0);
+  const metadata = await response.json().catch(() => ({}));
+  const contentLength = Number(metadata?.size ?? 0);
   if (!Number.isFinite(contentLength) || contentLength <= 0) {
     throw new SafeError(
       "UPLOAD_EMPTY",
@@ -1046,8 +1079,7 @@ async function getGcsObjectMetadata(input: {
   }
   return {
     contentLength,
-    contentType: response.headers.get("content-type")?.toLowerCase().trim() ??
-      "",
+    contentType: metadata?.contentType?.toString().toLowerCase().trim() ?? "",
   };
 }
 
@@ -1511,4 +1543,113 @@ function formatDate(date: Date) {
 
 function formatTime(date: Date) {
   return date.toISOString().slice(11, 19).replaceAll(":", "");
+}
+
+function allowedCorsOrigin() {
+  const configured = Deno.env.get("SOURCEBASE_ALLOWED_ORIGIN")?.trim();
+  if (!configured || configured === "*") return DEFAULT_ALLOWED_ORIGIN;
+  return configured;
+}
+
+function safeGetGcsConfigForDelete() {
+  try {
+    return getGcsConfig();
+  } catch (error) {
+    const safeCode = error instanceof SafeError
+      ? error.code
+      : "GCS_DELETE_CONFIG_ERROR";
+    console.warn("GCS delete skipped:", safeCode);
+    return null;
+  }
+}
+
+async function createGoogleAccessToken(
+  serviceAccountJson: string,
+  scope: string,
+  invalidConfigCode: string,
+  authFailureCode: string,
+) {
+  const serviceAccount = parseGoogleServiceAccount(
+    serviceAccountJson,
+    invalidConfigCode,
+  );
+  const now = Math.floor(Date.now() / 1000);
+  const encodedHeader = base64UrlEncode(JSON.stringify({
+    alg: "RS256",
+    typ: "JWT",
+  }));
+  const encodedClaim = base64UrlEncode(JSON.stringify({
+    iss: serviceAccount.clientEmail,
+    scope,
+    aud: "https://oauth2.googleapis.com/token",
+    exp: now + 3600,
+    iat: now,
+  }));
+  const signatureInput = `${encodedHeader}.${encodedClaim}`;
+  const jwt = `${signatureInput}.${await rsaSha256Base64Url(
+    serviceAccount.privateKey,
+    signatureInput,
+  )}`;
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+  if (response.status === 400 || response.status === 401) {
+    throw new SafeError(
+      authFailureCode,
+      "Google Cloud kimlik doğrulama başarısız.",
+      500,
+    );
+  }
+  if (!response.ok) {
+    throw new SafeError(
+      "GOOGLE_UPSTREAM_ERROR",
+      "Google Cloud servisine ulaşılamadı.",
+      502,
+    );
+  }
+  const data = await response.json().catch(() => ({}));
+  const accessToken = data?.access_token?.toString() ?? "";
+  if (!accessToken) {
+    throw new SafeError(
+      authFailureCode,
+      "Google Cloud kimlik doğrulama başarısız.",
+      500,
+    );
+  }
+  return accessToken;
+}
+
+async function rsaSha256Base64Url(privateKeyPem: string, value: string) {
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    pemToArrayBuffer(privateKeyPem),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    new TextEncoder().encode(value),
+  );
+  return base64UrlEncode(new Uint8Array(signature));
+}
+
+function base64UrlEncode(value: string | Uint8Array) {
+  const bytes = typeof value === "string"
+    ? new TextEncoder().encode(value)
+    : value;
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary)
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
 }

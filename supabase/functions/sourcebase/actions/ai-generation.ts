@@ -459,7 +459,10 @@ function createJobProcessor(): JobProcessor {
 function createVertexConfig() {
   try {
     return getVertexConfig();
-  } catch (_error) {
+  } catch (error) {
+    if (error instanceof SafeError) {
+      throw error;
+    }
     throw new SafeError(
       "CONFIG_ERROR",
       "AI üretim yapılandırması eksik.",
