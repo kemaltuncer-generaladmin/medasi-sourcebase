@@ -133,7 +133,19 @@ class SourceBaseDriveApi {
     required GeneratedKind kind,
     int? itemCount,
   }) {
-    final payload = <String, dynamic>{'fileId': fileId, 'kind': kind.name};
+    return createGeneratedOutputByKind(
+      fileId: fileId,
+      kind: kind.name,
+      itemCount: itemCount,
+    );
+  }
+
+  Future<Map<String, dynamic>> createGeneratedOutputByKind({
+    required String fileId,
+    required String kind,
+    int? itemCount,
+  }) {
+    final payload = <String, dynamic>{'fileId': fileId, 'kind': kind};
     if (itemCount != null) payload['itemCount'] = itemCount;
     return invoke('create_generated_output', payload: payload);
   }

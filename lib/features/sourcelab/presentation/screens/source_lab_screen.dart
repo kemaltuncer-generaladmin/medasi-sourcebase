@@ -60,18 +60,19 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
     selectedSources = const [];
   }
 
-  String clinicalType = '';
-  String clinicalDifficulty = '';
-  String clinicalLevel = '';
-  String clinicalBranch = '';
+  String clinicalType = 'TUS tarzı vaka';
+  String clinicalDifficulty = 'Orta';
+  String clinicalLevel = 'Soru-cevaplı vaka';
+  String clinicalBranch = 'Standart';
   double patientAge = 0;
   bool clinicalFeedback = true;
 
-  String planGoal = '';
-  String planPriority = '';
-  String planIntensity = '';
-  int planDays = 1;
-  String dailyDuration = '';
+  String planGoal = '7 günlük plan';
+  String planPriority = 'Aktif hatırlama';
+  String planIntensity = 'Gün gün plan';
+  int planDays = 7;
+  String dailyDuration = '1 saat';
+  String planQuality = 'Standart';
   bool includeReviews = true;
 
   String podcastVoice = '';
@@ -174,6 +175,8 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
         qualityTier: switch (tool) {
           _ToolKind.examMorning => _examQualityValue(examQuality),
           _ToolKind.infographic => _infographicQualityValue(infographicQuality),
+          _ToolKind.clinical => _sourceLabQualityValue(clinicalBranch),
+          _ToolKind.plan => _sourceLabQualityValue(planQuality),
           _ => null,
         },
         options: switch (tool) {
@@ -189,6 +192,21 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             style: infographicStyle,
             density: infographicDensity,
             quality: infographicQuality,
+            source: selectedSources.first,
+          ),
+          _ToolKind.clinical => _clinicalPayloadOptions(
+            scenarioType: clinicalType,
+            difficulty: clinicalDifficulty,
+            outputFormat: clinicalLevel,
+            quality: clinicalBranch,
+            source: selectedSources.first,
+          ),
+          _ToolKind.plan => _learningPlanPayloadOptions(
+            goal: planGoal,
+            dailyTime: dailyDuration,
+            studyStyle: planPriority,
+            outputFormat: planIntensity,
+            quality: planQuality,
             source: selectedSources.first,
           ),
           _ => null,
@@ -298,7 +316,7 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
       return;
     }
     try {
-      await _api.createGeneratedOutput(
+      await _api.createGeneratedOutputByKind(
         fileId: file.id,
         kind: kind,
         itemCount: _sourceLabContentCount(result.content),
@@ -570,15 +588,20 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
                 intensity: planIntensity,
                 days: planDays,
                 dailyDuration: dailyDuration,
+                quality: planQuality,
                 includeReviews: includeReviews,
                 onBack: _back,
                 onSearch: widget.onSearch,
                 onPickSources: _showSourcePicker,
-                onGoal: (value) => setState(() => planGoal = value),
+                onGoal: (value) => setState(() {
+                  planGoal = value;
+                  planDays = _planDaysForGoal(value);
+                }),
                 onPriority: (value) => setState(() => planPriority = value),
                 onIntensity: (value) => setState(() => planIntensity = value),
                 onDaysChanged: (value) => setState(() => planDays = value),
                 onDuration: (value) => setState(() => dailyDuration = value),
+                onQuality: (value) => setState(() => planQuality = value),
                 onReviews: (value) => setState(() => includeReviews = value),
                 onGenerate: () =>
                     _generate(SourceLabView.planResult, _ToolKind.plan),
@@ -898,6 +921,141 @@ Map<String, dynamic> _examMorningPayloadOptions({
   };
 }
 
+Map<String, dynamic> _clinicalPayloadOptions({
+  required String scenarioType,
+  required String difficulty,
+  required String outputFormat,
+  required String quality,
+  required _LabSource source,
+}) {
+  final difficultyValue = _clinicalDifficultyValue(difficulty);
+  final qualityValue = _sourceLabQualityValue(quality);
+  return {
+    'scenario_type': _clinicalScenarioTypeValue(scenarioType),
+    'difficulty': difficultyValue,
+    'output_format': _clinicalOutputFormatValue(outputFormat),
+    'quality_tier': qualityValue,
+    'mode': 'structured',
+    'clinical': true,
+    'hard': difficultyValue == 'hard' || difficultyValue == 'expert',
+    'premium': qualityValue == 'premium',
+    'source_size_tier': _sourceSizeTierFromLabel(source.size),
+  };
+}
+
+Map<String, dynamic> _learningPlanPayloadOptions({
+  required String goal,
+  required String dailyTime,
+  required String studyStyle,
+  required String outputFormat,
+  required String quality,
+  required _LabSource source,
+}) {
+  final qualityValue = _sourceLabQualityValue(quality);
+  return {
+    'plan_goal': _planGoalValue(goal),
+    'daily_time': _dailyTimeValue(dailyTime),
+    'study_style': _studyStyleValue(studyStyle),
+    'output_format': _planOutputFormatValue(outputFormat),
+    'quality_tier': qualityValue,
+    'mode': 'structured',
+    'personalized': true,
+    'premium': qualityValue == 'premium',
+    'source_size_tier': _sourceSizeTierFromLabel(source.size),
+  };
+}
+
+String _clinicalScenarioTypeValue(String value) {
+  return switch (value) {
+    'Klinik karar senaryosu' => 'clinical_decision',
+    'Acil yaklaşım vakası' => 'emergency_approach',
+    'Tanı koydurucu vaka' => 'diagnostic_case',
+    'Tedavi seçimi vakası' => 'treatment_choice',
+    'Temel bilimden kliniğe vaka' => 'basic_to_clinical',
+    _ => 'tus_case',
+  };
+}
+
+String _clinicalDifficultyValue(String value) {
+  return switch (value) {
+    'Kolay' => 'easy',
+    'Zor' => 'hard',
+    'Uzmanlık seviyesi' => 'expert',
+    _ => 'medium',
+  };
+}
+
+String _clinicalOutputFormatValue(String value) {
+  return switch (value) {
+    '3 kısa vaka' => 'three_short_cases',
+    'Soru-cevaplı vaka' => 'qa_case',
+    'Açıklamalı vaka' => 'explained_case',
+    'Adım adım klinik akıl yürütme' => 'stepwise_reasoning',
+    _ => 'single_case',
+  };
+}
+
+String _planGoalValue(String value) {
+  return switch (value) {
+    'Hızlı tekrar planı' => 'quick_review',
+    '14 günlük plan' => '14_day',
+    '30 günlük plan' => '30_day',
+    'Sınav tarihi odaklı plan' => 'exam_date_backplanning',
+    'Zayıf konu kapatma planı' => 'weak_topic_closure',
+    _ => '7_day',
+  };
+}
+
+String _dailyTimeValue(String value) {
+  return switch (value) {
+    '30 dk' => '30_min',
+    '2 saat' => '2_hours',
+    '4 saat' => '4_hours',
+    'Özel süre' => 'custom',
+    _ => '1_hour',
+  };
+}
+
+String _studyStyleValue(String value) {
+  return switch (value) {
+    'Soru çözerek öğrenme' => 'question_based',
+    'Flashcard destekli' => 'flashcard_supported',
+    'Klinik bağlantılı' => 'clinical_linked',
+    'Temel bilim bağlantılı' => 'basic_science_linked',
+    'Dengeli' => 'balanced',
+    _ => 'active_recall',
+  };
+}
+
+String _planOutputFormatValue(String value) {
+  return switch (value) {
+    'Haftalık yol haritası' => 'weekly_roadmap',
+    'Checklist' => 'checklist',
+    'Takvim + tekrar döngüsü' => 'calendar_review_cycle',
+    'Pomodoro blokları' => 'pomodoro_blocks',
+    _ => 'day_by_day',
+  };
+}
+
+int _planDaysForGoal(String value) {
+  return switch (value) {
+    'Hızlı tekrar planı' => 3,
+    '14 günlük plan' => 14,
+    '30 günlük plan' => 30,
+    'Sınav tarihi odaklı plan' => 21,
+    'Zayıf konu kapatma planı' => 10,
+    _ => 7,
+  };
+}
+
+String _sourceLabQualityValue(String value) {
+  return switch (value) {
+    'Ekonomik' => 'economy',
+    'Premium' => 'premium',
+    _ => 'standard',
+  };
+}
+
 String _examSummaryModeValue(String value) {
   return switch (value) {
     'Hızlı tekrar' => 'quick_review',
@@ -1003,16 +1161,20 @@ String? _sourceLabJobType(_ToolKind tool) {
     _ToolKind.examMorning => 'exam_morning_summary',
     _ToolKind.podcast => 'podcast',
     _ToolKind.infographic => 'infographic',
-    _ToolKind.clinical || _ToolKind.plan || _ToolKind.mindMap => null,
+    _ToolKind.clinical => 'clinical_scenario',
+    _ToolKind.plan => 'learning_plan',
+    _ToolKind.mindMap => null,
   };
 }
 
-GeneratedKind? _sourceLabGeneratedKind(_ToolKind tool) {
+String? _sourceLabGeneratedKind(_ToolKind tool) {
   return switch (tool) {
-    _ToolKind.examMorning => GeneratedKind.summary,
-    _ToolKind.podcast => GeneratedKind.podcast,
-    _ToolKind.infographic => GeneratedKind.infographic,
-    _ToolKind.clinical || _ToolKind.plan || _ToolKind.mindMap => null,
+    _ToolKind.examMorning => GeneratedKind.summary.name,
+    _ToolKind.podcast => GeneratedKind.podcast.name,
+    _ToolKind.infographic => GeneratedKind.infographic.name,
+    _ToolKind.clinical => 'clinical_scenario',
+    _ToolKind.plan => 'learning_plan',
+    _ToolKind.mindMap => null,
   };
 }
 
@@ -1126,6 +1288,18 @@ String _friendlyLabError(Object error, {_ToolKind? tool}) {
           text.contains('UPSTREAM') ||
           text.contains('CONFIG_ERROR'))) {
     return 'Sınav Sabahı Özeti şu anda tamamlanamadı. Kaynağın güvende; harcanan MC varsa iade edilir.';
+  }
+  if ((tool == _ToolKind.clinical || tool == _ToolKind.plan) &&
+      (text.contains('VERTEX_AUTH_FAILED') ||
+          text.contains('VERTEX_NOT_CONFIGURED') ||
+          text.contains('JOB_CREATE_FAILED') ||
+          text.contains('AI_FAILED') ||
+          text.contains('UPSTREAM') ||
+          text.contains('CONFIG_ERROR'))) {
+    final label = tool == _ToolKind.clinical
+        ? 'Klinik Senaryo'
+        : 'Öğrenme Planı';
+    return '$label şu anda tamamlanamadı. Kaynağın güvende; harcanan MC varsa iade edilir.';
   }
   if (text.contains('IMAGE_PROVIDER_NOT_CONFIGURED')) {
     return 'İnfografik üretimi şu anda tamamlanamadı. Kaynağın güvende; harcanan MC varsa iade edilir.';
@@ -1678,157 +1852,158 @@ class _ClinicalScenarioBuilder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasSources = selectedSources.isNotEmpty;
+    final blockedReasons = selectedSources
+        .where((source) => source.disabledReason != null)
+        .map((source) => source.disabledReason!)
+        .toSet()
+        .toList();
+    final canGenerate = hasSources && blockedReasons.isEmpty;
     return _LabScroll(
       children: [
         _LabTopBar(onBack: onBack, onSearch: onSearch),
-        _LabHero(
+        _CompactToolHero(
           title: 'Klinik Senaryo',
-          subtitle:
-              'Drive’dan seçtiğin kaynakları hasta\nsenaryolarına dönüştür.',
-          art: _HeroArtKind.clinical,
+          subtitle: 'Kaynağından vaka temelli klinik düşünme senaryoları üret.',
+          icon: Icons.monitor_heart_outlined,
+          selectedCount: selectedSources.length,
+          hasSources: hasSources,
+          onPickSources: onPickSources,
         ),
         _StepPanel(
           number: 1,
-          title: 'Seçili Kaynaklar',
-          trailing: _DriveAddButton(onTap: onPickSources),
+          title: 'Kaynak Seçimi',
+          trailing: _SmallActionButton(
+            label: hasSources ? 'Kaynak Değiştir' : 'Drive’dan kaynak seç',
+            icon: Icons.folder_open_rounded,
+            onTap: onPickSources,
+          ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _SourceList(
-                sources: selectedSources,
-                onRemove: onRemoveSource,
-                onReorder: () =>
-                    _showLabSnack(context, 'Kaynak sırası güncellendi.'),
-              ),
-              const SizedBox(height: 12),
-              _DashedAddRow(
-                label: 'Başka kaynak eklemek için Drive’dan seç',
-                onTap: onPickSources,
-              ),
+              if (!hasSources)
+                const _LabEmptyState(
+                  icon: Icons.folder_open_outlined,
+                  title: 'Kaynak seçilmedi',
+                  message:
+                      'Hazır/Tamamlandı durumda ve boyutu 0 KB olmayan bir Drive kaynağı seçin.',
+                )
+              else
+                _SourceGrid(
+                  sources: selectedSources,
+                  allowRemove: true,
+                  onRemove: onRemoveSource,
+                  onMenu: onPickSources,
+                ),
+              for (final reason in blockedReasons) ...[
+                const SizedBox(height: 12),
+                _LabNotice(text: reason),
+              ],
             ],
           ),
         ),
         _StepPanel(
           number: 2,
-          title: 'Senaryo Ayarları',
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final twoColumns = constraints.maxWidth > 700;
-              final left = Column(
-                children: [
-                  _SettingRow(
-                    label: 'Senaryo Türü',
-                    child: _SegmentedOptions(
-                      values: const ['Acil', 'Poliklinik', 'Yataklı Servis'],
-                      selected: clinicalType,
-                      onSelected: onClinicalType,
-                    ),
-                  ),
-                  _SettingRow(
-                    label: 'Öğrenci Seviyesi',
-                    child: _SegmentedOptions(
-                      values: const ['Dönem 3', 'Dönem 4', 'İntörn'],
-                      selected: level,
-                      onSelected: onLevel,
-                    ),
-                  ),
-                  _SettingRow(
-                    label: 'Hasta Yaşı',
-                    child: _LabeledSlider(
-                      value: patientAge,
-                      min: 16,
-                      max: 90,
-                      label: '${patientAge.round()} yaş',
-                      leftLabel: '16',
-                      rightLabel: '90+',
-                      onChanged: onAge,
-                    ),
-                  ),
-                ],
-              );
-              final right = Column(
-                children: [
-                  _SettingRow(
-                    label: 'Zorluk',
-                    child: _SegmentedOptions(
-                      values: const ['Kolay', 'Orta', 'Zor'],
-                      selected: difficulty,
-                      onSelected: onDifficulty,
-                    ),
-                  ),
-                  _SettingRow(
-                    label: 'Branş',
-                    child: _SelectBox(
-                      icon: Icons.favorite_border_rounded,
-                      label: branch,
-                      onTap: () => onBranch(
-                        branch == 'Kategori 1' ? 'Kategori 2' : 'Kategori 1',
-                      ),
-                    ),
-                  ),
-                  _SwitchSetting(
-                    title: 'Açıklamalı Geri Bildirim',
-                    subtitle: 'Senaryonun sonunda detaylı geri bildirim ver.',
-                    value: feedback,
-                    onChanged: onFeedback,
-                  ),
-                ],
-              );
-              if (!twoColumns) {
-                return Column(
-                  children: [left, const SizedBox(height: 12), right],
-                );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: left),
-                  const SizedBox(width: 28),
-                  Expanded(child: right),
-                ],
-              );
-            },
+          title: 'Senaryo Tipi',
+          child: _InfographicOptionGrid(
+            values: const [
+              'TUS tarzı vaka',
+              'Klinik karar senaryosu',
+              'Acil yaklaşım vakası',
+              'Tanı koydurucu vaka',
+              'Tedavi seçimi vakası',
+              'Temel bilimden kliniğe vaka',
+            ],
+            selected: clinicalType,
+            onSelected: onClinicalType,
           ),
         ),
         _StepPanel(
           number: 3,
-          title: 'Odak Alanları',
-          child: _FocusChips(
-            labels: const [
-              'Tanı',
-              'Tetkik',
-              'Tedavi',
-              'Ayırıcı Tanı',
-              'Komplikasyonlar',
+          title: 'Zorluk ve Format',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SegmentedOptions(
+                values: const ['Kolay', 'Orta', 'Zor', 'Uzmanlık seviyesi'],
+                selected: difficulty,
+                onSelected: onDifficulty,
+              ),
+              const SizedBox(height: 16),
+              _InfographicOptionGrid(
+                values: const [
+                  'Tek vaka',
+                  '3 kısa vaka',
+                  'Soru-cevaplı vaka',
+                  'Açıklamalı vaka',
+                  'Adım adım klinik akıl yürütme',
+                ],
+                selected: level,
+                onSelected: onLevel,
+              ),
             ],
-            selectedLabels: const {'Tanı', 'Tetkik', 'Tedavi', 'Ayırıcı Tanı'},
-            onTap: (label) =>
-                _showLabSnack(context, '$label odağı güncellendi.'),
           ),
         ),
         _StepPanel(
           number: 4,
-          title: 'Önizleme',
-          trailing: const _InfoPill(label: 'Tahmini süre: 12-15 dk'),
-          child: const _ResponsiveSplit(
-            breakpoint: 720,
+          title: 'Kalite ve MC',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(width: 140, height: 140, child: _PatientAvatar()),
-              _PreviewTextBlock(
-                title: '58 yaş erkek hasta, göğüs ağrısı...',
-                body:
-                    'Eforla artan göğüs ağrısı ve nefes darlığı şikayetiyle acil servise başvuran hastada akut koroner sendrom ön tanısı değerlendirilecek.',
+              _SegmentedOptions(
+                values: const ['Ekonomik', 'Standart', 'Premium'],
+                selected: branch,
+                onSelected: onBranch,
               ),
-              _LearningGoalsPreview(),
+              const SizedBox(height: 12),
+              _LabNotice(
+                text: branch == 'Premium'
+                    ? 'Premium kalite daha derin klinik akıl yürütme hedefler ve daha yüksek MC tüketebilir. Kesin ücret backend tarafından üretim sırasında hesaplanır.'
+                    : 'MC tutarı üretim sırasında güvenli şekilde backend tarafından hesaplanır.',
+              ),
             ],
+          ),
+        ),
+        _StepPanel(
+          number: 5,
+          title: 'Klinik İçerik Kapsamı',
+          child: _FocusChips(
+            labels: const [
+              'Hasta bilgisi',
+              'Başvuru şikayeti',
+              'Öykü',
+              'Fizik muayene',
+              'Laboratuvar/görüntüleme',
+              'Klinik karar',
+              'Tanı-tedavi tartışması',
+              'Sınav ipuçları',
+            ],
+            selectedLabels: const {
+              'Hasta bilgisi',
+              'Başvuru şikayeti',
+              'Öykü',
+              'Fizik muayene',
+              'Laboratuvar/görüntüleme',
+              'Klinik karar',
+              'Tanı',
+              'Sınav ipuçları',
+            },
+            onTap: (label) =>
+                _showLabSnack(context, '$label odağı güncellendi.'),
           ),
         ),
         _SummaryActionBar(
           icon: Icons.description_outlined,
           title: 'Özet',
           detail:
-              '${selectedSources.length} kaynak  •  $clinicalType senaryo  •  $difficulty zorluk  •  $level  •  $branch  •  ${patientAge.round()} yaş',
-          buttonLabel: 'Senaryoyu Oluştur',
-          onTap: onGenerate,
+              '${selectedSources.length} kaynak  •  $clinicalType  •  $difficulty  •  $level  •  $branch',
+          buttonLabel: 'Klinik senaryo üret',
+          subtitle: canGenerate
+              ? null
+              : hasSources
+              ? 'Hazır olmayan kaynak var'
+              : 'Önce kaynak seç',
+          onTap: canGenerate ? onGenerate : null,
         ),
       ],
     );
@@ -1863,6 +2038,7 @@ class _ClinicalScenarioResult extends StatelessWidget {
     if (loading || result != null || error != null) {
       return _SourceLabGeneratedResult(
         title: 'Klinik Senaryo',
+        tool: _ToolKind.clinical,
         loading: loading,
         result: result,
         error: error,
@@ -1870,6 +2046,14 @@ class _ClinicalScenarioResult extends StatelessWidget {
         onSave: onSave,
         onExport: onExport,
         onRegenerate: onRegenerate,
+        saveLabel: 'Koleksiyona ekle',
+        exportLabel: 'Kopyala',
+        loadingSteps: const [
+          'Kaynak analiz ediliyor',
+          'Klinik bulgular çıkarılıyor',
+          'Vaka kurgusu hazırlanıyor',
+          'Soru ve açıklamalar oluşturuluyor',
+        ],
       );
     }
     return _LabScroll(
@@ -1971,6 +2155,7 @@ class _LearningPlanBuilder extends StatelessWidget {
     required this.intensity,
     required this.days,
     required this.dailyDuration,
+    required this.quality,
     required this.includeReviews,
     required this.onBack,
     required this.onSearch,
@@ -1980,6 +2165,7 @@ class _LearningPlanBuilder extends StatelessWidget {
     required this.onIntensity,
     required this.onDaysChanged,
     required this.onDuration,
+    required this.onQuality,
     required this.onReviews,
     required this.onGenerate,
   });
@@ -1990,6 +2176,7 @@ class _LearningPlanBuilder extends StatelessWidget {
   final String intensity;
   final int days;
   final String dailyDuration;
+  final String quality;
   final bool includeReviews;
   final VoidCallback onBack;
   final VoidCallback onSearch;
@@ -1999,169 +2186,168 @@ class _LearningPlanBuilder extends StatelessWidget {
   final ValueChanged<String> onIntensity;
   final ValueChanged<int> onDaysChanged;
   final ValueChanged<String> onDuration;
+  final ValueChanged<String> onQuality;
   final ValueChanged<bool> onReviews;
   final VoidCallback onGenerate;
 
   @override
   Widget build(BuildContext context) {
+    final hasSources = selectedSources.isNotEmpty;
+    final blockedReasons = selectedSources
+        .where((source) => source.disabledReason != null)
+        .map((source) => source.disabledReason!)
+        .toSet()
+        .toList();
+    final canGenerate = hasSources && blockedReasons.isEmpty;
     return _LabScroll(
       children: [
         _LabTopBar(onBack: onBack, onSearch: onSearch),
-        _LabHero(
+        _CompactToolHero(
           title: 'Öğrenme Planı',
           subtitle:
-              'Kaynaklarına, hedeflerine ve sürene göre\nkişisel çalışma planı oluştur.',
-          art: _HeroArtKind.plan,
-          chips: const [
-            _MiniHeroChip(
-              icon: Icons.verified_user_outlined,
-              label: 'Kişiselleştirilmiş',
-            ),
-            _MiniHeroChip(icon: Icons.bolt_outlined, label: 'Akıllı Planlama'),
-            _MiniHeroChip(
-              icon: Icons.analytics_outlined,
-              label: 'Veriye Dayalı',
-            ),
-          ],
+              'Kaynağını günlük hedeflere, tekrar döngülerine ve çalışma planına dönüştür.',
+          icon: Icons.event_note_outlined,
+          selectedCount: selectedSources.length,
+          hasSources: hasSources,
+          onPickSources: onPickSources,
         ),
         _StepPanel(
           number: 1,
-          title: 'Seçili Kaynaklar',
-          trailing: _DriveAddButton(onTap: onPickSources),
-          child: _SourceGrid(
-            sources: selectedSources,
-            allowRemove: false,
-            onRemove: (_) {},
-            onMenu: onPickSources,
+          title: 'Kaynak Seçimi',
+          trailing: _SmallActionButton(
+            label: hasSources ? 'Kaynak Değiştir' : 'Drive’dan kaynak seç',
+            icon: Icons.folder_open_rounded,
+            onTap: onPickSources,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!hasSources)
+                const _LabEmptyState(
+                  icon: Icons.folder_open_outlined,
+                  title: 'Kaynak seçilmedi',
+                  message:
+                      'Hazır/Tamamlandı durumda ve boyutu 0 KB olmayan bir Drive kaynağı seçin.',
+                )
+              else
+                _SourceGrid(
+                  sources: selectedSources,
+                  allowRemove: false,
+                  onRemove: (_) {},
+                  onMenu: onPickSources,
+                ),
+              for (final reason in blockedReasons) ...[
+                const SizedBox(height: 12),
+                _LabNotice(text: reason),
+              ],
+            ],
           ),
         ),
         _StepPanel(
           number: 2,
-          title: 'Plan Ayarları',
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 760;
-              final topFields = [
-                _SettingRow(
-                  label: 'Hedef',
-                  child: _SegmentedOptions(
-                    values: const ['TUS', 'Komite', 'Final'],
-                    selected: goal,
-                    onSelected: onGoal,
-                    icons: const [
-                      Icons.medical_services_outlined,
-                      Icons.psychology_alt_outlined,
-                      Icons.school_outlined,
-                    ],
-                  ),
-                ),
-                _SettingRow(
-                  label: 'Gün Sayısı',
-                  child: _StepperBox(value: days, onChanged: onDaysChanged),
-                ),
-                _SettingRow(
-                  label: 'Günlük Süre',
-                  child: _DropdownLike(
-                    icon: Icons.schedule_rounded,
-                    label: dailyDuration,
-                    onTap: () => onDuration(
-                      dailyDuration == '2 saat' ? '3 saat' : '2 saat',
-                    ),
-                  ),
-                ),
-              ];
-              final priorityFields = [
-                _SettingRow(
-                  label: 'Öncelik Modu',
-                  child: _SegmentedOptions(
-                    values: const ['Zayıf Konular', 'Karma', 'Hızlı Tekrar'],
-                    selected: priority,
-                    onSelected: onPriority,
-                    icons: const [
-                      Icons.track_changes_rounded,
-                      Icons.shuffle_rounded,
-                      Icons.flash_on_outlined,
-                    ],
-                  ),
-                ),
-                _SettingRow(
-                  label: 'Çalışma Yoğunluğu',
-                  child: _SegmentedOptions(
-                    values: const ['Düşük', 'Orta', 'Yüksek'],
-                    selected: intensity,
-                    onSelected: onIntensity,
-                    icons: const [
-                      Icons.eco_outlined,
-                      Icons.show_chart_rounded,
-                      Icons.local_fire_department_outlined,
-                    ],
-                  ),
-                ),
-              ];
-
-              List<Widget> rowFor(List<Widget> children) {
-                if (compact) {
-                  return [
-                    for (var i = 0; i < children.length; i++) ...[
-                      children[i],
-                      if (i != children.length - 1) const SizedBox(height: 4),
-                    ],
-                  ];
-                }
-                return [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var i = 0; i < children.length; i++) ...[
-                        Expanded(child: children[i]),
-                        if (i != children.length - 1) const SizedBox(width: 22),
-                      ],
-                    ],
-                  ),
-                ];
-              }
-
-              return Column(
-                children: [
-                  ...rowFor(topFields),
-                  if (!compact) const SizedBox(height: 2),
-                  ...rowFor(priorityFields),
-                  _SwitchSetting(
-                    title: 'Tekrar Seansları Ekle',
-                    subtitle:
-                        'Planına spaced repetition tekrar seansları otomatik olarak eklensin.',
-                    value: includeReviews,
-                    onChanged: onReviews,
-                  ),
-                ],
-              );
-            },
+          title: 'Plan Hedefi',
+          child: _InfographicOptionGrid(
+            values: const [
+              'Hızlı tekrar planı',
+              '7 günlük plan',
+              '14 günlük plan',
+              '30 günlük plan',
+              'Sınav tarihi odaklı plan',
+              'Zayıf konu kapatma planı',
+            ],
+            selected: goal,
+            onSelected: onGoal,
           ),
         ),
         _StepPanel(
           number: 3,
-          title: 'Odak Konular',
-          child: _FocusChips(
-            labels: const ['Bu bölüm hazırlanıyor'],
-            selectedLabels: const {},
-            onTap: (_) {},
+          title: 'Günlük Süre ve Çalışma Stili',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SegmentedOptions(
+                values: const [
+                  '30 dk',
+                  '1 saat',
+                  '2 saat',
+                  '4 saat',
+                  'Özel süre',
+                ],
+                selected: dailyDuration,
+                onSelected: onDuration,
+              ),
+              const SizedBox(height: 16),
+              _InfographicOptionGrid(
+                values: const [
+                  'Aktif hatırlama',
+                  'Soru çözerek öğrenme',
+                  'Flashcard destekli',
+                  'Klinik bağlantılı',
+                  'Temel bilim bağlantılı',
+                  'Dengeli',
+                ],
+                selected: priority,
+                onSelected: onPriority,
+              ),
+            ],
           ),
         ),
         _StepPanel(
           number: 4,
-          title: 'Plan Önizleme',
-          trailing: _SmallActionButton(
-            label: 'Tümünü Gör',
-            onTap: () => _showLabSnack(context, '7 günlük önizleme açıldı.'),
+          title: 'Çıktı Formatı',
+          child: _InfographicOptionGrid(
+            values: const [
+              'Gün gün plan',
+              'Haftalık yol haritası',
+              'Checklist',
+              'Takvim + tekrar döngüsü',
+              'Pomodoro blokları',
+            ],
+            selected: intensity,
+            onSelected: onIntensity,
           ),
-          child: const _PlanPreviewCards(),
+        ),
+        _StepPanel(
+          number: 5,
+          title: 'Kalite ve Tekrar Döngüsü',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SegmentedOptions(
+                values: const ['Ekonomik', 'Standart', 'Premium'],
+                selected: quality,
+                onSelected: onQuality,
+              ),
+              const SizedBox(height: 12),
+              _LabNotice(
+                text: quality == 'Premium'
+                    ? 'Premium kalite daha kişiselleştirilmiş planlama hedefler ve daha yüksek MC tüketebilir. Kesin ücret backend tarafından üretim sırasında hesaplanır.'
+                    : 'MC tutarı üretim sırasında güvenli şekilde backend tarafından hesaplanır.',
+              ),
+              const SizedBox(height: 14),
+              _SwitchSetting(
+                title: 'Tekrar Seansları Ekle',
+                subtitle:
+                    'Planına spaced repetition tekrar seansları otomatik olarak eklensin.',
+                value: includeReviews,
+                onChanged: onReviews,
+              ),
+            ],
+          ),
         ),
         _PlanSummaryBar(
-          days: days,
+          days: _planDaysForGoal(goal),
           duration: dailyDuration,
           focus: 5,
           reviews: includeReviews,
-          onGenerate: onGenerate,
+          quality: quality,
+          canGenerate: canGenerate,
+          blockedSubtitle: canGenerate
+              ? null
+              : hasSources
+              ? 'Hazır olmayan kaynak var'
+              : 'Önce kaynak seç',
+          onGenerate: canGenerate ? onGenerate : null,
         ),
       ],
     );
@@ -2200,6 +2386,7 @@ class _LearningPlanResult extends StatelessWidget {
     if (loading || result != null || error != null) {
       return _SourceLabGeneratedResult(
         title: 'Öğrenme Planı',
+        tool: _ToolKind.plan,
         loading: loading,
         result: result,
         error: error,
@@ -2207,6 +2394,14 @@ class _LearningPlanResult extends StatelessWidget {
         onSave: onSave,
         onExport: onExport,
         onRegenerate: onRegenerate,
+        saveLabel: 'Koleksiyona ekle',
+        exportLabel: 'Kopyala',
+        loadingSteps: const [
+          'Kaynak bölümlere ayrılıyor',
+          'Öncelikler belirleniyor',
+          'Tekrar döngüsü kuruluyor',
+          'Çalışma planı hazırlanıyor',
+        ],
       );
     }
     return _LabScroll(
@@ -2516,6 +2711,7 @@ class _PodcastResult extends StatelessWidget {
     if (loading || result != null || error != null) {
       return _SourceLabGeneratedResult(
         title: 'Podcast Özeti',
+        tool: _ToolKind.podcast,
         loading: loading,
         result: result,
         error: error,
@@ -3969,6 +4165,7 @@ class _MindMapResult extends StatelessWidget {
     if (loading || result != null || error != null) {
       return _SourceLabGeneratedResult(
         title: 'Zihin Haritası',
+        tool: _ToolKind.mindMap,
         loading: loading,
         result: result,
         error: error,
@@ -4361,6 +4558,7 @@ String _firstText(List<Object?> values) {
 class _SourceLabGeneratedResult extends StatelessWidget {
   const _SourceLabGeneratedResult({
     required this.title,
+    required this.tool,
     required this.loading,
     required this.result,
     required this.error,
@@ -4368,10 +4566,14 @@ class _SourceLabGeneratedResult extends StatelessWidget {
     required this.onSave,
     required this.onExport,
     required this.onRegenerate,
+    this.saveLabel = 'Kaydet',
+    this.exportLabel = 'Dışa Aktar',
+    this.loadingSteps = const [],
     this.audioNotice,
   });
 
   final String title;
+  final _ToolKind tool;
   final bool loading;
   final _LabGenerationResult? result;
   final String? error;
@@ -4379,6 +4581,9 @@ class _SourceLabGeneratedResult extends StatelessWidget {
   final VoidCallback onSave;
   final VoidCallback onExport;
   final VoidCallback onRegenerate;
+  final String saveLabel;
+  final String exportLabel;
+  final List<String> loadingSteps;
   final String? audioNotice;
 
   @override
@@ -4388,7 +4593,7 @@ class _SourceLabGeneratedResult extends StatelessWidget {
         _MinimalTopBar(
           title: title,
           subtitle: loading
-              ? 'Üretim kuyruğu işleniyor.'
+              ? '${_sourceLabToolTitle(tool)} üretim kuyruğu işleniyor.'
               : result == null
               ? 'Üretim tamamlanamadı.'
               : '${result!.sourceTitle} kaynağından oluşturuldu.',
@@ -4396,7 +4601,7 @@ class _SourceLabGeneratedResult extends StatelessWidget {
         ),
         _LabPanel(
           child: loading
-              ? const _LabLoadingState()
+              ? _LabLoadingState(steps: loadingSteps)
               : error != null
               ? _LabEmptyState(
                   icon: Icons.error_outline_rounded,
@@ -4417,7 +4622,15 @@ class _SourceLabGeneratedResult extends StatelessWidget {
                       _LabNotice(text: audioNotice!),
                       const SizedBox(height: 14),
                     ],
-                    _LabGeneratedContent(content: result!.content),
+                    switch (result!.tool) {
+                      _ToolKind.clinical => _ClinicalGeneratedContent(
+                        result: result!,
+                      ),
+                      _ToolKind.plan => _LearningPlanGeneratedContent(
+                        result: result!,
+                      ),
+                      _ => _LabGeneratedContent(content: result!.content),
+                    },
                   ],
                 ),
         ),
@@ -4425,12 +4638,12 @@ class _SourceLabGeneratedResult extends StatelessWidget {
           _ResponsiveActions(
             children: [
               _SecondaryLabButton(
-                label: 'Kaydet',
+                label: saveLabel,
                 icon: Icons.bookmark_border_rounded,
                 onTap: onSave,
               ),
               _SecondaryLabButton(
-                label: 'Dışa Aktar',
+                label: exportLabel,
                 icon: Icons.file_download_outlined,
                 onTap: onExport,
               ),
@@ -4453,17 +4666,19 @@ class _SourceLabGeneratedResult extends StatelessWidget {
 }
 
 class _LabLoadingState extends StatelessWidget {
-  const _LabLoadingState();
+  const _LabLoadingState({this.steps = const []});
+
+  final List<String> steps;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 20),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
       child: Column(
         children: [
-          CircularProgressIndicator(color: AppColors.blue),
-          SizedBox(height: 16),
-          Text(
+          const CircularProgressIndicator(color: AppColors.blue),
+          const SizedBox(height: 16),
+          const Text(
             'AI üretimi devam ediyor. Bu ekran tamamlanınca otomatik güncellenecek.',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -4473,6 +4688,33 @@ class _LabLoadingState extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
+          if (steps.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            for (final step in steps)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_outline_rounded,
+                      color: AppColors.blue,
+                      size: 19,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        step,
+                        style: const TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -4563,6 +4805,535 @@ class _LabGeneratedContent extends StatelessWidget {
     }
     return _LabGeneratedText(text: value.toString());
   }
+}
+
+class _ClinicalGeneratedContent extends StatelessWidget {
+  const _ClinicalGeneratedContent({required this.result});
+
+  final _LabGenerationResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = result.content;
+    if (content is! Map) return _LabGeneratedContent(content: content);
+    final title =
+        _labTextFor(content, const ['title', 'vaka_basligi']) ?? result.title;
+    final question = _labFirstMapFor(content, const ['questions', 'sorular']);
+    final answerText = [
+      _labTextFor(question, const ['answer', 'yanit', 'cevap']),
+      _labTextFor(question, const ['explanation', 'aciklama']),
+    ].whereType<String>().where((item) => item.isNotEmpty).join('\n\n');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _GeneratedTitleBlock(
+          icon: Icons.monitor_heart_outlined,
+          title: title,
+          subtitle: '${result.sourceTitle} kaynağından yapılandırıldı.',
+        ),
+        const SizedBox(height: 14),
+        _GeneratedSectionCard(
+          icon: Icons.badge_outlined,
+          title: 'Hasta Bilgisi',
+          child: _GeneratedText(
+            _labTextFor(content, const [
+                  'patientInfo',
+                  'patient_info',
+                  'hasta_bilgisi',
+                ]) ??
+                'Backend çıktısında hasta bilgisi alanı boş döndü.',
+          ),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.local_hospital_outlined,
+          title: 'Başvuru',
+          child: _GeneratedText(
+            _labTextFor(content, const [
+                  'chiefComplaint',
+                  'chief_complaint',
+                  'presentation',
+                  'basvuru',
+                  'caseStem',
+                ]) ??
+                'Backend çıktısında başvuru alanı boş döndü.',
+          ),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.history_edu_outlined,
+          title: 'Öykü',
+          child: _GeneratedText(
+            _labTextFor(content, const ['history', 'oyku', 'caseStem']) ??
+                'Backend çıktısında öykü alanı boş döndü.',
+          ),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.health_and_safety_outlined,
+          title: 'Fizik Muayene',
+          child: _GeneratedBulletList(
+            values: _labListFor(
+              _labValueFor(content, const [
+                'physicalExam',
+                'physical_exam',
+                'muayene',
+                'findings',
+              ]),
+            ),
+          ),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.biotech_outlined,
+          title: 'Laboratuvar / Görüntüleme',
+          child: _GeneratedBulletList(
+            values: _labListFor(
+              _labValueFor(content, const [
+                'labsImaging',
+                'labs_imaging',
+                'lab_imaging',
+                'investigations',
+                'laboratuvar_goruntuleme',
+              ]),
+            ),
+          ),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.alt_route_rounded,
+          title: 'Klinik Karar Noktası',
+          child: _GeneratedText(
+            _labTextFor(content, const [
+                  'decisionPoint',
+                  'decision_point',
+                  'clinical_decision',
+                  'karar_noktasi',
+                ]) ??
+                'Backend çıktısında karar noktası alanı boş döndü.',
+          ),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.help_outline_rounded,
+          title: 'Klinik Soru / Yorum',
+          child: _GeneratedText(
+            _labTextFor(question, const ['question', 'soru']) ??
+                'Backend çıktısında klinik soru alanı boş döndü.',
+          ),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.fact_check_outlined,
+          title: 'Yanıt ve Açıklama',
+          child: _GeneratedText(
+            answerText.isEmpty
+                ? 'Backend çıktısında yanıt/açıklama alanı boş döndü.'
+                : answerText,
+          ),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.school_outlined,
+          title: 'Öğrenme Hedefi',
+          child: _GeneratedBulletList(
+            values: _labListFor(
+              _labValueFor(content, const [
+                'learningObjective',
+                'learning_objective',
+                'learningObjectives',
+                'learning_objectives',
+                'teachingPoints',
+                'ogrenme_hedefi',
+              ]),
+            ),
+          ),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.lightbulb_outline_rounded,
+          title: 'Sınavda Yakala İpuçları',
+          child: _GeneratedBulletList(
+            values: _labListFor(
+              _labValueFor(content, const [
+                'examTips',
+                'exam_tips',
+                'tusTips',
+                'tus_tips',
+                'sinav_ipuclari',
+              ]),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LearningPlanGeneratedContent extends StatelessWidget {
+  const _LearningPlanGeneratedContent({required this.result});
+
+  final _LabGenerationResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = result.content;
+    if (content is! Map) return _LabGeneratedContent(content: content);
+    final title =
+        _labTextFor(content, const ['title', 'plan_title']) ?? result.title;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _GeneratedTitleBlock(
+          icon: Icons.event_note_outlined,
+          title: title,
+          subtitle: '${result.sourceTitle} kaynağından çalışma planı.',
+        ),
+        const SizedBox(height: 14),
+        _GeneratedSectionCard(
+          icon: Icons.source_outlined,
+          title: 'Kaynak Adı',
+          child: _GeneratedText(result.sourceTitle),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.date_range_outlined,
+          title: 'Plan Süresi',
+          child: _GeneratedText(
+            _labTextFor(content, const [
+                  'duration',
+                  'planDuration',
+                  'plan_duration',
+                  'sure',
+                ]) ??
+                'Backend çıktısında plan süresi alanı boş döndü.',
+          ),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.flag_outlined,
+          title: 'Günlük Hedefler',
+          child: _GeneratedBulletList(
+            values: _labListFor(
+              _labValueFor(content, const [
+                'dailyGoals',
+                'daily_goals',
+                'gunluk_hedefler',
+                'sessions',
+              ]),
+            ),
+          ),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.checklist_rounded,
+          title: 'Checklist',
+          child: _GeneratedBulletList(
+            values: _labListFor(
+              _labValueFor(content, const [
+                'checklist',
+                'objectives',
+                'hedefler',
+              ]),
+            ),
+          ),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.sync_rounded,
+          title: 'Tekrar Günleri',
+          child: _GeneratedBulletList(
+            values: _labListFor(
+              _labValueFor(content, const [
+                'reviewDays',
+                'review_days',
+                'reviewCycle',
+                'checkpoints',
+                'tekrar_gunleri',
+              ]),
+            ),
+          ),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.quiz_outlined,
+          title: 'Soru / Flashcard Önerileri',
+          child: _GeneratedBulletList(
+            values: _labListFor(
+              _labValueFor(content, const [
+                'questionFlashcardSuggestions',
+                'question_flashcard_suggestions',
+                'recommendations',
+                'oneriler',
+              ]),
+            ),
+          ),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.priority_high_rounded,
+          title: 'Zayıf Nokta ve Önceliklendirme',
+          child: _GeneratedBulletList(
+            values: _labListFor(
+              _labValueFor(content, const [
+                'weakPoints',
+                'weak_points',
+                'priorities',
+                'zayif_noktalar',
+              ]),
+            ),
+          ),
+        ),
+        _GeneratedSectionCard(
+          icon: Icons.play_circle_outline_rounded,
+          title: 'Bugün Başla',
+          child: _GeneratedBulletList(
+            values: _labListFor(
+              _labValueFor(content, const [
+                'startToday',
+                'start_today',
+                'today',
+                'bugun_basla',
+              ]),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GeneratedTitleBlock extends StatelessWidget {
+  const _GeneratedTitleBlock({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: AppColors.blue.withValues(alpha: .12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: AppColors.blue),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 22,
+                  height: 1.15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 14.5,
+                  height: 1.3,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GeneratedSectionCard extends StatelessWidget {
+  const _GeneratedSectionCard({
+    required this.icon,
+    required this.title,
+    required this.child,
+  });
+
+  final IconData icon;
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FBFF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: AppColors.blue, size: 21),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _GeneratedText extends StatelessWidget {
+  const _GeneratedText(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.trim().isEmpty ? '-' : text.trim(),
+      softWrap: true,
+      style: const TextStyle(
+        color: AppColors.navy,
+        fontSize: 15,
+        height: 1.45,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+}
+
+class _GeneratedBulletList extends StatelessWidget {
+  const _GeneratedBulletList({required this.values});
+
+  final List<String> values;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = values.isEmpty
+        ? const ['Backend çıktısında bu alan boş döndü.']
+        : values;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final item in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 7),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 7),
+                  child: Icon(Icons.circle, color: AppColors.blue, size: 6),
+                ),
+                const SizedBox(width: 9),
+                Expanded(child: _GeneratedText(item)),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+Object? _labValueFor(Map<dynamic, dynamic>? content, List<String> keys) {
+  if (content == null) return null;
+  for (final key in keys) {
+    if (content.containsKey(key)) return content[key];
+  }
+  final normalizedKeys = keys.map(_normalizeLabKey).toSet();
+  for (final entry in content.entries) {
+    if (normalizedKeys.contains(_normalizeLabKey(entry.key.toString()))) {
+      return entry.value;
+    }
+  }
+  return null;
+}
+
+String? _labTextFor(Map<dynamic, dynamic>? content, List<String> keys) {
+  final text = _labText(_labValueFor(content, keys));
+  return text == null || text.trim().isEmpty ? null : text.trim();
+}
+
+Map<dynamic, dynamic>? _labFirstMapFor(
+  Map<dynamic, dynamic> content,
+  List<String> keys,
+) {
+  final value = _labValueFor(content, keys);
+  if (value is List) {
+    for (final item in value) {
+      if (item is Map) return item;
+    }
+  }
+  if (value is Map) return value;
+  return null;
+}
+
+List<String> _labListFor(Object? value) {
+  if (value == null) return const [];
+  if (value is List) {
+    return value
+        .map(_labText)
+        .whereType<String>()
+        .where((text) => text.trim().isNotEmpty)
+        .toList();
+  }
+  if (value is Map) {
+    return value.entries
+        .map((entry) {
+          final text = _labText(entry.value);
+          if (text == null || text.trim().isEmpty) return null;
+          return '${_humanizeLabLabel(entry.key.toString())}: $text';
+        })
+        .whereType<String>()
+        .toList();
+  }
+  final text = _labText(value);
+  if (text == null || text.trim().isEmpty) return const [];
+  return text
+      .split(RegExp(r'\n+|•\s*'))
+      .map((item) => item.replaceFirst(RegExp(r'^[-*]\s*'), '').trim())
+      .where((item) => item.isNotEmpty)
+      .toList();
+}
+
+String? _labText(Object? value) {
+  if (value == null) return null;
+  if (value is String) return value.trim();
+  if (value is num || value is bool) return value.toString();
+  if (value is List) {
+    return value.map(_labText).whereType<String>().join(' / ');
+  }
+  if (value is Map) {
+    return value.entries
+        .map((entry) {
+          final text = _labText(entry.value);
+          if (text == null || text.isEmpty) return null;
+          return '${_humanizeLabLabel(entry.key.toString())}: $text';
+        })
+        .whereType<String>()
+        .join(' | ');
+  }
+  return value.toString().trim();
+}
+
+String _normalizeLabKey(String value) {
+  return value
+      .toLowerCase()
+      .replaceAll('_', '')
+      .replaceAll('-', '')
+      .replaceAll(' ', '');
 }
 
 List<Object?>? _labPreferredList(Map<dynamic, dynamic> content) {
@@ -7018,67 +7789,6 @@ class _SwitchSetting extends StatelessWidget {
   }
 }
 
-class _LabeledSlider extends StatelessWidget {
-  const _LabeledSlider({
-    required this.value,
-    required this.min,
-    required this.max,
-    required this.label,
-    required this.leftLabel,
-    required this.rightLabel,
-    required this.onChanged,
-  });
-
-  final double value;
-  final double min;
-  final double max;
-  final String label;
-  final String leftLabel;
-  final String rightLabel;
-  final ValueChanged<double> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Align(
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.muted,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        Slider(
-          value: value,
-          min: min,
-          max: max,
-          onChanged: onChanged,
-          activeColor: AppColors.blue,
-          inactiveColor: AppColors.line,
-        ),
-        Row(
-          children: [
-            Text(
-              leftLabel,
-              style: const TextStyle(color: AppColors.muted, fontSize: 12),
-            ),
-            const Spacer(),
-            Text(
-              rightLabel,
-              style: const TextStyle(color: AppColors.muted, fontSize: 12),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
 class _RangeLine extends StatelessWidget {
   const _RangeLine({
     required this.value,
@@ -7120,72 +7830,6 @@ class _RangeLine extends StatelessWidget {
   }
 }
 
-class _SelectBox extends StatelessWidget {
-  const _SelectBox({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return _DropdownLike(icon: icon, label: label, onTap: onTap);
-  }
-}
-
-class _DropdownLike extends StatelessWidget {
-  const _DropdownLike({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        height: 48,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.line),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.blue, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: AppColors.muted,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _InputLike extends StatelessWidget {
   const _InputLike({required this.text});
 
@@ -7213,49 +7857,6 @@ class _InputLike extends StatelessWidget {
             ),
           ),
           const Icon(Icons.close_rounded, color: AppColors.muted, size: 20),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepperBox extends StatelessWidget {
-  const _StepperBox({required this.value, required this.onChanged});
-
-  final int value;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 46,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () => onChanged(math.max(1, value - 1)),
-            icon: const Icon(Icons.remove_rounded),
-          ),
-          Expanded(
-            child: Center(
-              child: Text(
-                '$value',
-                style: const TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ),
-          IconButton(
-            onPressed: () => onChanged(value + 1),
-            icon: const Icon(Icons.add_rounded),
-          ),
         ],
       ),
     );
@@ -7402,161 +8003,6 @@ class _InfoPill extends StatelessWidget {
   }
 }
 
-class _PatientAvatar extends StatelessWidget {
-  const _PatientAvatar();
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(painter: _PatientAvatarPainter());
-  }
-}
-
-class _PatientAvatarPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    canvas.drawCircle(
-      center,
-      size.width * .45,
-      Paint()..color = AppColors.selectedBlue,
-    );
-    canvas.drawCircle(
-      Offset(center.dx, center.dy - 24),
-      26,
-      Paint()..color = const Color(0xFFD7E2F8),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: Offset(center.dx, center.dy + 38),
-          width: 82,
-          height: 56,
-        ),
-        const Radius.circular(22),
-      ),
-      Paint()..color = const Color(0xFF4D78C8),
-    );
-    canvas.drawCircle(
-      Offset(center.dx - 18, center.dy - 32),
-      4,
-      Paint()..color = AppColors.navy,
-    );
-    canvas.drawCircle(
-      Offset(center.dx + 18, center.dy - 32),
-      4,
-      Paint()..color = AppColors.navy,
-    );
-    canvas.drawLine(
-      Offset(center.dx - 18, center.dy - 2),
-      Offset(center.dx + 18, center.dy - 2),
-      Paint()
-        ..color = AppColors.red
-        ..strokeWidth = 3
-        ..strokeCap = StrokeCap.round,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _PreviewTextBlock extends StatelessWidget {
-  const _PreviewTextBlock({required this.title, required this.body});
-
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: AppColors.navy,
-            fontSize: 20,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          body,
-          style: const TextStyle(
-            color: AppColors.muted,
-            fontSize: 15,
-            height: 1.45,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _LearningGoalsPreview extends StatelessWidget {
-  const _LearningGoalsPreview();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Olası Öğrenme Hedefleri',
-            style: TextStyle(
-              color: AppColors.navy,
-              fontWeight: FontWeight.w900,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 12),
-          for (final goal in const [
-            'Tanı yaklaşımını uygulama',
-            'Uygun tetkik ve tedavi planlama',
-            'Ayırıcı tanıda klinik karar verme',
-          ])
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.check_rounded,
-                    color: AppColors.green,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      goal,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 13.5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          const Text(
-            'Tümünü göster',
-            style: TextStyle(
-              color: AppColors.blue,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SummaryActionBar extends StatelessWidget {
   const _SummaryActionBar({
     required this.icon,
@@ -7564,61 +8010,186 @@ class _SummaryActionBar extends StatelessWidget {
     required this.detail,
     required this.buttonLabel,
     required this.onTap,
+    this.subtitle,
   });
 
   final IconData icon;
   final String title;
   final String detail;
   final String buttonLabel;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
     return _LabPanel(
       padding: const EdgeInsets.fromLTRB(22, 16, 22, 16),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: AppColors.blue.withValues(alpha: .14),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: AppColors.blue),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final leading = Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: AppColors.blue.withValues(alpha: .14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: AppColors.blue),
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      detail,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+          final button = _PrimaryLabButton(
+            label: buttonLabel,
+            icon: Icons.auto_awesome_rounded,
+            onTap: onTap,
+            subtitle: subtitle,
+          );
+          if (constraints.maxWidth < 640) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [leading, const SizedBox(height: 14), button],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: leading),
+              const SizedBox(width: 18),
+              SizedBox(width: 250, child: button),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CompactToolHero extends StatelessWidget {
+  const _CompactToolHero({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.selectedCount,
+    required this.hasSources,
+    required this.onPickSources,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final int selectedCount;
+  final bool hasSources;
+  final VoidCallback onPickSources;
+
+  @override
+  Widget build(BuildContext context) {
+    return _LabPanel(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      radius: 18,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 620;
+          final copy = Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: AppColors.blue.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: AppColors.blue),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 30,
+                        height: 1.05,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 16,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        _MiniHeroChip(
+                          icon: Icons.library_books_outlined,
+                          label: '$selectedCount kaynak seçili',
+                        ),
+                        const _MiniHeroChip(
+                          icon: Icons.verified_outlined,
+                          label: 'Kaynak temelli',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+          final action = _SmallActionButton(
+            label: hasSources ? 'Kaynakları yönet' : 'Drive’dan kaynak seç',
+            icon: Icons.folder_open_rounded,
+            onTap: onPickSources,
+          );
+          if (compact) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  detail,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 14),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(
-            width: 250,
-            child: _PrimaryLabButton(
-              label: buttonLabel,
-              icon: Icons.auto_awesome_rounded,
-              onTap: onTap,
-            ),
-          ),
-        ],
+              children: [copy, const SizedBox(height: 16), action],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: copy),
+              const SizedBox(width: 18),
+              SizedBox(width: 230, child: action),
+            ],
+          );
+        },
       ),
     );
   }
@@ -8088,112 +8659,15 @@ class _ScoreBox extends StatelessWidget {
   }
 }
 
-class _PlanPreviewCards extends StatelessWidget {
-  const _PlanPreviewCards();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (var i = 1; i <= 3; i++) ...[
-          Expanded(child: _PlanPreviewCard(day: i)),
-          if (i != 3) const SizedBox(width: 18),
-        ],
-        const SizedBox(width: 18),
-        Expanded(
-          child: Container(
-            height: 170,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.line),
-            ),
-            child: const Text(
-              'Devam eden günler\nplanına göre\noluşturulacak.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.muted,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _PlanPreviewCard extends StatelessWidget {
-  const _PlanPreviewCard({required this.day});
-
-  final int day;
-
-  @override
-  Widget build(BuildContext context) {
-    final lines = const [
-      'İçerik hazırlanıyor',
-      'İçerik hazırlanıyor',
-      'İçerik hazırlanıyor',
-    ];
-    return Container(
-      height: 170,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: day == 1 ? const Color(0xFFF4FFFC) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Gün $day',
-                style: TextStyle(
-                  color: day == 1 ? AppColors.green : AppColors.purple,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 15,
-                ),
-              ),
-              const Spacer(),
-              const Icon(Icons.menu_book_outlined, color: AppColors.blue),
-            ],
-          ),
-          const SizedBox(height: 14),
-          for (final line in lines)
-            Text(
-              '- $line',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.navy,
-                fontSize: 12.5,
-                height: 1.55,
-              ),
-            ),
-          const Spacer(),
-          const Text(
-            'Tahmini 6 görev  •  2 saat',
-            style: TextStyle(
-              color: AppColors.green,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _PlanSummaryBar extends StatelessWidget {
   const _PlanSummaryBar({
     required this.days,
     required this.duration,
     required this.focus,
     required this.reviews,
+    required this.quality,
+    required this.canGenerate,
+    required this.blockedSubtitle,
     required this.onGenerate,
   });
 
@@ -8201,50 +8675,71 @@ class _PlanSummaryBar extends StatelessWidget {
   final String duration;
   final int focus;
   final bool reviews;
-  final VoidCallback onGenerate;
+  final String quality;
+  final bool canGenerate;
+  final String? blockedSubtitle;
+  final VoidCallback? onGenerate;
 
   @override
   Widget build(BuildContext context) {
     return _LabPanel(
-      child: Row(
-        children: [
-          _SummaryMetric(
-            icon: Icons.menu_book_outlined,
-            title: 'Tahmini Görev',
-            value: '${days * 6}',
-            detail: 'görev',
-          ),
-          const _VerticalDividerLite(),
-          _SummaryMetric(
-            icon: Icons.schedule_rounded,
-            title: 'Toplam Süre',
-            value: '${days * 2}',
-            detail: 'saat',
-          ),
-          const _VerticalDividerLite(),
-          _SummaryMetric(
-            icon: Icons.track_changes_rounded,
-            title: 'Ana Odak',
-            value: '$focus',
-            detail: 'konu',
-          ),
-          const _VerticalDividerLite(),
-          _SummaryMetric(
-            icon: Icons.sync_rounded,
-            title: 'Tekrar Seansları',
-            value: reviews ? 'Eklenecek' : 'Kapalı',
-            detail: 'Spaced Repetition',
-          ),
-          const SizedBox(width: 24),
-          SizedBox(
-            width: 210,
-            child: _PrimaryLabButton(
-              label: 'Planı Oluştur',
-              icon: Icons.auto_awesome_rounded,
-              onTap: onGenerate,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final metrics = [
+            _SummaryMetric(
+              icon: Icons.menu_book_outlined,
+              title: 'Plan Süresi',
+              value: '$days',
+              detail: 'gün',
             ),
-          ),
-        ],
+            _SummaryMetric(
+              icon: Icons.schedule_rounded,
+              title: 'Günlük Süre',
+              value: duration,
+              detail: 'hedef',
+            ),
+            _SummaryMetric(
+              icon: Icons.track_changes_rounded,
+              title: 'Ana Odak',
+              value: '$focus',
+              detail: 'bölüm',
+            ),
+            _SummaryMetric(
+              icon: Icons.sync_rounded,
+              title: 'Kalite',
+              value: quality,
+              detail: reviews ? 'Tekrar eklenecek' : 'Tekrar kapalı',
+            ),
+          ];
+          final button = _PrimaryLabButton(
+            label: 'Öğrenme planı oluştur',
+            icon: Icons.auto_awesome_rounded,
+            onTap: onGenerate,
+            subtitle: canGenerate ? null : blockedSubtitle,
+          );
+          if (constraints.maxWidth < 760) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final metric in metrics) ...[
+                  metric,
+                  const SizedBox(height: 10),
+                ],
+                button,
+              ],
+            );
+          }
+          return Row(
+            children: [
+              for (var i = 0; i < metrics.length; i++) ...[
+                Expanded(child: metrics[i]),
+                if (i != metrics.length - 1) const _VerticalDividerLite(),
+              ],
+              const SizedBox(width: 24),
+              SizedBox(width: 240, child: button),
+            ],
+          );
+        },
       ),
     );
   }

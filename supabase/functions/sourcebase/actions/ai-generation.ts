@@ -315,6 +315,11 @@ export async function createGenerationJob(
       infographicType: textOption(payload.infographic_type),
       visualStyle: textOption(payload.visual_style),
       density: textOption(payload.density),
+      scenarioType: textOption(payload.scenario_type),
+      difficulty: textOption(payload.difficulty),
+      planGoal: textOption(payload.plan_goal),
+      dailyTime: textOption(payload.daily_time),
+      studyStyle: textOption(payload.study_style),
       qualityTier,
     },
   };

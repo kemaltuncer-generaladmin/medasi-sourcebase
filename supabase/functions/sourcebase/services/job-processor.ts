@@ -229,6 +229,11 @@ type JobGenerationOptions = {
   infographicType?: string;
   visualStyle?: string;
   density?: string;
+  scenarioType?: string;
+  difficulty?: string;
+  planGoal?: string;
+  dailyTime?: string;
+  studyStyle?: string;
   qualityTier?: string;
 };
 
@@ -294,6 +299,11 @@ export class JobProcessor {
             infographicType: input.options?.infographicType,
             visualStyle: input.options?.visualStyle,
             density: input.options?.density,
+            scenarioType: input.options?.scenarioType,
+            difficulty: input.options?.difficulty,
+            planGoal: input.options?.planGoal,
+            dailyTime: input.options?.dailyTime,
+            studyStyle: input.options?.studyStyle,
             qualityTier: input.options?.qualityTier,
           },
         },
@@ -482,6 +492,11 @@ export class JobProcessor {
       infographicType: options.infographicType,
       visualStyle: options.visualStyle,
       density: options.density,
+      scenarioType: options.scenarioType,
+      difficulty: options.difficulty,
+      planGoal: options.planGoal,
+      dailyTime: options.dailyTime,
+      studyStyle: options.studyStyle,
       qualityTier: options.qualityTier,
     };
     switch (jobType) {

@@ -146,6 +146,12 @@ export interface PodcastScript {
 
 export interface ClinicalScenario {
   title: string;
+  patientInfo?: string;
+  chiefComplaint?: string;
+  history?: string;
+  physicalExam?: string[];
+  labsImaging?: string[];
+  decisionPoint?: string;
   caseStem: string;
   findings: string[];
   questions: Array<{
@@ -153,11 +159,21 @@ export interface ClinicalScenario {
     answer: string;
     explanation?: string;
   }>;
+  learningObjective?: string[];
+  examTips?: string[];
   teachingPoints: string[];
 }
 
 export interface LearningPlan {
   title: string;
+  sourceName?: string;
+  duration?: string;
+  dailyGoals?: string[];
+  checklist?: string[];
+  reviewDays?: string[];
+  questionFlashcardSuggestions?: string[];
+  weakPoints?: string[];
+  startToday?: string[];
   objectives: string[];
   sessions: Array<{
     title: string;
