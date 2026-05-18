@@ -1,6 +1,10 @@
 import { isRecord, SafeError } from "./types.ts";
 import {
+  getAllowedOrigin,
   getGcsConfig,
+  getSupabaseAnonKey,
+  getSupabaseServiceRoleKey,
+  getSupabaseUrl,
   parseGoogleServiceAccount,
   runtimeConfigStatus,
 } from "./config.ts";
@@ -8,6 +12,7 @@ import {
   cancelJob,
   centralAiChat,
   createGenerationJob,
+  estimateGenerationCost,
   getGeneratedContent,
   getJobStatus,
   listUserJobs,
@@ -122,6 +127,8 @@ Deno.serve(async (request) => {
         return success(await processFileExtraction(user.id, payload));
       case "create_generation_job":
         return success(await createGenerationJob(user.id, payload));
+      case "estimate_generation_cost":
+        return success(await estimateGenerationCost(user.id, payload));
       case "get_job_status":
         return success(await getJobStatus(user.id, payload));
       case "get_generated_content":
@@ -151,8 +158,8 @@ Deno.serve(async (request) => {
 async function authenticate(
   request: Request,
 ): Promise<{ id: string; email?: string }> {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const supabaseUrl = getSupabaseUrl();
+  const anonKey = getSupabaseAnonKey();
   const authorization = request.headers.get("authorization");
 
   if (!supabaseUrl || !anonKey) {
@@ -923,8 +930,8 @@ async function audit(
 }
 
 async function supabaseRest(path: string, init: RequestInit) {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const supabaseUrl = getSupabaseUrl();
+  const serviceKey = getSupabaseServiceRoleKey();
   if (!supabaseUrl || !serviceKey) {
     throw new SafeError(
       "DATABASE_NOT_CONFIGURED",
@@ -1613,7 +1620,7 @@ function formatTime(date: Date) {
 }
 
 function allowedCorsOrigin() {
-  const configured = Deno.env.get("SOURCEBASE_ALLOWED_ORIGIN")?.trim();
+  const configured = getAllowedOrigin();
   if (!configured || configured === "*") return DEFAULT_ALLOWED_ORIGIN;
   return configured;
 }

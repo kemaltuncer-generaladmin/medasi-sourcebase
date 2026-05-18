@@ -1,5 +1,11 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { supabaseAdmin } from "../_shared/supabase-client.ts";
+import {
+  envValue,
+  getSupabaseAnonKey,
+  getSupabaseServiceRoleKey,
+  getSupabaseUrl,
+} from "../sourcebase/config.ts";
 import { VertexAIClient } from "../sourcebase/services/vertex-ai.ts";
 import { isRecord, SafeError } from "../sourcebase/types.ts";
 
@@ -78,14 +84,13 @@ Deno.serve(async (req) => {
 
 async function authenticate(req: Request): Promise<AuthContext> {
   const authorization = req.headers.get("authorization") ?? "";
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim() ??
-    "";
+  const serviceRoleKey = getSupabaseServiceRoleKey();
   if (serviceRoleKey && authorization === `Bearer ${serviceRoleKey}`) {
     return { kind: "service", userId: null };
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim() ?? "";
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")?.trim() ?? "";
+  const supabaseUrl = getSupabaseUrl();
+  const anonKey = getSupabaseAnonKey();
   if (!supabaseUrl || !anonKey) {
     throw new SafeError(
       "AUTH_NOT_CONFIGURED",
@@ -359,12 +364,19 @@ async function assertEntityOwned(
 }
 
 function createVertexAIClient(): VertexAIClient {
-  const projectId = Deno.env.get("VERTEX_PROJECT_ID")?.trim() ?? "";
-  const location = Deno.env.get("VERTEX_LOCATION")?.trim() ?? "us-central1";
-  const model = Deno.env.get("VERTEX_MODEL")?.trim() ?? "gemini-2.5-flash";
-  const serviceAccountJson =
-    Deno.env.get("VERTEX_SERVICE_ACCOUNT_JSON")?.trim() ??
-      "";
+  const projectId = envValue(
+    "VERTEX_PROJECT_ID",
+    "SOURCEBASE_VERTEX_PROJECT_ID",
+  );
+  const location = envValue("VERTEX_LOCATION", "SOURCEBASE_VERTEX_LOCATION") ||
+    "us-central1";
+  const model = envValue("VERTEX_MODEL", "SOURCEBASE_VERTEX_MODEL") ||
+    "gemini-2.5-flash";
+  const serviceAccountJson = envValue(
+    "VERTEX_SERVICE_ACCOUNT_JSON",
+    "SOURCEBASE_VERTEX_SERVICE_ACCOUNT_JSON",
+    "GOOGLE_VERTEX_SERVICE_ACCOUNT_JSON",
+  );
 
   if (!projectId || !serviceAccountJson) {
     throw new SafeError(

@@ -11,7 +11,15 @@ import {
   JobStatus,
   SafeError,
 } from "../types.ts";
-import { VertexAIClient } from "./vertex-ai.ts";
+import { generateInfographicImage } from "./image-provider.ts";
+import { captureMedasiCoin, refundMedasiCoin } from "./medasicoin-wallet.ts";
+import type { McPricingQuote } from "./medasicoin-pricing.ts";
+import { resolveTextRoute, RouteOptions, TextRoute } from "./model-router.ts";
+import {
+  GenerationOptions,
+  GenerationResult,
+  VertexAIClient,
+} from "./vertex-ai.ts";
 
 export interface JobUpdate {
   status?: JobStatus;
@@ -203,6 +211,18 @@ export interface JobProcessorConfig {
   vertexServiceAccountJson: string;
 }
 
+type JobGenerationOptions = {
+  count?: number;
+  temperature?: number;
+  maxTokens?: number;
+  routeOptions?: RouteOptions;
+  pricing?: McPricingQuote;
+};
+
+type RoutedGenerationResult<T> = GenerationResult<T> & {
+  modelRoute: ReturnType<typeof safeRouteMetadata>;
+};
+
 export class JobProcessor {
   private vertex: VertexAIClient;
 
@@ -220,11 +240,7 @@ export class JobProcessor {
     sourceFileId?: string;
     jobType: GenerationType;
     sourceText: string;
-    options?: {
-      count?: number;
-      temperature?: number;
-      maxTokens?: number;
-    };
+    options?: JobGenerationOptions;
   }): Promise<GenerationJob> {
     const job = await this.createQueuedJob(input);
     return await this.processJob(job, input);
@@ -235,12 +251,13 @@ export class JobProcessor {
     sourceFileId?: string;
     jobType: GenerationType;
     sourceText: string;
-    options?: {
-      count?: number;
-      temperature?: number;
-      maxTokens?: number;
-    };
+    options?: JobGenerationOptions;
   }): Promise<GenerationJob> {
+    const route = resolveTextRoute(
+      input.jobType,
+      input.options?.routeOptions,
+      input.sourceText.length,
+    );
     const job = await createJob(
       this.config.supabaseUrl,
       this.config.serviceRoleKey,
@@ -248,8 +265,12 @@ export class JobProcessor {
       {
         source_file_id: input.sourceFileId,
         job_type: input.jobType,
-        model: this.config.vertexModel,
-        metadata: { sourceTextLength: input.sourceText.length },
+        model: route.model,
+        metadata: {
+          sourceTextLength: input.sourceText.length,
+          modelRoute: safeRouteMetadata(route),
+          pricing: input.options?.pricing,
+        },
       },
     );
 
@@ -261,11 +282,7 @@ export class JobProcessor {
     input: {
       jobType: GenerationType;
       sourceText: string;
-      options?: {
-        count?: number;
-        temperature?: number;
-        maxTokens?: number;
-      };
+      options?: JobGenerationOptions;
     },
   ): Promise<GenerationJob> {
     await updateJob(
@@ -292,25 +309,49 @@ export class JobProcessor {
           input_tokens: result.inputTokens,
           output_tokens: result.outputTokens,
           cost_estimate: result.costEstimate,
+          model: result.modelRoute.model,
           metadata: {
             ...job.metadata,
             content: result.content,
+            modelRoute: result.modelRoute,
             completedAt: new Date().toISOString(),
           },
         },
       );
+      await captureMedasiCoin({
+        config: this.config,
+        userId: job.owner_user_id,
+        jobId: job.id,
+        reason: `ai_generation_capture:${input.jobType}`,
+        metadata: { modelRoute: result.modelRoute },
+      });
       return {
         ...job,
         status: "completed",
         input_tokens: result.inputTokens,
         output_tokens: result.outputTokens,
         cost_estimate: result.costEstimate,
+        model: result.modelRoute.model,
         metadata: {
           ...job.metadata,
           content: result.content,
+          modelRoute: result.modelRoute,
         },
       };
     } catch (error) {
+      const pricing = isPricingQuote(job.metadata?.pricing)
+        ? job.metadata.pricing
+        : undefined;
+      await refundMedasiCoin({
+        config: this.config,
+        userId: job.owner_user_id,
+        jobId: job.id,
+        amountUnits: pricing?.amount_units ?? 0,
+        reason: `ai_generation_refund:${input.jobType}`,
+        metadata: {
+          errorCode: error instanceof SafeError ? error.code : "AI_FAILED",
+        },
+      });
       await updateJob(
         this.config.supabaseUrl,
         this.config.serviceRoleKey,
@@ -384,37 +425,134 @@ export class JobProcessor {
   private generate(
     jobType: GenerationType,
     sourceText: string,
-    options: { count?: number; temperature?: number; maxTokens?: number },
+    options: JobGenerationOptions,
   ) {
+    const route = resolveTextRoute(
+      jobType,
+      options.routeOptions,
+      sourceText.length,
+    );
+    const routedOptions: GenerationOptions = {
+      temperature: options.temperature,
+      maxTokens: options.maxTokens,
+      provider: route.provider,
+      model: route.model,
+    };
     switch (jobType) {
       case "flashcard":
-        return this.vertex.generateFlashcards(
-          sourceText,
-          options.count ?? 20,
-          options,
+        return this.withRoute(
+          route,
+          this.vertex.generateFlashcards(
+            sourceText,
+            options.count ?? 20,
+            routedOptions,
+          ),
         );
       case "quiz":
-        return this.vertex.generateQuiz(
-          sourceText,
-          options.count ?? 10,
-          options,
+        return this.withRoute(
+          route,
+          this.vertex.generateQuiz(
+            sourceText,
+            options.count ?? 10,
+            routedOptions,
+          ),
         );
       case "summary":
-        return this.vertex.generateSummary(sourceText, options);
+        return this.withRoute(
+          route,
+          this.vertex.generateSummary(sourceText, routedOptions),
+        );
       case "algorithm":
-        return this.vertex.generateAlgorithm(sourceText, options);
+        return this.withRoute(
+          route,
+          this.vertex.generateAlgorithm(sourceText, routedOptions),
+        );
       case "comparison":
-        return this.vertex.generateComparison(sourceText, options);
+        return this.withRoute(
+          route,
+          this.vertex.generateComparison(sourceText, routedOptions),
+        );
       case "podcast":
-        return this.vertex.generatePodcast(sourceText, options);
+        return this.withRoute(
+          route,
+          this.vertex.generatePodcast(sourceText, routedOptions),
+        );
       case "clinical_scenario":
-        return this.vertex.generateClinicalScenario(sourceText, options);
+        return this.withRoute(
+          route,
+          this.vertex.generateClinicalScenario(sourceText, routedOptions),
+        );
       case "learning_plan":
-        return this.vertex.generateLearningPlan(sourceText, options);
+        return this.withRoute(
+          route,
+          this.vertex.generateLearningPlan(sourceText, routedOptions),
+        );
       case "infographic":
-        return this.vertex.generateInfographic(sourceText, options);
+        return this.generateInfographicWithImage(
+          sourceText,
+          { ...routedOptions, routeOptions: options.routeOptions },
+          route,
+        );
       case "mind_map":
-        return this.vertex.generateMindMap(sourceText, options);
+        return this.withRoute(
+          route,
+          this.vertex.generateMindMap(sourceText, routedOptions),
+        );
     }
   }
+
+  private async generateInfographicWithImage(
+    sourceText: string,
+    options: GenerationOptions & { routeOptions?: RouteOptions },
+    route: TextRoute,
+  ): Promise<RoutedGenerationResult<unknown>> {
+    const specResult = await this.vertex.generateInfographic(
+      sourceText,
+      options,
+    );
+    const image = await generateInfographicImage(
+      specResult.content,
+      options.routeOptions,
+    );
+    return {
+      ...specResult,
+      content: {
+        ...specResult.content,
+        image: {
+          provider: image.provider,
+          model: image.model,
+          mimeType: image.mimeType,
+          dataUrl: image.dataUrl,
+          url: image.url,
+          prompt: image.prompt,
+        },
+      },
+      modelRoute: safeRouteMetadata(route),
+    };
+  }
+
+  private async withRoute<T>(
+    route: TextRoute,
+    result: Promise<GenerationResult<T>>,
+  ): Promise<RoutedGenerationResult<T>> {
+    return {
+      ...await result,
+      modelRoute: safeRouteMetadata(route),
+    };
+  }
+}
+
+function safeRouteMetadata(route: TextRoute) {
+  return {
+    provider: route.provider,
+    model: route.model,
+    tier: route.tier,
+    reason: route.reason,
+    fallbackUsed: route.fallbackUsed,
+  };
+}
+
+function isPricingQuote(value: unknown): value is McPricingQuote {
+  return typeof value === "object" && value !== null &&
+    typeof (value as { amount_units?: unknown }).amount_units === "number";
 }

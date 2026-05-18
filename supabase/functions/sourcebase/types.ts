@@ -151,11 +151,26 @@ export interface LearningPlan {
 
 export interface InfographicPlan {
   title: string;
+  audience?: string;
+  style?: string;
+  layout?: string;
   sections: Array<{
     heading: string;
     bullets: string[];
   }>;
+  visual_elements?: string[];
+  color_palette?: string;
+  avoid?: string[];
+  language?: string;
   visualNotes: string[];
+  image?: {
+    provider: string;
+    model: string;
+    mimeType: string;
+    dataUrl?: string;
+    url?: string;
+    prompt?: string;
+  };
 }
 
 export interface MindMap {

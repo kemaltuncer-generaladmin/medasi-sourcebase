@@ -9,7 +9,18 @@ export const corsHeaders = {
 };
 
 function allowedCorsOrigin() {
-  const configured = Deno.env.get("SOURCEBASE_ALLOWED_ORIGIN")?.trim();
+  const configured = envValue(
+    "SOURCEBASE_ALLOWED_ORIGIN",
+    "SOURCEBASE_PUBLIC_URL",
+  );
   if (!configured || configured === "*") return DEFAULT_ALLOWED_ORIGIN;
   return configured;
+}
+
+function envValue(...names: string[]) {
+  for (const name of names) {
+    const value = Deno.env.get(name)?.trim();
+    if (value) return value;
+  }
+  return "";
 }

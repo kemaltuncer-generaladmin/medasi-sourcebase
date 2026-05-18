@@ -22,10 +22,37 @@ export interface VertexConfig {
   serviceAccount: GoogleServiceAccount;
 }
 
-export function getGcsConfig(): GcsConfig {
-  const bucket = stripWrappingQuotes(
-    Deno.env.get("SOURCEBASE_GCS_BUCKET")?.trim() ?? "",
+export function envValue(...names: string[]) {
+  return firstEnv(...names);
+}
+
+export function getSupabaseUrl() {
+  return envValue("SUPABASE_URL", "SOURCEBASE_SUPABASE_URL");
+}
+
+export function getSupabaseAnonKey() {
+  return envValue(
+    "SUPABASE_ANON_KEY",
+    "SOURCEBASE_SUPABASE_PUBLIC_TOKEN",
+    "SOURCEBASE_SUPABASE_ANON_KEY",
   );
+}
+
+export function getSupabaseServiceRoleKey() {
+  return envValue(
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SOURCEBASE_SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_SERVICE_KEY",
+  );
+}
+
+export function getAllowedOrigin() {
+  return envValue("SOURCEBASE_ALLOWED_ORIGIN", "SOURCEBASE_PUBLIC_URL") ||
+    "https://sourcebase.medasi.com.tr";
+}
+
+export function getGcsConfig(): GcsConfig {
+  const bucket = envValue("SOURCEBASE_GCS_BUCKET", "GCS_BUCKET");
   const serviceAccountJson = firstEnv(
     "SOURCEBASE_GCS_SERVICE_ACCOUNT_JSON",
     "GOOGLE_SERVICE_ACCOUNT_JSON",
@@ -51,13 +78,12 @@ export function getGcsConfig(): GcsConfig {
 }
 
 export function getVertexConfig(): VertexConfig {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim() ?? "";
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim() ??
-    "";
+  const supabaseUrl = getSupabaseUrl();
+  const serviceRoleKey = getSupabaseServiceRoleKey();
   const vertexServiceAccountJson = firstEnv(
     "VERTEX_SERVICE_ACCOUNT_JSON",
-    "GOOGLE_SERVICE_ACCOUNT_JSON",
-    "GOOGLE_SERVICE_ACCOUNT_JSON_BASE64",
+    "SOURCEBASE_VERTEX_SERVICE_ACCOUNT_JSON",
+    "GOOGLE_VERTEX_SERVICE_ACCOUNT_JSON",
   );
   const serviceAccount = vertexServiceAccountJson
     ? parseGoogleServiceAccount(
@@ -65,12 +91,18 @@ export function getVertexConfig(): VertexConfig {
       "VERTEX_SERVICE_ACCOUNT_INVALID",
     )
     : undefined;
-  const vertexProjectId = Deno.env.get("VERTEX_PROJECT_ID")?.trim() ||
+  const vertexProjectId = envValue(
+    "VERTEX_PROJECT_ID",
+    "SOURCEBASE_VERTEX_PROJECT_ID",
+  ) ||
     serviceAccount?.projectId ||
     "";
-  const vertexLocation = Deno.env.get("VERTEX_LOCATION")?.trim() ||
+  const vertexLocation = envValue(
+    "VERTEX_LOCATION",
+    "SOURCEBASE_VERTEX_LOCATION",
+  ) ||
     "us-central1";
-  const vertexModel = Deno.env.get("VERTEX_MODEL")?.trim() ||
+  const vertexModel = envValue("VERTEX_MODEL", "SOURCEBASE_VERTEX_MODEL") ||
     "gemini-2.5-flash";
 
   if (
@@ -103,8 +135,8 @@ export function runtimeConfigStatus() {
   );
   const vertexServiceJson = firstEnv(
     "VERTEX_SERVICE_ACCOUNT_JSON",
-    "GOOGLE_SERVICE_ACCOUNT_JSON",
-    "GOOGLE_SERVICE_ACCOUNT_JSON_BASE64",
+    "SOURCEBASE_VERTEX_SERVICE_ACCOUNT_JSON",
+    "GOOGLE_VERTEX_SERVICE_ACCOUNT_JSON",
   );
   const vertexAccount = vertexServiceJson
     ? safeParseServiceAccount(vertexServiceJson)
@@ -113,15 +145,20 @@ export function runtimeConfigStatus() {
   return {
     gcs: {
       provider: "gcs",
-      bucketConfigured: Boolean(Deno.env.get("SOURCEBASE_GCS_BUCKET")),
+      bucketConfigured: Boolean(
+        envValue("SOURCEBASE_GCS_BUCKET", "GCS_BUCKET"),
+      ),
       serviceAccountConfigured: Boolean(gcsServiceJson),
     },
     vertex: {
       projectConfigured: Boolean(
-        Deno.env.get("VERTEX_PROJECT_ID") || vertexAccount?.projectId,
+        envValue("VERTEX_PROJECT_ID", "SOURCEBASE_VERTEX_PROJECT_ID") ||
+          vertexAccount?.projectId,
       ),
-      location: Deno.env.get("VERTEX_LOCATION") ?? "us-central1",
-      model: Deno.env.get("VERTEX_MODEL") ?? "gemini-2.5-flash",
+      location: envValue("VERTEX_LOCATION", "SOURCEBASE_VERTEX_LOCATION") ??
+        "us-central1",
+      model: envValue("VERTEX_MODEL", "SOURCEBASE_VERTEX_MODEL") ??
+        "gemini-2.5-flash",
       serviceAccountConfigured: Boolean(vertexServiceJson),
     },
   };
@@ -188,8 +225,9 @@ function stripWrappingQuotes(value: string) {
 function decodeBase64Env(value: string) {
   try {
     return new TextDecoder().decode(
-      Uint8Array.from(atob(stripWrappingQuotes(value)), (char) =>
-        char.charCodeAt(0)
+      Uint8Array.from(
+        atob(stripWrappingQuotes(value)),
+        (char) => char.charCodeAt(0),
       ),
     ).trim();
   } catch (_error) {
