@@ -1017,7 +1017,7 @@ class _BaseForceHero extends StatelessWidget {
               title,
               style: TextStyle(
                 color: AppColors.navy,
-                fontSize: compact ? 36 : 44,
+                fontSize: compact ? 32 : 44,
                 fontWeight: FontWeight.w900,
                 height: 1.04,
                 letterSpacing: 0,
@@ -1028,13 +1028,13 @@ class _BaseForceHero extends StatelessWidget {
               subtitle,
               style: TextStyle(
                 color: AppColors.muted,
-                fontSize: compact ? 17 : 20,
-                height: compact ? 1.28 : 1.42,
+                fontSize: compact ? 16 : 20,
+                height: compact ? 1.22 : 1.42,
                 fontWeight: FontWeight.w500,
               ),
             ),
             if (actions.isNotEmpty) ...[
-              SizedBox(height: compact ? 16 : 24),
+              SizedBox(height: compact ? 12 : 24),
               Wrap(spacing: 10, runSpacing: 10, children: actions),
             ],
           ],
@@ -3283,21 +3283,25 @@ class _HeroAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 420;
     return SizedBox(
-      height: 58,
+      height: compact ? 48 : 58,
       child: ElevatedButton.icon(
         onPressed: onTap,
-        icon: Icon(icon, size: 27),
+        icon: Icon(icon, size: compact ? 22 : 27),
         label: Text(label, maxLines: 1),
         style: ElevatedButton.styleFrom(
           elevation: 0,
           backgroundColor: cyan ? AppColors.cyan : AppColors.blue,
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 22),
+          padding: EdgeInsets.symmetric(horizontal: compact ? 16 : 22),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
-          textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          textStyle: TextStyle(
+            fontSize: compact ? 16 : 20,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );
