@@ -497,6 +497,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
           ),
           BaseForceView.flashcardResults => _FlashcardResultsScreen(
             result: _latestResult,
+            saveError: _latestResultSaveError,
             onSearch: widget.onSearch,
             onBack: _backToHome,
             onSave: () {
@@ -2487,6 +2488,7 @@ class _QueueScreen extends StatelessWidget {
 class _FlashcardResultsScreen extends StatelessWidget {
   const _FlashcardResultsScreen({
     required this.result,
+    required this.saveError,
     required this.onSearch,
     required this.onBack,
     required this.onSave,
@@ -2496,6 +2498,7 @@ class _FlashcardResultsScreen extends StatelessWidget {
   });
 
   final _GenerationResult? result;
+  final String? saveError;
   final VoidCallback onSearch;
   final VoidCallback onBack;
   final VoidCallback onSave;
@@ -2527,6 +2530,17 @@ class _FlashcardResultsScreen extends StatelessWidget {
                 )
               : _GeneratedContentView(result: current),
         ),
+        if (saveError != null && current != null) ...[
+          const SizedBox(height: 12),
+          _BasePanel(
+            child: _EmptyBaseForceState(
+              icon: Icons.sync_problem_rounded,
+              title: 'Sonuç görüntülendi, kayıt bekliyor',
+              message:
+                  'Üretim tamamlandı ancak üretimler listesine kayıt oluşturulamadı. Kaydet butonuyla tekrar deneyin.\n$saveError',
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         _SectionHeader(title: current == null ? 'Sonraki Adım' : 'Hızlı Aksiyonlar'),
         if (current == null)
