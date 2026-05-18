@@ -1107,6 +1107,10 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
                           onGenerate: _generateFromFile,
                           onOpenCollections: () =>
                               _go(WorkspaceRouteKey.collections),
+                          onOpenBaseForce: () =>
+                              _go(WorkspaceRouteKey.baseForce),
+                          onOpenSourceLab: () =>
+                              _go(WorkspaceRouteKey.sourceLab),
                         ),
                 WorkspaceRouteKey.search => DriveSearchScreen(
                   files: _allFiles,

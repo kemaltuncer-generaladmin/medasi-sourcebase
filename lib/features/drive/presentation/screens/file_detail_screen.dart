@@ -11,6 +11,8 @@ class FileDetailScreen extends StatefulWidget {
     required this.onBack,
     required this.onGenerate,
     required this.onOpenCollections,
+    required this.onOpenBaseForce,
+    required this.onOpenSourceLab,
     super.key,
   });
 
@@ -19,6 +21,8 @@ class FileDetailScreen extends StatefulWidget {
   final VoidCallback onBack;
   final ValueChanged<GeneratedKind> onGenerate;
   final VoidCallback onOpenCollections;
+  final VoidCallback onOpenBaseForce;
+  final VoidCallback onOpenSourceLab;
 
   @override
   State<FileDetailScreen> createState() => _FileDetailScreenState();
@@ -249,6 +253,43 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
                   : 'İşleme tamamlandığında flashcard, soru ve özet üretebilirsiniz.',
             ),
           ),
+        const SectionTitle(title: 'Üretim merkezleri'),
+        GlassPanel(
+          padding: const EdgeInsets.all(14),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 520;
+              final baseForce = _GenerationCenterAction(
+                icon: Icons.layers_rounded,
+                title: 'BaseForce',
+                subtitle: 'Flashcard, soru, özet ve algoritma üret',
+                onTap: widget.onOpenBaseForce,
+              );
+              final sourceLab = _GenerationCenterAction(
+                icon: Icons.science_outlined,
+                title: 'SourceLab',
+                subtitle: 'Senaryo, plan, podcast ve zihin haritası hazırla',
+                onTap: widget.onOpenSourceLab,
+              );
+              if (compact) {
+                return Column(
+                  children: [
+                    baseForce,
+                    const SizedBox(height: 10),
+                    sourceLab,
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: baseForce),
+                  const SizedBox(width: 10),
+                  Expanded(child: sourceLab),
+                ],
+              );
+            },
+          ),
+        ),
         SectionTitle(
           title: 'Üretilenler',
           actionLabel: hasGenerated ? 'Tümünü Gör' : null,
@@ -263,12 +304,13 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
                       _GeneratedRow(output: output),
                   ],
                 )
-              : const Padding(
-                  padding: EdgeInsets.all(22),
+              : Padding(
+                  padding: const EdgeInsets.all(22),
                   child: EmptyState(
                     message: 'Henüz çıktı üretilmedi.',
-                    subMessage:
-                        'Yukarıdaki üretim merkezlerinden birini kullanarak bu dosyadan içerik oluşturabilirsin.',
+                    subMessage: readyForGeneration
+                        ? 'Yukarıdaki üretim merkezlerinden birini kullanarak bu dosyadan içerik oluşturabilirsin.'
+                        : 'Dosya hazır olduğunda üretilen çıktılar burada listelenir.',
                     icon: Icons.auto_awesome_outlined,
                   ),
                 ),
@@ -305,6 +347,71 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
       DriveItemStatus.failed => 'Hata',
       DriveItemStatus.draft => 'Taslak',
     };
+  }
+}
+
+class _GenerationCenterAction extends StatelessWidget {
+  const _GenerationCenterAction({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.selectedBlue,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.softLine),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.blue, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.navy,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 13,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.navy),
+          ],
+        ),
+      ),
+    );
   }
 }
 
