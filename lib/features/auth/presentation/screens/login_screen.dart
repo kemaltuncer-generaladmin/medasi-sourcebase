@@ -22,7 +22,6 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
-  bool remember = true;
   bool obscure = true;
   bool loading = false;
   String? errorMessage;
@@ -249,46 +248,30 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         const SizedBox(height: 18),
-        Row(
-          children: [
-            AuthCheck(
-              value: remember,
-              onTap: () => setState(() => remember = !remember),
-              label: 'Beni hatırla',
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'Beni hatırla',
-              style: TextStyle(color: AppColors.navy, fontSize: 18),
-            ),
-            Expanded(
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: loading || _socialLoading
-                      ? null
-                      : () => Navigator.pushNamed(
-                            context,
-                            ForgotPasswordScreen.route,
-                          ),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.blue,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                  ),
-                  child: const FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      'Şifremi unuttum',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: loading || _socialLoading
+                ? null
+                : () => Navigator.pushNamed(
+                      context,
+                      ForgotPasswordScreen.route,
                     ),
-                  ),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.blue,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+            ),
+            child: const FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                'Şifremi unuttum',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-          ],
+          ),
         ),
         if (errorMessage != null) ...[
           const SizedBox(height: 10),

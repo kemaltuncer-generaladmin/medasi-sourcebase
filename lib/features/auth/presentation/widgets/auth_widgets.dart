@@ -356,13 +356,14 @@ class AuthCheck extends StatelessWidget {
   });
 
   final bool value;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final String label;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
+      enabled: onTap != null,
       toggled: value,
       label: label,
       child: GestureDetector(

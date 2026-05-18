@@ -248,7 +248,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         ),
         const SizedBox(height: 30),
         Container(
-          height: 58,
+          constraints: const BoxConstraints(minHeight: 58),
           padding: const EdgeInsets.symmetric(horizontal: 18),
           decoration: BoxDecoration(
             color: AppColors.white.withValues(alpha: .92),
@@ -257,22 +257,33 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           ),
           child: Row(
             children: [
-              const Text(
-                'Kod gelmedi mi?',
-                style: TextStyle(color: AppColors.muted, fontSize: 18),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed:
-                    loading || !_canResend
-                        ? null
-                        : () => _resend(email),
-                style: TextButton.styleFrom(foregroundColor: AppColors.blue),
+              const Expanded(
                 child: Text(
-                  loading ? 'Gönderiliyor...' : 'Tekrar gönder',
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
+                  'Kod gelmedi mi?',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.muted, fontSize: 18),
+                ),
+              ),
+              Flexible(
+                child: TextButton(
+                  onPressed:
+                      loading || !_canResend ? null : () => _resend(email),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.blue,
+                    minimumSize: Size.zero,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      loading ? 'Gönderiliyor...' : 'Tekrar gönder',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
               ),
