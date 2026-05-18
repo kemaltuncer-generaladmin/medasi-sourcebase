@@ -420,7 +420,13 @@ export async function processGenerationJob(
     );
   }
 
-  const sourceText = await sourceTextForJob(userId, job);
+  let sourceText: string;
+  try {
+    sourceText = await sourceTextForJob(userId, job);
+  } catch (error) {
+    await processor.failJobBeforeProcessing(job, job.job_type, error);
+    throw error;
+  }
   const processed = await processor.processJob(job, {
     jobType: job.job_type,
     sourceText,
@@ -789,8 +795,30 @@ export async function centralAiChat(
           : "CENTRAL_AI_FAILED",
       },
     });
-    throw error;
+    throw userSafeCentralAiError(error);
   }
+}
+
+function userSafeCentralAiError(error: unknown) {
+  if (error instanceof SafeError && !isProviderOrRawErrorCode(error.code)) {
+    return error;
+  }
+  return new SafeError(
+    "CENTRAL_AI_UNAVAILABLE",
+    "Merkezi AI şu anda yanıt üretemedi. Harcanan MC varsa iade edilir.",
+    502,
+  );
+}
+
+function isProviderOrRawErrorCode(code: string) {
+  const normalized = code.toUpperCase();
+  return normalized.startsWith("VERTEX_") ||
+    normalized.startsWith("OPENAI_") ||
+    normalized.startsWith("ANTHROPIC_") ||
+    normalized.includes("UPSTREAM") ||
+    normalized.includes("PROVIDER") ||
+    normalized.includes("AI_FAILED") ||
+    normalized.includes("EMPTY_AI_OUTPUT");
 }
 
 /**

@@ -72,6 +72,7 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
       final response = await _api.centralAiChat(
         prompt,
         context: _contextText(),
+        fileIds: _contextFileIds(),
       );
       final data = response['data'];
       final answer = data is Map
@@ -91,12 +92,7 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _messages.add(
-          _ChatMessage(
-            text: _friendlyAiError(error),
-            isAi: true,
-          ),
-        );
+        _messages.add(_ChatMessage(text: _friendlyAiError(error), isAi: true));
       });
     } finally {
       if (mounted) {
@@ -106,7 +102,7 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
   }
 
   String _contextText() {
-    final files = _workspace.recentFiles
+    final files = _contextFiles()
         .where((file) => _selectedFileIds.contains(file.id))
         .toList();
     final buffer = StringBuffer('Mod: $_mode');
@@ -121,6 +117,17 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
       );
     }
     return buffer.toString();
+  }
+
+  List<String> _contextFileIds() {
+    return _contextFiles()
+        .where(
+          (file) =>
+              _selectedFileIds.contains(file.id) &&
+              file.status == DriveItemStatus.completed,
+        )
+        .map((file) => file.id)
+        .toList();
   }
 
   void _toggleFile(String id) {
@@ -177,7 +184,7 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
                 itemBuilder: (context, index) {
                   if (index == _messages.length) {
                     return _ContextPanel(
-                      files: _workspace.recentFiles,
+                      files: _contextFiles(),
                       selectedFileIds: _selectedFileIds,
                       loading: _loadingSources,
                       error: _sourceError,
@@ -202,6 +209,22 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
         ),
       ),
     );
+  }
+
+  List<DriveFile> _contextFiles() {
+    final files = <DriveFile>[];
+    final seen = <String>{};
+    for (final course in _workspace.courses) {
+      for (final section in course.sections) {
+        for (final file in section.files) {
+          if (seen.add(file.id)) files.add(file);
+        }
+      }
+    }
+    for (final file in _workspace.recentFiles) {
+      if (seen.add(file.id)) files.add(file);
+    }
+    return files;
   }
 }
 
@@ -318,10 +341,14 @@ class _ContextPanel extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final file = files[index];
                     final selected = selectedFileIds.contains(file.id);
+                    final disabledReason = _contextFileDisabledReason(file);
                     return _ContextFileCard(
                       file: file,
                       selected: selected,
-                      onTap: () => onToggleFile(file.id),
+                      disabledReason: disabledReason,
+                      onTap: disabledReason == null
+                          ? () => onToggleFile(file.id)
+                          : null,
                     );
                   },
                 ),
@@ -373,12 +400,14 @@ class _ContextFileCard extends StatelessWidget {
   const _ContextFileCard({
     required this.file,
     required this.selected,
+    required this.disabledReason,
     required this.onTap,
   });
 
   final DriveFile file;
   final bool selected;
-  final VoidCallback onTap;
+  final String? disabledReason;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -389,7 +418,11 @@ class _ContextFileCard extends StatelessWidget {
         width: 220,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: selected ? AppColors.selectedBlue : Colors.white,
+          color: disabledReason != null
+              ? const Color(0xFFF8FAFC)
+              : selected
+              ? AppColors.selectedBlue
+              : Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: selected ? AppColors.blue : AppColors.line),
         ),
@@ -413,7 +446,7 @@ class _ContextFileCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${file.sizeLabel} • ${file.pageLabel}',
+                    disabledReason ?? '${file.sizeLabel} • ${file.pageLabel}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -426,8 +459,16 @@ class _ContextFileCard extends StatelessWidget {
               ),
             ),
             Icon(
-              selected ? Icons.check_circle_rounded : Icons.circle_outlined,
-              color: selected ? AppColors.blue : AppColors.muted,
+              disabledReason != null
+                  ? Icons.hourglass_empty_rounded
+                  : selected
+                  ? Icons.check_circle_rounded
+                  : Icons.circle_outlined,
+              color: disabledReason != null
+                  ? AppColors.muted
+                  : selected
+                  ? AppColors.blue
+                  : AppColors.muted,
             ),
           ],
         ),
@@ -677,7 +718,41 @@ String _friendlyAiError(Object error) {
   if (text.contains('SourceBase Supabase client is not configured')) {
     return 'Oturum bağlantısı hazır değil. Lütfen tekrar giriş yapın.';
   }
+  if (_isRawAiProviderError(text)) {
+    return 'Merkezi AI şu anda yanıt üretemedi. Kaynakların güvende; harcanan MC varsa iade edilir.';
+  }
   return text.isEmpty
       ? 'Merkezi AI isteği tamamlanamadı. Lütfen tekrar deneyin.'
       : text;
+}
+
+String? _contextFileDisabledReason(DriveFile file) {
+  if (file.status == DriveItemStatus.processing) {
+    return 'İşleniyor';
+  }
+  if (file.status == DriveItemStatus.uploading) {
+    return 'Yükleniyor';
+  }
+  if (file.status == DriveItemStatus.failed) {
+    return 'İşlenemedi';
+  }
+  if (file.status == DriveItemStatus.draft) {
+    return 'Taslak';
+  }
+  return null;
+}
+
+bool _isRawAiProviderError(String text) {
+  final normalized = text.toUpperCase();
+  return normalized.contains('VERTEX_') ||
+      normalized.contains('OPENAI_') ||
+      normalized.contains('ANTHROPIC_') ||
+      normalized.contains('CENTRAL_AI_UNAVAILABLE') ||
+      normalized.contains('UPSTREAM') ||
+      normalized.contains('PROVIDER') ||
+      normalized.contains('STACK') ||
+      normalized.contains('UNDEFINED') ||
+      normalized.contains('NULL') ||
+      normalized.contains('{') ||
+      normalized.contains('}');
 }

@@ -202,10 +202,19 @@ class SourceBaseDriveApi {
   Future<Map<String, dynamic>> centralAiChat(
     String message, {
     String? context,
+    List<String>? fileIds,
   }) {
     final payload = <String, dynamic>{'message': message};
     if (context != null && context.trim().isNotEmpty) {
       payload['context'] = context.trim();
+    }
+    final cleanFileIds = fileIds
+        ?.map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+    if (cleanFileIds != null && cleanFileIds.isNotEmpty) {
+      payload['fileIds'] = cleanFileIds;
     }
     return invoke('central_ai_chat', payload: payload);
   }

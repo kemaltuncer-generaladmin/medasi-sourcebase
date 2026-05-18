@@ -825,7 +825,7 @@ class _LabGenerationResult {
 
 List<_LabSource> _sourcePool(DriveWorkspaceData data) {
   final converted = <_LabSource>[];
-  for (final file in data.recentFiles) {
+  for (final file in _allDriveFiles(data)) {
     converted.add(
       _LabSource(
         id: file.id,
@@ -840,6 +840,22 @@ List<_LabSource> _sourcePool(DriveWorkspaceData data) {
     );
   }
   return converted;
+}
+
+List<DriveFile> _allDriveFiles(DriveWorkspaceData data) {
+  final files = <DriveFile>[];
+  final seen = <String>{};
+  for (final course in data.courses) {
+    for (final section in course.sections) {
+      for (final file in section.files) {
+        if (seen.add(file.id)) files.add(file);
+      }
+    }
+  }
+  for (final file in data.recentFiles) {
+    if (seen.add(file.id)) files.add(file);
+  }
+  return files;
 }
 
 String? _sourceDisabledReason(DriveFile file) {
@@ -1392,6 +1408,9 @@ String _friendlyLabError(Object error, {_ToolKind? tool}) {
   if (tool == _ToolKind.infographic && text.contains('JOB_CREATE_FAILED')) {
     return 'İnfografik üretim işi şu anda başlatılamadı. Kaynağın güvende; harcanan MC varsa iade edilir.';
   }
+  if (_isRawLabProviderError(text)) {
+    return '${_sourceLabToolTitle(tool ?? _ToolKind.examMorning)} şu anda tamamlanamadı. Kaynağın güvende; harcanan MC varsa iade edilir.';
+  }
   if (text.contains('VERTEX_AUTH_FAILED') ||
       text.contains('VERTEX_NOT_CONFIGURED') ||
       text.contains('IMAGE_AUTH_FAILED')) {
@@ -1408,6 +1427,23 @@ String _friendlyLabError(Object error, {_ToolKind? tool}) {
   return text.isEmpty
       ? 'AI üretimi tamamlanamadı. Lütfen tekrar deneyin.'
       : text;
+}
+
+bool _isRawLabProviderError(String text) {
+  final normalized = text.toUpperCase();
+  return normalized.contains('VERTEX_') ||
+      normalized.contains('OPENAI_') ||
+      normalized.contains('ANTHROPIC_') ||
+      normalized.contains('IMAGE_') ||
+      normalized.contains('UPSTREAM') ||
+      normalized.contains('PROVIDER') ||
+      normalized.contains('AI_FAILED') ||
+      normalized.contains('EMPTY_AI_OUTPUT') ||
+      normalized.contains('STACK') ||
+      normalized.contains('UNDEFINED') ||
+      normalized.contains('NULL') ||
+      normalized.contains('{') ||
+      normalized.contains('}');
 }
 
 void _showLabSnack(BuildContext context, String message) {

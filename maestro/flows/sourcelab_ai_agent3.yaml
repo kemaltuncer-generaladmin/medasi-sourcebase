@@ -1,0 +1,21 @@
+appId: tr.com.medasi.sourcebase
+---
+- launchApp
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible:
+    text: "SourceBase"
+- tapOn:
+    text: "SourceLab"
+- assertVisible:
+    text: "SourceLab"
+- tapOn:
+    text: "Klinik Senaryo"
+- assertVisible:
+    text: "Drive"
+- tapOn:
+    text: "Merkezi AI"
+- assertVisible:
+    text: "Merkezi AI"
+- assertVisible:
+    text: "Drive Bağlamı"

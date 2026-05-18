@@ -310,6 +310,9 @@ export class JobProcessor {
             infographicType: input.options?.infographicType,
             visualStyle: input.options?.visualStyle,
             density: input.options?.density,
+            mapType: input.options?.mapType,
+            depth: input.options?.depth,
+            viewMode: input.options?.viewMode,
             scenarioType: input.options?.scenarioType,
             difficulty: input.options?.difficulty,
             planGoal: input.options?.planGoal,
@@ -468,9 +471,7 @@ export class JobProcessor {
         job.id,
         {
           status: "failed",
-          error_message: error instanceof SafeError
-            ? error.message
-            : "AI üretimi tamamlanamadı.",
+          error_message: userMessageForGenerationFailure(error),
           metadata: {
             ...job.metadata,
             errorCode,
@@ -514,6 +515,46 @@ export class JobProcessor {
     if (!ok) {
       throw new SafeError("JOB_NOT_CANCELLED", "İş iptal edilemedi.", 400);
     }
+  }
+
+  async failJobBeforeProcessing(
+    job: GenerationJob,
+    jobType: GenerationType,
+    error: unknown,
+  ): Promise<void> {
+    const errorCode = error instanceof SafeError ? error.code : "AI_FAILED";
+    logAiPipeline({
+      action: "process_generation_job",
+      status: "failed",
+      jobId: job.id,
+      jobType,
+      errorCode,
+    });
+    const pricing = isPricingQuote(job.metadata?.pricing)
+      ? job.metadata.pricing
+      : undefined;
+    await refundMedasiCoin({
+      config: this.config,
+      userId: job.owner_user_id,
+      jobId: job.id,
+      amountUnits: pricing?.amount_units ?? 0,
+      reason: `ai_generation_refund:${jobType}`,
+      metadata: { errorCode },
+    });
+    await updateJob(
+      this.config.supabaseUrl,
+      this.config.serviceRoleKey,
+      job.id,
+      {
+        status: "failed",
+        error_message: userMessageForGenerationFailure(error),
+        metadata: {
+          ...job.metadata,
+          errorCode,
+          failedAt: new Date().toISOString(),
+        },
+      },
+    );
   }
 
   async retryJob(userId: string, jobId: string): Promise<GenerationJob> {
@@ -710,6 +751,25 @@ function safeRouteMetadata(route: TextRoute) {
     reason: route.reason,
     fallbackUsed: route.fallbackUsed,
   };
+}
+
+function userMessageForGenerationFailure(error: unknown) {
+  if (error instanceof SafeError && !isProviderOrRawErrorCode(error.code)) {
+    return error.message || "AI üretimi tamamlanamadı.";
+  }
+  return "AI üretimi şu anda tamamlanamadı. Kaynağın güvende; harcanan MC varsa iade edilir.";
+}
+
+function isProviderOrRawErrorCode(code: string) {
+  const normalized = code.toUpperCase();
+  return normalized.startsWith("VERTEX_") ||
+    normalized.startsWith("OPENAI_") ||
+    normalized.startsWith("ANTHROPIC_") ||
+    normalized.startsWith("IMAGE_") ||
+    normalized.includes("UPSTREAM") ||
+    normalized.includes("PROVIDER") ||
+    normalized.includes("AI_FAILED") ||
+    normalized.includes("EMPTY_AI_OUTPUT");
 }
 
 async function persistGeneratedOutput(
