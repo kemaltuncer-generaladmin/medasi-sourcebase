@@ -254,55 +254,84 @@ class _UploadRow extends StatelessWidget {
     final file = upload.file;
     return GlassPanel(
       padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          FileKindBadge(kind: file.kind, large: true, plain: true),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  file.title,
-                  style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 520;
+          final fileInfo = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                file.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${file.sizeLabel}  •  ${file.pageLabel}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.muted, fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.folder_outlined,
+                    color: AppColors.muted,
+                    size: 20,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${file.sizeLabel}  •  ${file.pageLabel}',
-                  style: const TextStyle(color: AppColors.muted, fontSize: 16),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.folder_outlined,
-                      color: AppColors.muted,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
                       '${file.courseTitle}  ›  ${file.sectionTitle}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.muted,
                         fontSize: 15,
                       ),
                     ),
+                  ),
+                ],
+              ),
+            ],
+          );
+          final state = _UploadState(upload: upload, onRetry: onRetryUpload);
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    FileKindBadge(kind: file.kind, large: true, plain: true),
+                    const SizedBox(width: 14),
+                    Expanded(child: fileInfo),
                   ],
                 ),
+                const SizedBox(height: 14),
+                state,
               ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 140,
-            child: _UploadState(upload: upload, onRetry: onRetryUpload),
-          ),
-          const Icon(Icons.more_vert_rounded, color: AppColors.muted),
-        ],
+            );
+          }
+
+          return Row(
+            children: [
+              FileKindBadge(kind: file.kind, large: true, plain: true),
+              const SizedBox(width: 18),
+              Expanded(child: fileInfo),
+              const SizedBox(width: 10),
+              SizedBox(width: 140, child: state),
+              const Icon(Icons.more_vert_rounded, color: AppColors.muted),
+            ],
+          );
+        },
       ),
     );
   }

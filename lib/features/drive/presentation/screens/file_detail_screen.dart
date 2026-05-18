@@ -64,6 +64,8 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
                       children: [
                         Text(
                           file.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: AppColors.navy,
                             fontSize: 24,
@@ -115,30 +117,36 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
                 ],
               ),
               const Divider(height: 28, color: AppColors.line),
-              Row(
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 6,
                 children: [
                   const Icon(Icons.folder_outlined, color: AppColors.muted),
-                  const SizedBox(width: 10),
-                  Text(
-                    file.courseTitle,
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 16,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 220),
+                    child: Text(
+                      file.courseTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10),
-                    child: Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppColors.navy,
-                    ),
-                  ),
-                  Text(
-                    file.sectionTitle,
-                    style: const TextStyle(
-                      color: AppColors.blue,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                  const Icon(Icons.chevron_right_rounded, color: AppColors.navy),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 240),
+                    child: Text(
+                      file.sectionTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.blue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
