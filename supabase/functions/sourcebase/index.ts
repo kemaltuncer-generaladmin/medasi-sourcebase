@@ -116,6 +116,8 @@ Deno.serve(async (request) => {
         return success(await retryFileProcessing(user.id, payload));
       case "add_to_collection":
         return success(await addToCollection(user.id, payload));
+      case "purchase_medasicoin":
+        return success(await purchaseMedasiCoin(user.id, payload));
 
       // AI Generation actions
       case "process_file_extraction":
@@ -726,6 +728,15 @@ async function addToCollection(userId: string, payload: JsonMap) {
   }
   await audit(userId, "add_to_collection", "drive_file", null, { fileIds });
   return { fileIds, collectionPinnedAt: pinnedAt };
+}
+
+async function purchaseMedasiCoin(_userId: string, payload: JsonMap) {
+  requireString(payload.product_code, "product_code");
+  throw new SafeError(
+    "PAYMENT_UNAVAILABLE",
+    "Ödeme servisi şu anda kullanılamıyor. Kartından ücret alınmadı.",
+    503,
+  );
 }
 
 async function createGeneratedOutput(userId: string, payload: JsonMap) {
