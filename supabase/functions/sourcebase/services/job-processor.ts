@@ -435,13 +435,20 @@ export class JobProcessor {
         provider: result.modelRoute.provider,
         model: result.modelRoute.model,
       });
-      await captureMedasiCoin({
-        config: this.config,
-        userId: job.owner_user_id,
-        jobId: job.id,
-        reason: `ai_generation_capture:${input.jobType}`,
-        metadata: { modelRoute: result.modelRoute },
-      });
+      try {
+        await captureMedasiCoin({
+          config: this.config,
+          userId: job.owner_user_id,
+          jobId: job.id,
+          reason: `ai_generation_capture:${input.jobType}`,
+          metadata: { modelRoute: result.modelRoute },
+        });
+      } catch (captureError) {
+        const captureErrorCode = captureError instanceof SafeError
+          ? captureError.code
+          : "WALLET_CAPTURE_FAILED";
+        console.warn("MC capture bookkeeping failed:", captureErrorCode);
+      }
       return {
         ...job,
         status: "completed",

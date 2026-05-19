@@ -22,6 +22,7 @@ import { logAiPipeline } from "../services/ai-logger.ts";
 import {
   JobGenerationOptions,
   JobProcessor,
+  updateJob,
 } from "../services/job-processor.ts";
 import type { McPricingQuote } from "../services/medasicoin-pricing.ts";
 import {
@@ -383,13 +384,37 @@ export async function createGenerationJob(
       : undefined,
     model: job.model,
   });
-  const reservation = await reserveMedasiCoin({
-    config: walletConfig,
-    userId,
-    jobId: job.id,
-    quote: pricing,
-    reason: `ai_generation:${jobType}`,
-  });
+  let reservation;
+  try {
+    reservation = await reserveMedasiCoin({
+      config: walletConfig,
+      userId,
+      jobId: job.id,
+      quote: pricing,
+      reason: `ai_generation:${jobType}`,
+    });
+  } catch (error) {
+    const errorCode = error instanceof SafeError ? error.code : "WALLET_ERROR";
+    logAiPipeline({
+      action: "create_generation_job",
+      status: "failed",
+      jobId: job.id,
+      jobType,
+      errorCode,
+    });
+    await updateJob(config.supabaseUrl, config.serviceRoleKey, job.id, {
+      status: "failed",
+      error_message: error instanceof SafeError
+        ? error.message
+        : "MedasiCoin rezervasyonu tamamlanamadı.",
+      metadata: {
+        ...job.metadata,
+        errorCode,
+        failedAt: new Date().toISOString(),
+      },
+    });
+    throw error;
+  }
 
   return {
     jobId: job.id,
@@ -433,6 +458,14 @@ export async function processGenerationJob(
       job.error_message || "AI üretimi tamamlanamadı.",
       400,
     );
+  }
+  if (job.status === "processing") {
+    return {
+      jobId: job.id,
+      status: job.status,
+      jobType: job.job_type,
+      alreadyProcessing: true,
+    };
   }
 
   let sourceText: string;
