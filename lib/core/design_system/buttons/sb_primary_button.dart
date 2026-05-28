@@ -42,10 +42,10 @@ class SBPrimaryButton extends StatelessWidget {
 
   double get _fontSize {
     return switch (size) {
-      SBButtonSize.small => 16,
-      SBButtonSize.medium => 18,
-      SBButtonSize.large => 20,
-      SBButtonSize.xLarge => 22,
+      SBButtonSize.small => 13,
+      SBButtonSize.medium => 14,
+      SBButtonSize.large => 15,
+      SBButtonSize.xLarge => 16,
     };
   }
 
@@ -80,9 +80,9 @@ class SBPrimaryButton extends StatelessWidget {
                 ? null
                 : [
                     BoxShadow(
-                      color: AppColors.blue.withValues(alpha: 0.24),
-                      blurRadius: 18,
-                      offset: const Offset(0, 10),
+                      color: AppColors.blue.withValues(alpha: 0.14),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
                   ],
           ),
@@ -93,7 +93,7 @@ class SBPrimaryButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(SBDimensions.buttonRadius),
               child: Container(
                 padding: EdgeInsets.symmetric(
-                  horizontal: SBSpacing.lg,
+                  horizontal: SBSpacing.md,
                   vertical: 0,
                 ),
                 child: loading

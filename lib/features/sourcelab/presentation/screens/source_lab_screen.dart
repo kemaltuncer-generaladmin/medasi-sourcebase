@@ -221,7 +221,7 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
       final data = createResponse['data'];
       final jobId = data is Map ? data['jobId']?.toString().trim() ?? '' : '';
       if (jobId.isEmpty) {
-        throw StateError('AI üretim işi başlatılamadı.');
+        throw StateError('İçerik üretimi başlatılamadı.');
       }
       await _api.processGenerationJob(jobId);
       final content = await _pollLabContent(jobId);
@@ -289,16 +289,18 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
         final code = data is Map ? data['errorCode']?.toString() : null;
         final message = data is Map
             ? data['errorMessage']?.toString()
-            : 'AI üretimi başarısız oldu.';
+            : 'İçerik üretimi başarısız oldu.';
         throw StateError(
           message == null || message.trim().isEmpty
-              ? 'AI üretimi başarısız oldu.'
+              ? 'İçerik üretimi başarısız oldu.'
               : [code, message].whereType<String>().join(': '),
         );
       }
       await Future<void>.delayed(const Duration(seconds: 2));
     }
-    throw StateError('AI üretimi zaman aşımına uğradı. Lütfen tekrar deneyin.');
+    throw StateError(
+      'İçerik üretimi zaman aşımına uğradı. Lütfen tekrar deneyin.',
+    );
   }
 
   DriveFile? _driveFileForSource(_LabSource source) {
@@ -397,7 +399,7 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
       showDragHandle: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
       ),
       builder: (context) {
         return StatefulBuilder(
@@ -1373,6 +1375,17 @@ String _sourceLabToolTitle(_ToolKind tool) {
   };
 }
 
+String _sourceLabToolKey(_ToolKind tool) {
+  return switch (tool) {
+    _ToolKind.examMorning => 'sourcelab-tool-exam-morning',
+    _ToolKind.clinical => 'sourcelab-tool-clinical',
+    _ToolKind.plan => 'sourcelab-tool-plan',
+    _ToolKind.podcast => 'sourcelab-tool-podcast',
+    _ToolKind.infographic => 'sourcelab-tool-infographic',
+    _ToolKind.mindMap => 'sourcelab-tool-mind-map',
+  };
+}
+
 String _sourceLabLoadingSubtitle(_ToolKind tool) {
   return switch (tool) {
     _ToolKind.clinical =>
@@ -1455,7 +1468,7 @@ String _friendlyLabError(Object error, {_ToolKind? tool}) {
   if (text.contains('VERTEX_AUTH_FAILED') ||
       text.contains('VERTEX_NOT_CONFIGURED') ||
       text.contains('IMAGE_AUTH_FAILED')) {
-    return 'AI üretim sağlayıcısı şu anda doğrulanamadı. Kaynağın güvende; harcanan MC varsa iade edilir.';
+    return 'Üretim sağlayıcısı şu anda doğrulanamadı. Kaynağın güvende; harcanan MC varsa iade edilir.';
   }
   if (text.contains('INSUFFICIENT_MC')) {
     return 'Bu üretim için MC bakiyen yetersiz. Paket alıp tekrar deneyebilirsin.';
@@ -1605,8 +1618,6 @@ class _SourceLabHome extends StatelessWidget {
       children: [
         SourceBasePageHeader(
           title: 'SourceLab',
-          subtitle:
-              'Kaynaklarından klinik ve akademik öğrenme çıktıları oluştur.',
           leading: const SourceBaseBrand(compact: true),
           actions: [
             _RoundButton(
@@ -1766,6 +1777,13 @@ class _ToolGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final tools = [
       _ToolSpec(
+        _ToolKind.examMorning,
+        Icons.alarm_on_outlined,
+        'Sınav Sabahı Özeti',
+        'Kaynağından son tekrar için yüksek verimli özet çıkar.',
+        AppColors.warning,
+      ),
+      _ToolSpec(
         _ToolKind.clinical,
         Icons.medical_services_outlined,
         'Klinik Senaryo',
@@ -1803,7 +1821,7 @@ class _ToolGrid extends StatelessWidget {
     ];
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 980
+        final columns = constraints.maxWidth >= 820
             ? 3
             : constraints.maxWidth >= 620
             ? 2
@@ -1818,6 +1836,7 @@ class _ToolGrid extends StatelessWidget {
               SizedBox(
                 width: width,
                 child: _ToolCard(
+                  key: ValueKey(_sourceLabToolKey(tool.kind)),
                   spec: tool,
                   onTap: () => onOpenTool(tool.kind),
                 ),
@@ -1840,7 +1859,7 @@ class _ToolSpec {
 }
 
 class _ToolCard extends StatelessWidget {
-  const _ToolCard({required this.spec, required this.onTap});
+  const _ToolCard({required this.spec, required this.onTap, super.key});
 
   final _ToolSpec spec;
   final VoidCallback onTap;
@@ -1848,48 +1867,111 @@ class _ToolCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 420;
-    return _LabPanel(
-      padding: EdgeInsets.fromLTRB(12, compact ? 14 : 18, 12, 12),
-      radius: 16,
-      child: Column(
-        children: [
-          Container(
-            width: compact ? 48 : 58,
-            height: compact ? 48 : 58,
-            decoration: BoxDecoration(
-              color: spec.color.withValues(alpha: .16),
-              borderRadius: BorderRadius.circular(16),
+    final radius = BorderRadius.circular(8);
+    return Semantics(
+      button: true,
+      label: '${spec.title} başlat',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: radius,
+          child: _LabPanel(
+            padding: EdgeInsets.fromLTRB(12, compact ? 12 : 14, 12, 12),
+            radius: 8,
+            child: SizedBox(
+              height: compact ? 126 : 138,
+              child: Column(
+                children: [
+                  Container(
+                    width: compact ? 36 : 40,
+                    height: compact ? 36 : 40,
+                    decoration: BoxDecoration(
+                      color: spec.color.withValues(alpha: .10),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: spec.color.withValues(alpha: .12),
+                      ),
+                    ),
+                    child: Icon(
+                      spec.icon,
+                      color: spec.color,
+                      size: compact ? 21 : 23,
+                    ),
+                  ),
+                  SizedBox(height: compact ? 7 : 8),
+                  Text(
+                    spec.title,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.navy,
+                      fontSize: compact ? 14 : 15,
+                      height: 1.08,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  SizedBox(height: compact ? 5 : 6),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: Text(
+                        spec.subtitle,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.muted,
+                          fontSize: compact ? 11.5 : 12,
+                          height: 1.23,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: compact ? 6 : 7),
+                  _InlineToolAction(color: spec.color),
+                ],
+              ),
             ),
-            child: Icon(spec.icon, color: spec.color, size: compact ? 28 : 34),
           ),
-          SizedBox(height: compact ? 10 : 15),
-          Text(
-            spec.title,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            style: TextStyle(
-              color: AppColors.navy,
-              fontSize: compact ? 16 : 18,
-              height: 1.08,
-              fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineToolAction extends StatelessWidget {
+  const _InlineToolAction({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: .14)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Başlat',
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-          ),
-          SizedBox(height: compact ? 7 : 9),
-          Text(
-            spec.subtitle,
-            textAlign: TextAlign.center,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: AppColors.muted,
-              fontSize: compact ? 12 : 13,
-              height: 1.23,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          SizedBox(height: compact ? 9 : 13),
-          _SmallActionButton(label: 'Başlat', onTap: onTap),
-        ],
+            const SizedBox(width: 5),
+            Icon(Icons.arrow_forward_rounded, color: color, size: 15),
+          ],
+        ),
       ),
     );
   }
@@ -2521,7 +2603,7 @@ class _PodcastBuilder extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const _PanelTitleRow(
-                icon: Icons.auto_awesome_outlined,
+                icon: Icons.tune_rounded,
                 title: 'Anlatım ve İçerik Ayarları',
               ),
               _SettingRow(
@@ -2615,7 +2697,7 @@ class _PodcastBuilder extends StatelessWidget {
               : hasSources
               ? 'Hazır olmayan kaynak var'
               : 'Önce kaynak seç',
-          icon: Icons.auto_awesome_rounded,
+          icon: Icons.play_arrow_rounded,
           onTap: canGenerate ? onGenerate : null,
           height: 76,
         ),
@@ -2871,7 +2953,11 @@ class _InfographicOptionGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth > 680 ? 3 : 2;
+        final columns = constraints.maxWidth > 680
+            ? 3
+            : constraints.maxWidth >= 340
+            ? 2
+            : 1;
         const gap = 10.0;
         final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
         return Wrap(
@@ -3210,7 +3296,11 @@ class _ExamFormatGrid extends StatelessWidget {
     ];
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth > 680 ? 3 : 2;
+        final columns = constraints.maxWidth > 680
+            ? 3
+            : constraints.maxWidth >= 340
+            ? 2
+            : 1;
         const gap = 10.0;
         final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
         return Wrap(
@@ -3834,7 +3924,7 @@ class _InfographicBuilder extends StatelessWidget {
             hasBlockedSources: blockedReasons.isNotEmpty,
             readyLabel: 'İnfografik taslağı oluştur',
           ),
-          icon: Icons.auto_awesome_rounded,
+          icon: Icons.design_services_outlined,
           onTap: canGenerate ? onGenerate : null,
           subtitle: canGenerate
               ? null
@@ -4081,7 +4171,7 @@ class _MindMapBuilder extends StatelessWidget {
             hasBlockedSources: blockedReasons.isNotEmpty,
             readyLabel: 'Zihin haritası oluştur',
           ),
-          icon: Icons.auto_awesome_rounded,
+          icon: Icons.account_tree_outlined,
           onTap: canGenerate ? onGenerate : null,
           subtitle: canGenerate
               ? null
@@ -6042,9 +6132,14 @@ class _LabScroll extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final horizontalPadding = width < 420 ? 16.0 : 26.0;
     final isMobile = width < 600;
-    final topPadding = MediaQuery.viewPaddingOf(context).top + 12;
+    final horizontalPadding = SourceBaseMobileMetrics.horizontalPadding(
+      context,
+    );
+    final topPadding = SourceBaseMobileMetrics.topSafePadding(
+      context,
+      extra: isMobile ? 6 : 10,
+    );
     final bottomPadding = isMobile
         ? SourceBaseBottomNav.scrollEndPadding(context)
         : 48.0;
@@ -6053,6 +6148,7 @@ class _LabScroll extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 940),
         child: ListView(
           physics: const BouncingScrollPhysics(),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: EdgeInsets.fromLTRB(
             horizontalPadding,
             topPadding,
@@ -6062,7 +6158,7 @@ class _LabScroll extends StatelessWidget {
           children: [
             for (final child in children) ...[
               child,
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
             ],
             if (isMobile) const WorkspaceBottomNavGuard(),
           ],
@@ -6292,27 +6388,27 @@ class _LabHero extends StatelessWidget {
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 620;
         final artWidth = compact
-            ? math.min(constraints.maxWidth, 250.0)
-            : 430.0;
-        final artHeight = compact ? 170.0 : 260.0;
+            ? math.min(constraints.maxWidth, 160.0)
+            : 240.0;
+        final artHeight = compact ? 96.0 : 150.0;
 
         final copy = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _GradientTitle(title),
-            const SizedBox(height: 14),
+            const SizedBox(height: 6),
             Text(
               subtitle,
               style: TextStyle(
                 color: AppColors.muted,
-                fontSize: compact ? 17 : 21,
+                fontSize: compact ? 13 : 14,
                 height: 1.34,
                 fontWeight: FontWeight.w500,
               ),
             ),
             if (chips.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Wrap(spacing: 10, runSpacing: 10, children: chips),
+              const SizedBox(height: 10),
+              Wrap(spacing: 6, runSpacing: 6, children: chips),
             ],
           ],
         );
@@ -6347,7 +6443,7 @@ class _LabHero extends StatelessWidget {
         }
 
         return Container(
-          constraints: const BoxConstraints(minHeight: 260),
+          constraints: const BoxConstraints(minHeight: 150),
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [Color(0x00FFFFFF), Color(0xFFEAF5FF)],
@@ -6367,7 +6463,7 @@ class _LabHero extends StatelessWidget {
                 ),
               ),
               Padding(
-                padding: EdgeInsets.fromLTRB(6, 58, artWidth, 18),
+                padding: EdgeInsets.fromLTRB(4, 22, artWidth, 12),
                 child: copy,
               ),
             ],
@@ -6387,10 +6483,10 @@ class _GradientTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final fontSize = width < 390
-        ? 38.0
+        ? 24.0
         : width < 620
-        ? 46.0
-        : 58.0;
+        ? 28.0
+        : 32.0;
     return ShaderMask(
       shaderCallback: (bounds) => const LinearGradient(
         colors: [Color(0xFF1711BC), AppColors.blue, AppColors.cyan],
@@ -6401,9 +6497,9 @@ class _GradientTitle extends StatelessWidget {
         maxLines: 2,
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 58,
-          fontWeight: FontWeight.w900,
-          height: 1.02,
+          fontSize: 32,
+          fontWeight: FontWeight.w800,
+          height: 1.08,
           letterSpacing: 0,
         ).copyWith(fontSize: fontSize),
       ),
@@ -6421,11 +6517,11 @@ class _TitleBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final titleSize = width < 420
-        ? 30.0
+        ? 22.0
         : width < 620
-        ? 34.0
-        : 40.0;
-    final subtitleSize = width < 420 ? 16.0 : 20.0;
+        ? 24.0
+        : 26.0;
+    final subtitleSize = width < 420 ? 13.0 : 14.0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -6552,8 +6648,8 @@ class _StepNumber extends StatelessWidget {
 class _LabPanel extends StatelessWidget {
   const _LabPanel({
     required this.child,
-    this.padding = const EdgeInsets.all(24),
-    this.radius = 22,
+    this.padding = const EdgeInsets.all(14),
+    this.radius = 8,
   });
 
   final Widget child;
@@ -6571,9 +6667,9 @@ class _LabPanel extends StatelessWidget {
         border: Border.all(color: AppColors.line.withValues(alpha: .86)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1B3D84).withValues(alpha: .07),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+            color: const Color(0xFF1B3D84).withValues(alpha: .04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -6781,6 +6877,8 @@ class _SourceListRow extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '${source.size}  •  ${source.detail}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: AppColors.muted, fontSize: 13),
                 ),
               ],
@@ -6840,6 +6938,8 @@ class _RecentSourceRow extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   '${source.size}  •  ${source.detail}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: AppColors.muted, fontSize: 13),
                 ),
               ],
@@ -6949,6 +7049,8 @@ class _SourcePickerRow extends StatelessWidget {
                 children: [
                   Text(
                     source.title.replaceAll('\n', ' '),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.navy,
                       fontSize: 15,
@@ -6958,6 +7060,8 @@ class _SourcePickerRow extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${source.size}  •  ${source.detail}  •  ${source.tag}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.muted,
                       fontSize: 13,
@@ -6967,6 +7071,8 @@ class _SourcePickerRow extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       source.disabledReason!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.red,
                         fontSize: 12.5,
@@ -7033,21 +7139,21 @@ class _RoundButton extends StatelessWidget {
         customBorder: const CircleBorder(),
         child: ExcludeSemantics(
           child: Container(
-            width: 52,
-            height: 52,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
               border: Border.all(color: AppColors.line),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.navy.withValues(alpha: .06),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
+                  color: AppColors.navy.withValues(alpha: .04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
-            child: Icon(icon, color: AppColors.navy, size: 28),
+            child: Icon(icon, color: AppColors.navy, size: 22),
           ),
         ),
       ),
@@ -7085,7 +7191,7 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 8, 2, 2),
+      padding: const EdgeInsets.fromLTRB(2, 6, 2, 0),
       child: Row(
         children: [
           Expanded(
@@ -7093,8 +7199,8 @@ class _SectionHeader extends StatelessWidget {
               title,
               style: const TextStyle(
                 color: AppColors.navy,
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
@@ -7108,12 +7214,12 @@ class _SectionHeader extends StatelessWidget {
                   Text(
                     action!,
                     style: const TextStyle(
-                      fontSize: 15,
+                      fontSize: 13,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const Icon(Icons.arrow_forward_rounded, size: 20),
+                  const Icon(Icons.arrow_forward_rounded, size: 17),
                 ],
               ),
             ),
@@ -7131,7 +7237,9 @@ class _MiniHeroChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final maxWidth = math.min(MediaQuery.sizeOf(context).width - 72, 260.0);
     return Container(
+      constraints: BoxConstraints(maxWidth: maxWidth),
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: .9),
@@ -7143,12 +7251,16 @@ class _MiniHeroChip extends StatelessWidget {
         children: [
           Icon(icon, color: AppColors.blue, size: 19),
           const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.navy,
-              fontSize: 13.5,
-              fontWeight: FontWeight.w800,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.navy,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -7529,6 +7641,7 @@ class _PrimaryLabButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
+    final compact = MediaQuery.sizeOf(context).width < 390;
     return SizedBox(
       width: double.infinity,
       height: height,
@@ -7561,29 +7674,42 @@ class _PrimaryLabButton extends StatelessWidget {
             ),
             textStyle: const TextStyle(fontWeight: FontWeight.w900),
           ),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 25),
-                const SizedBox(width: 12),
-                Column(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.max,
+            children: [
+              Icon(icon, size: compact ? 22 : 25),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(label, style: const TextStyle(fontSize: 22)),
-                    if (subtitle != null)
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: compact ? 18 : 20),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
                       Text(
                         subtitle!,
-                        style: const TextStyle(
-                          fontSize: 14,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: compact ? 11.5 : 12.5,
+                          height: 1.12,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                    ],
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -7665,14 +7791,20 @@ class _SmallActionButton extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: 7)],
-          Text(label),
-          const SizedBox(width: 7),
-          const Icon(Icons.arrow_forward_rounded, size: 18),
-        ],
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 20),
+              const SizedBox(width: 7),
+            ],
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(width: 7),
+            const Icon(Icons.arrow_forward_rounded, size: 18),
+          ],
+        ),
       ),
     );
   }
@@ -7745,7 +7877,9 @@ class _TagPill extends StatelessWidget {
       'Biyokimya' => AppColors.blue,
       _ => AppColors.purple,
     };
+    final maxWidth = math.min(MediaQuery.sizeOf(context).width - 96, 220.0);
     return Container(
+      constraints: BoxConstraints(maxWidth: maxWidth),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: .1),
@@ -7753,6 +7887,8 @@ class _TagPill extends StatelessWidget {
       ),
       child: Text(
         label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: color,
           fontSize: 12,
@@ -7899,10 +8035,17 @@ class _SegmentedOptions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (values.length > 4) {
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          final columns = constraints.maxWidth > 680 ? 4 : 2;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final needsWrappedLayout =
+            values.length > 4 ||
+            (constraints.maxWidth < 340 && values.length > 2);
+        if (needsWrappedLayout) {
+          final columns = constraints.maxWidth > 680
+              ? 4
+              : constraints.maxWidth >= 340
+              ? 2
+              : 1;
           const gap = 8.0;
           final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
           return Wrap(
@@ -7921,23 +8064,23 @@ class _SegmentedOptions extends StatelessWidget {
                 ),
             ],
           );
-        },
-      );
-    }
-    return Row(
-      children: [
-        for (var i = 0; i < values.length; i++) ...[
-          Expanded(
-            child: _SegmentButton(
-              label: values[i],
-              icon: icons != null && i < icons!.length ? icons![i] : null,
-              selected: values[i] == selected,
-              onTap: () => onSelected(values[i]),
-            ),
-          ),
-          if (i != values.length - 1) const SizedBox(width: 8),
-        ],
-      ],
+        }
+        return Row(
+          children: [
+            for (var i = 0; i < values.length; i++) ...[
+              Expanded(
+                child: _SegmentButton(
+                  label: values[i],
+                  icon: icons != null && i < icons!.length ? icons![i] : null,
+                  selected: values[i] == selected,
+                  onTap: () => onSelected(values[i]),
+                ),
+              ),
+              if (i != values.length - 1) const SizedBox(width: 8),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -8150,10 +8293,12 @@ class _FocusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final maxWidth = math.min(MediaQuery.sizeOf(context).width - 64, 300.0);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
+        constraints: BoxConstraints(maxWidth: maxWidth),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
           color: selected ? const Color(0xFFF0EEFF) : Colors.white,
@@ -8165,12 +8310,16 @@ class _FocusChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? AppColors.blue : AppColors.navy,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? AppColors.blue : AppColors.navy,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
             if (selected) ...[
@@ -8192,7 +8341,9 @@ class _InfoPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final maxWidth = math.min(MediaQuery.sizeOf(context).width - 72, 280.0);
     return Container(
+      constraints: BoxConstraints(maxWidth: maxWidth),
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.blue.withValues(alpha: .08),
@@ -8206,12 +8357,16 @@ class _InfoPill extends StatelessWidget {
             Icon(icon, color: AppColors.blue, size: 21),
             const SizedBox(width: 8),
           ],
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.blue,
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.blue,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],
@@ -8284,7 +8439,7 @@ class _SummaryActionBar extends StatelessWidget {
           );
           final button = _PrimaryLabButton(
             label: buttonLabel,
-            icon: Icons.auto_awesome_rounded,
+            icon: Icons.play_arrow_rounded,
             onTap: onTap,
             subtitle: subtitle,
           );
@@ -8327,8 +8482,8 @@ class _CompactToolHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _LabPanel(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-      radius: 18,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      radius: 8,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 620;
@@ -8336,15 +8491,15 @@ class _CompactToolHero extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 50,
-                height: 50,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
                   color: AppColors.blue.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: AppColors.blue),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -8353,25 +8508,25 @@ class _CompactToolHero extends StatelessWidget {
                       title,
                       style: const TextStyle(
                         color: AppColors.navy,
-                        fontSize: 30,
-                        height: 1.05,
-                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
+                        height: 1.12,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Text(
                       subtitle,
                       style: const TextStyle(
                         color: AppColors.muted,
-                        fontSize: 16,
+                        fontSize: 13,
                         height: 1.35,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
+                      spacing: 6,
+                      runSpacing: 6,
                       children: [
                         _MiniHeroChip(
                           icon: Icons.library_books_outlined,
@@ -8396,14 +8551,14 @@ class _CompactToolHero extends StatelessWidget {
           if (compact) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [copy, const SizedBox(height: 16), action],
+              children: [copy, const SizedBox(height: 10), action],
             );
           }
           return Row(
             children: [
               Expanded(child: copy),
-              const SizedBox(width: 18),
-              SizedBox(width: 230, child: action),
+              const SizedBox(width: 12),
+              SizedBox(width: 190, child: action),
             ],
           );
         },
@@ -8474,7 +8629,7 @@ class _PlanSummaryBar extends StatelessWidget {
               hasBlockedSources: hasBlockedSources,
               readyLabel: 'Plan oluştur',
             ),
-            icon: Icons.auto_awesome_rounded,
+            icon: Icons.event_note_outlined,
             onTap: onGenerate,
             subtitle: canGenerate ? null : blockedSubtitle,
           );
@@ -8521,38 +8676,36 @@ class _SummaryMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.blue, size: 28),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.blue, size: 28),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(color: AppColors.muted, fontSize: 12),
+              ),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
                 ),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  detail,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
-                ),
-              ],
-            ),
+              ),
+              Text(
+                detail,
+                style: const TextStyle(color: AppColors.muted, fontSize: 12),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -8571,38 +8724,51 @@ class _PodcastPreviewFlow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: const [
-        Expanded(
-          child: _PodcastPreviewCard(
-            title: 'Giriş',
-            time: '00:00 - 00:45',
-            color: AppColors.purple,
-          ),
-        ),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14),
-          child: Icon(Icons.arrow_forward_rounded, color: AppColors.blue),
-        ),
-        Expanded(
-          child: _PodcastPreviewCard(
-            title: 'Ana Başlıklar',
-            time: '00:45 - 09:00',
-            color: AppColors.blue,
-          ),
-        ),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14),
-          child: Icon(Icons.arrow_forward_rounded, color: AppColors.cyan),
-        ),
-        Expanded(
-          child: _PodcastPreviewCard(
-            title: 'Kapanış',
-            time: '09:00 - 10:00',
-            color: AppColors.green,
-          ),
-        ),
-      ],
+    const cards = [
+      _PodcastPreviewCard(
+        title: 'Giriş',
+        time: '00:00 - 00:45',
+        color: AppColors.purple,
+      ),
+      _PodcastPreviewCard(
+        title: 'Ana Başlıklar',
+        time: '00:45 - 09:00',
+        color: AppColors.blue,
+      ),
+      _PodcastPreviewCard(
+        title: 'Kapanış',
+        time: '09:00 - 10:00',
+        color: AppColors.green,
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 620) {
+          return Column(
+            children: [
+              for (var i = 0; i < cards.length; i++) ...[
+                cards[i],
+                if (i != cards.length - 1) const SizedBox(height: 10),
+              ],
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: cards[0]),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14),
+              child: Icon(Icons.arrow_forward_rounded, color: AppColors.blue),
+            ),
+            Expanded(child: cards[1]),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14),
+              child: Icon(Icons.arrow_forward_rounded, color: AppColors.cyan),
+            ),
+            Expanded(child: cards[2]),
+          ],
+        );
+      },
     );
   }
 }
@@ -8649,11 +8815,15 @@ class _PodcastPreviewCard extends StatelessWidget {
               children: [
                 Text(
                   time,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: AppColors.muted, fontSize: 12),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: color,
                     fontSize: 18,
@@ -8663,6 +8833,8 @@ class _PodcastPreviewCard extends StatelessWidget {
                 const SizedBox(height: 3),
                 const Text(
                   'Konuya giriş ve öğrenme hedefleri',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: AppColors.muted, fontSize: 12),
                 ),
               ],
@@ -8688,44 +8860,65 @@ class _PodcastStructurePanel extends StatelessWidget {
             title: 'Podcast Yapısı',
           ),
           const SizedBox(height: 16),
-          Row(
-            children: const [
-              Expanded(
-                child: _StructureItem(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const items = [
+                _StructureItem(
                   icon: Icons.mic_none_rounded,
                   title: 'Açılış',
                   detail: '~45 sn',
                   color: AppColors.purple,
                 ),
-              ),
-              Icon(Icons.chevron_right_rounded, color: AppColors.muted),
-              Expanded(
-                child: _StructureItem(
+                _StructureItem(
                   icon: Icons.menu_book_outlined,
                   title: 'Konu Özeti',
                   detail: '~6-7 dk',
                   color: AppColors.blue,
                 ),
-              ),
-              Icon(Icons.chevron_right_rounded, color: AppColors.muted),
-              Expanded(
-                child: _StructureItem(
+                _StructureItem(
                   icon: Icons.track_changes_rounded,
                   title: 'Kritik Noktalar',
                   detail: '~2-3 dk',
                   color: AppColors.green,
                 ),
-              ),
-              Icon(Icons.chevron_right_rounded, color: AppColors.muted),
-              Expanded(
-                child: _StructureItem(
+                _StructureItem(
                   icon: Icons.quiz_outlined,
                   title: 'Mini Quiz',
                   detail: '~1-2 dk',
                   color: AppColors.orange,
                 ),
-              ),
-            ],
+              ];
+              if (constraints.maxWidth < 620) {
+                return Column(
+                  children: [
+                    for (var i = 0; i < items.length; i++) ...[
+                      items[i],
+                      if (i != items.length - 1) const SizedBox(height: 10),
+                    ],
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: items[0]),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.muted,
+                  ),
+                  Expanded(child: items[1]),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.muted,
+                  ),
+                  Expanded(child: items[2]),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.muted,
+                  ),
+                  Expanded(child: items[3]),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -8765,6 +8958,8 @@ class _StructureItem extends StatelessWidget {
               children: [
                 Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: color,
                     fontSize: 17,
@@ -8773,6 +8968,8 @@ class _StructureItem extends StatelessWidget {
                 ),
                 Text(
                   detail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: AppColors.muted, fontSize: 13),
                 ),
               ],

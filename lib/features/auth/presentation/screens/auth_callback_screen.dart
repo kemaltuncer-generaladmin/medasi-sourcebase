@@ -180,7 +180,7 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
             subtitle: 'Hesabına güvenli şekilde erişmek için yeni şifreni gir.',
             art: AuthArtType.forgot,
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 16),
           AuthTextField(
             icon: Icons.lock_outline_rounded,
             hint: 'Yeni şifre',
@@ -229,7 +229,7 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
             const SizedBox(height: 14),
             AuthStatusBox(message: _errorMessage!),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           GradientActionButton(
             label: _saving ? 'Kaydediliyor...' : 'Şifreyi güncelle',
             onPressed: _saving ? null : _savePassword,

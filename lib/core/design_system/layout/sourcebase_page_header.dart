@@ -37,6 +37,8 @@ class SourceBasePageHeader extends StatelessWidget {
             const SizedBox(height: SBSpacing.xs),
             Text(
               subtitle!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: SBTextStyles.bodySmall.copyWith(color: AppColors.muted),
             ),
           ],
@@ -50,13 +52,13 @@ class SourceBasePageHeader extends StatelessWidget {
       header: true,
       label: title,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: SBSpacing.lg),
+        padding: const EdgeInsets.only(bottom: 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             if (leading != null) ...[
               leading!,
-              const SizedBox(width: SBSpacing.md),
+              const SizedBox(width: SBSpacing.sm),
             ],
             titleBlock,
             if (actions.isNotEmpty) ...[

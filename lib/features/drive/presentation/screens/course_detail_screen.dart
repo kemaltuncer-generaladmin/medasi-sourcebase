@@ -571,6 +571,7 @@ class _SectionsTab extends StatelessWidget {
                 : constraints.maxWidth >= 640
                 ? 2
                 : 1;
+            final compactCards = constraints.maxWidth < 640;
             return GridView.builder(
               itemCount: course.sections.length,
               shrinkWrap: true,
@@ -579,7 +580,7 @@ class _SectionsTab extends StatelessWidget {
                 crossAxisCount: columns,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                mainAxisExtent: 184,
+                mainAxisExtent: compactCards ? 214 : 184,
               ),
               itemBuilder: (context, index) {
                 final section = course.sections[index];

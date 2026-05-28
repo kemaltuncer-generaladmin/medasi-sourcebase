@@ -169,33 +169,40 @@ class _FolderScreenState extends State<FolderScreen> {
           ],
         ),
         const SizedBox(height: 18),
-        Row(
-          children: [
-            const Spacer(),
-            SizedBox(
-              width: 150,
-              child: SBPrimaryButton(
-                label: 'Dosya Yükle',
-                icon: Icons.add_rounded,
-                onPressed: widget.onOpenUploads,
-                size: SBButtonSize.medium,
-                fullWidth: false,
-              ),
-            ),
-            const SizedBox(width: 12),
-            SizedBox(
-              width: 95,
-              child: SBSecondaryButton(
-                label: _hasSelection ? 'Seçimi Kaldır' : 'Tümünü Seç',
-                icon: _hasSelection
-                    ? Icons.deselect_rounded
-                    : Icons.select_all_rounded,
-                onPressed: _selectAll,
-                size: SBButtonSize.medium,
-                fullWidth: false,
-              ),
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 430;
+            final upload = SBPrimaryButton(
+              label: 'Dosya Yükle',
+              icon: Icons.add_rounded,
+              onPressed: widget.onOpenUploads,
+              size: SBButtonSize.medium,
+              fullWidth: compact,
+            );
+            final select = SBSecondaryButton(
+              label: _hasSelection ? 'Seçimi Kaldır' : 'Tümünü Seç',
+              icon: _hasSelection
+                  ? Icons.deselect_rounded
+                  : Icons.select_all_rounded,
+              onPressed: _selectAll,
+              size: SBButtonSize.medium,
+              fullWidth: compact,
+            );
+            if (compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [upload, const SizedBox(height: 10), select],
+              );
+            }
+            return Row(
+              children: [
+                const Spacer(),
+                SizedBox(width: 150, child: upload),
+                const SizedBox(width: 12),
+                SizedBox(width: 140, child: select),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 18),
         _Toolbar(
@@ -275,11 +282,7 @@ class _FolderScreenState extends State<FolderScreen> {
             onOpenCollections: widget.onOpenCollections,
             onClear: _clearSelection,
           ),
-        SectionTitle(
-          title: 'Akıllı Öneriler',
-          actionLabel: null,
-          onAction: null,
-        ),
+        SectionTitle(title: 'Öneriler', actionLabel: null, onAction: null),
         GlassPanel(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -1024,54 +1027,83 @@ class _SuggestionRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.softLine),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 430;
+          final leading = Container(
+            width: 46,
+            height: 46,
             decoration: BoxDecoration(
               color: color,
-              borderRadius: BorderRadius.circular(9),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: Colors.white, size: 28),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
+            child: Icon(icon, color: Colors.white, size: 26),
+          );
+          final text = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w900,
                 ),
-                const SizedBox(height: 5),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 13.5,
-                  ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 13,
+                  height: 1.3,
                 ),
-              ],
-            ),
-          ),
-          OutlinedButton.icon(
+              ),
+            ],
+          );
+          final action = OutlinedButton.icon(
             onPressed: onTap,
-            icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+            icon: const Icon(Icons.play_arrow_rounded, size: 18),
             label: const Text('Oluştur'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.blue,
-              side: const BorderSide(color: AppColors.line),
+              foregroundColor: AppColors.clinicalActive,
+              side: const BorderSide(color: AppColors.clinicalBorder),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-          ),
-        ],
+          );
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    leading,
+                    const SizedBox(width: 12),
+                    Expanded(child: text),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Align(alignment: Alignment.centerLeft, child: action),
+              ],
+            );
+          }
+          return Row(
+            children: [
+              leading,
+              const SizedBox(width: 14),
+              Expanded(child: text),
+              const SizedBox(width: 10),
+              action,
+            ],
+          );
+        },
       ),
     );
   }

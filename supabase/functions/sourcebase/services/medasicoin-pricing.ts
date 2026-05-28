@@ -60,6 +60,7 @@ const MIN_UNITS: Record<string, Record<QualityTier, number>> = {
 const MODEL_COST_MICRO_TL: Record<string, { input: number; output: number }> = {
   "gemini-2.5-flash-lite": { input: 15, output: 60 },
   "gemini-2.5-flash": { input: 30, output: 120 },
+  "gpt-4o-mini": { input: 30, output: 120 },
   "gpt-5.4-mini": { input: 120, output: 480 },
   "gpt-5.4": { input: 400, output: 1600 },
 };

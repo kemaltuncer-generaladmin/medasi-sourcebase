@@ -12,8 +12,10 @@ class AuthScreenFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Scaffold(
       backgroundColor: AppColors.page,
+      resizeToAvoidBottomInset: true,
       body: Semantics(
         container: true,
         explicitChildNodes: true,
@@ -23,12 +25,24 @@ class AuthScreenFrame extends StatelessWidget {
           child: SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final viewInsets = MediaQuery.viewInsetsOf(context);
-                final horizontalPadding = ResponsiveLayout.getHorizontalPadding(
-                  context,
-                );
-                final useCard = constraints.maxWidth >= 700;
-                final maxWidth = useCard ? 520.0 : double.infinity;
+                final horizontalPadding = constraints.maxWidth < 430
+                    ? 24.0
+                    : ResponsiveLayout.getHorizontalPadding(context);
+                final useCard = constraints.maxWidth >= 760;
+                final compactPhone =
+                    SourceBaseMobileMetrics.isCompactPhone(context) ||
+                    keyboardVisible;
+                final topPadding = keyboardVisible
+                    ? 10.0
+                    : compactPhone
+                    ? 22.0
+                    : 32.0;
+                final bottomPadding =
+                    SourceBaseMobileMetrics.keyboardAwareBottomPadding(
+                      context,
+                      resting: 36,
+                    );
+                final maxWidth = useCard ? 460.0 : double.infinity;
                 final content = Semantics(
                   container: true,
                   explicitChildNodes: true,
@@ -46,27 +60,32 @@ class AuthScreenFrame extends StatelessWidget {
                           ScrollViewKeyboardDismissBehavior.onDrag,
                       padding: EdgeInsets.fromLTRB(
                         horizontalPadding,
-                        24,
+                        topPadding,
                         horizontalPadding,
-                        24 + viewInsets.bottom,
+                        bottomPadding,
                       ),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          minHeight: useCard
-                              ? 0
-                              : (constraints.maxHeight > 72
-                                    ? constraints.maxHeight - 72
-                                    : 0),
+                          minHeight: constraints.maxHeight > 72
+                              ? constraints.maxHeight - 72
+                              : 0,
                         ),
                         child: useCard
                             ? Container(
-                                padding: const EdgeInsets.all(28),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 28,
+                                  vertical: 30,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: AppColors.white.withValues(alpha: .92),
+                                  color: AppColors.white.withValues(alpha: .88),
                                   borderRadius: BorderRadius.circular(
                                     SBDimensions.cardRadius,
                                   ),
-                                  border: Border.all(color: AppColors.softLine),
+                                  border: Border.all(
+                                    color: AppColors.white.withValues(
+                                      alpha: .72,
+                                    ),
+                                  ),
                                   boxShadow: SBShadows.card,
                                 ),
                                 child: content,
@@ -99,17 +118,35 @@ class AuthHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final compactLayout = width < 430;
-    final artSize = compactLayout ? 112.0 : 156.0;
-    final titleStyle =
-        (compactLayout ? SBTextStyles.heading1 : SBTextStyles.display2)
-            .copyWith(color: AppColors.navy);
-    final subtitleStyle = SBTextStyles.bodyMedium.copyWith(
+    final media = MediaQuery.of(context);
+    final width = media.size.width;
+    final keyboardVisible = media.viewInsets.bottom > 0;
+    final compactLayout =
+        width < 390 || media.size.height < 700 || keyboardVisible;
+    final artSize = keyboardVisible
+        ? 0.0
+        : compactLayout
+        ? 92.0
+        : 150.0;
+    final titleStyle = TextStyle(
+      color: AppColors.navy,
+      fontSize: compactLayout ? 34 : 42,
+      fontWeight: FontWeight.w900,
+      height: 1.06,
+      letterSpacing: 0,
+    );
+    final subtitleStyle = TextStyle(
       color: AppColors.muted,
       fontWeight: FontWeight.w500,
+      fontSize: compactLayout ? 18 : 22,
+      height: 1.42,
+      letterSpacing: 0,
     );
-    final brandGap = compactLayout ? 40.0 : 58.0;
+    final brandGap = keyboardVisible
+        ? 20.0
+        : compactLayout
+        ? 34.0
+        : 58.0;
 
     return Semantics(
       container: true,
@@ -118,14 +155,15 @@ class AuthHeader extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Align(
-            alignment: Alignment.topRight,
-            child: SizedBox(
-              width: artSize,
-              height: artSize,
-              child: CustomPaint(painter: AuthArtPainter(art)),
+          if (artSize > 0)
+            Align(
+              alignment: Alignment.topRight,
+              child: SizedBox(
+                width: artSize,
+                height: artSize,
+                child: CustomPaint(painter: AuthArtPainter(art)),
+              ),
             ),
-          ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -137,7 +175,7 @@ class AuthHeader extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: titleStyle,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               Text(subtitle, style: subtitleStyle),
             ],
           ),
@@ -174,25 +212,25 @@ class AuthTextField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: SBDimensions.inputHeight),
+      constraints: const BoxConstraints(minHeight: 64),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.white.withValues(alpha: .96),
-          borderRadius: BorderRadius.circular(SBDimensions.inputRadius),
-          border: Border.all(color: AppColors.line),
+          color: AppColors.white.withValues(alpha: .94),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFD8DFEA), width: 1.2),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF234B86).withValues(alpha: .05),
-              blurRadius: 16,
+              color: const Color(0xFF234B86).withValues(alpha: .035),
+              blurRadius: 18,
               offset: const Offset(0, 8),
             ),
           ],
         ),
         child: Row(
           children: [
-            const SizedBox(width: 16),
-            Icon(icon, color: AppColors.blue, size: 22),
-            const SizedBox(width: 12),
+            const SizedBox(width: 20),
+            Icon(icon, color: AppColors.blue, size: 27),
+            const SizedBox(width: 18),
             Expanded(
               child: TextField(
                 controller: controller,
@@ -204,24 +242,38 @@ class AuthTextField extends StatelessWidget {
                 cursorColor: AppColors.blue,
                 decoration: InputDecoration(
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+                  filled: false,
+                  contentPadding: EdgeInsets.zero,
                   isDense: true,
                   hintText: hint,
-                  hintStyle: SBTextStyles.bodyMedium.copyWith(
+                  hintStyle: const TextStyle(
                     color: AppColors.softText,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                    letterSpacing: 0,
                   ),
                 ),
-                style: SBTextStyles.bodyMedium.copyWith(
+                style: const TextStyle(
                   color: AppColors.navy,
                   fontWeight: FontWeight.w600,
+                  fontSize: 21,
+                  height: 1.2,
+                  letterSpacing: 0,
                 ),
               ),
             ),
             if (trailing != null)
               IconTheme(
-                data: const IconThemeData(color: Color(0xFF7C89A6), size: 24),
+                data: const IconThemeData(color: Color(0xFF7C89A6), size: 29),
                 child: trailing!,
               ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 14),
           ],
         ),
       ),
@@ -233,7 +285,7 @@ class GradientActionButton extends StatelessWidget {
   const GradientActionButton({
     required this.label,
     required this.onPressed,
-    this.height = 64,
+    this.height = 44,
     super.key,
   });
 
@@ -246,7 +298,119 @@ class GradientActionButton extends StatelessWidget {
     return SourceBaseButton(
       label: label,
       onPressed: onPressed,
-      size: height >= 64 ? SBButtonSize.large : SBButtonSize.medium,
+      size: height >= 48 ? SBButtonSize.large : SBButtonSize.medium,
+    );
+  }
+}
+
+class AuthActionButton extends StatelessWidget {
+  const AuthActionButton({
+    required this.label,
+    required this.onPressed,
+    this.loading = false,
+    this.outlined = false,
+    super.key,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final bool loading;
+  final bool outlined;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = onPressed == null || loading;
+    final radius = BorderRadius.circular(10);
+    final foreground = outlined
+        ? (disabled ? AppColors.muted : AppColors.blue)
+        : (disabled ? AppColors.muted : AppColors.white);
+
+    return Semantics(
+      button: true,
+      enabled: !disabled,
+      label: label,
+      hint: loading ? 'Yükleniyor' : null,
+      excludeSemantics: true,
+      child: SizedBox(
+        width: double.infinity,
+        height: 66,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: outlined || disabled ? null : AppColors.primaryGradient,
+            color: outlined
+                ? AppColors.white.withValues(alpha: .70)
+                : disabled
+                ? AppColors.line
+                : null,
+            borderRadius: radius,
+            border: outlined
+                ? Border.all(
+                    color: disabled ? AppColors.line : AppColors.blue,
+                    width: 1.2,
+                  )
+                : null,
+            boxShadow: outlined || disabled
+                ? null
+                : [
+                    BoxShadow(
+                      color: AppColors.blue.withValues(alpha: .22),
+                      blurRadius: 18,
+                      offset: const Offset(0, 9),
+                    ),
+                  ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: disabled ? null : onPressed,
+              borderRadius: radius,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: loading
+                    ? Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              outlined ? AppColors.blue : AppColors.white,
+                            ),
+                          ),
+                        ),
+                      )
+                    : ExcludeSemantics(
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: foreground,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                height: 1,
+                                letterSpacing: 0,
+                              ),
+                            ),
+                            Positioned(
+                              right: 0,
+                              child: Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 32,
+                                color: foreground,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -255,7 +419,7 @@ class OutlineActionButton extends StatelessWidget {
   const OutlineActionButton({
     required this.label,
     required this.onPressed,
-    this.height = 58,
+    this.height = 44,
     super.key,
   });
 
@@ -269,7 +433,7 @@ class OutlineActionButton extends StatelessWidget {
       label: label,
       onPressed: onPressed,
       variant: SourceBaseButtonVariant.secondary,
-      size: height >= 58 ? SBButtonSize.medium : SBButtonSize.small,
+      size: height >= 44 ? SBButtonSize.medium : SBButtonSize.small,
     );
   }
 }
@@ -290,7 +454,7 @@ class SocialAuthButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 54,
+      height: 44,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
@@ -306,7 +470,7 @@ class SocialAuthButton extends StatelessWidget {
           fit: BoxFit.scaleDown,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: [icon, const SizedBox(width: 18), Text(label)],
+            children: [icon, const SizedBox(width: 10), Text(label)],
           ),
         ),
       ),
@@ -362,17 +526,23 @@ class DividerLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Expanded(child: Divider(color: AppColors.line)),
+        const Expanded(child: Divider(color: Color(0xFFD8DFEA))),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            label,
+            label.toUpperCase(),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: SBTextStyles.bodySmall.copyWith(color: AppColors.muted),
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              height: 1,
+              letterSpacing: 0,
+            ),
           ),
         ),
-        const Expanded(child: Divider(color: AppColors.line)),
+        const Expanded(child: Divider(color: Color(0xFFD8DFEA))),
       ],
     );
   }
@@ -386,30 +556,44 @@ class AuthStatusBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = error ? AppColors.red : AppColors.green;
+    final color = error ? AppColors.clinicalError : AppColors.green;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: error ? AppColors.redBg : AppColors.greenBg,
-        borderRadius: BorderRadius.circular(10),
+        color: error ? AppColors.clinicalErrorBg : AppColors.greenBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: error
+              ? AppColors.clinicalError.withValues(alpha: .12)
+              : AppColors.green.withValues(alpha: .14),
+        ),
       ),
       child: Row(
         children: [
-          Icon(
-            error ? Icons.error_outline_rounded : Icons.check_circle_rounded,
-            color: color,
-            size: 22,
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.white.withValues(alpha: .92),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              error ? Icons.error_outline_rounded : Icons.check_rounded,
+              color: color,
+              size: 26,
+            ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 16),
           Expanded(
             child: Text(
               message,
               style: TextStyle(
                 color: color,
-                fontSize: 14.5,
+                fontSize: 17,
                 fontWeight: FontWeight.w700,
-                height: 1.25,
+                height: 1.36,
+                letterSpacing: 0,
               ),
             ),
           ),
@@ -442,33 +626,70 @@ class AuthBackgroundPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = Colors.white);
+
     final blueWash = Paint()
-      ..shader =
-          RadialGradient(
-            colors: [
-              const Color(0xFFD9EAFF).withValues(alpha: .58),
-              Colors.transparent,
-            ],
-          ).createShader(
-            Rect.fromCircle(
-              center: Offset(size.width * .88, size.height * .09),
-              radius: size.width * .55,
-            ),
-          );
-    canvas.drawRect(Offset.zero & size, Paint()..color = AppColors.page);
+      ..shader = LinearGradient(
+        colors: [
+          const Color(0xFFE8F0FF).withValues(alpha: .68),
+          Colors.white.withValues(alpha: .0),
+        ],
+        begin: Alignment.topRight,
+        end: Alignment.centerLeft,
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height * .45));
     canvas.drawRect(Offset.zero & size, blueWash);
 
-    final dotPaint = Paint()
-      ..color = const Color(0xFFBFD8F6).withValues(alpha: .38);
-    for (var row = 0; row < 7; row++) {
-      for (var col = 0; col < 7; col++) {
-        canvas.drawCircle(
-          Offset(size.width - 110 + col * 13, 320 + row * 13),
-          2,
-          dotPaint,
-        );
-      }
-    }
+    final waveOne = Path()
+      ..moveTo(0, size.height - 90)
+      ..cubicTo(
+        size.width * .28,
+        size.height - 104,
+        size.width * .34,
+        size.height - 18,
+        size.width * .63,
+        size.height - 58,
+      )
+      ..cubicTo(
+        size.width * .80,
+        size.height - 82,
+        size.width * .92,
+        size.height - 80,
+        size.width,
+        size.height - 52,
+      )
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+      waveOne,
+      Paint()..color = const Color(0xFFEAF1FF).withValues(alpha: .78),
+    );
+
+    final waveTwo = Path()
+      ..moveTo(0, size.height - 52)
+      ..cubicTo(
+        size.width * .26,
+        size.height + 36,
+        size.width * .48,
+        size.height - 38,
+        size.width * .72,
+        size.height - 16,
+      )
+      ..cubicTo(
+        size.width * .86,
+        size.height - 4,
+        size.width * .94,
+        size.height - 18,
+        size.width,
+        size.height - 44,
+      )
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+      waveTwo,
+      Paint()..color = const Color(0xFFDDE8FF).withValues(alpha: .38),
+    );
   }
 
   @override

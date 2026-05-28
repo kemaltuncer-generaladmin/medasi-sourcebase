@@ -115,7 +115,7 @@ class DriveRepository {
       );
       jobId = _text((jobResponse['data'] as Map?)?['jobId']);
       if (jobId.isEmpty) {
-        throw StateError('AI üretim işi başlatılamadı.');
+        throw StateError('İçerik üretimi başlatılamadı.');
       }
       await api.processGenerationJob(jobId);
       final content = await _waitForGeneratedContent(api, jobId);
@@ -194,13 +194,16 @@ Future<Object?> _waitForGeneratedContent(
     }
     if (status == 'failed') {
       final message = statusData is Map
-          ? _text(statusData['errorMessage'], fallback: 'AI üretimi başarısız.')
-          : 'AI üretimi başarısız.';
+          ? _text(
+              statusData['errorMessage'],
+              fallback: 'İçerik üretimi başarısız.',
+            )
+          : 'İçerik üretimi başarısız.';
       throw StateError(message);
     }
     await Future<void>.delayed(const Duration(seconds: 2));
   }
-  throw StateError('AI üretimi zaman aşımına uğradı.');
+  throw StateError('İçerik üretimi zaman aşımına uğradı.');
 }
 
 DriveCourse _courseFromRow(

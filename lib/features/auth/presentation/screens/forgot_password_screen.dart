@@ -91,7 +91,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           subtitle: 'Şifreni yenilemek için kayıtlı e-posta adresini gir.',
           art: AuthArtType.forgot,
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 16),
         AuthTextField(
           icon: Icons.mail_outline_rounded,
           hint: 'E-posta',
@@ -132,7 +132,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             error: errorMessage != null,
           ),
         ],
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         GradientActionButton(
           label: loading ? 'Gönderiliyor...' : 'Sıfırlama bağlantısı gönder',
           onPressed: loading ? null : _sendReset,

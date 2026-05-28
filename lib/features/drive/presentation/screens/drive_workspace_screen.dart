@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/design_system/layout/responsive_scaffold.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/responsive_layout.dart';
+import '../../../../core/widgets/sourcebase_brand.dart';
 import '../../../auth/data/sourcebase_auth_backend.dart';
 import '../../../auth/presentation/screens/login_screen.dart';
 import '../../../baseforce/presentation/screens/baseforce_screen.dart';
@@ -11,7 +13,6 @@ import '../../data/drive_upload_payload.dart';
 import '../../data/drive_repository.dart';
 import '../../data/drive_upload_service.dart';
 import '../../data/sourcebase_drive_api.dart';
-import '../widgets/drive_ui.dart';
 import '../widgets/sourcebase_bottom_nav.dart';
 import '../widgets/sourcebase_nav_rail.dart';
 import 'collections_screen.dart';
@@ -51,17 +52,24 @@ class _UploadStepFailure implements Exception {
 }
 
 class DriveWorkspaceScreen extends StatefulWidget {
-  const DriveWorkspaceScreen({super.key});
+  const DriveWorkspaceScreen({
+    this.repository = const DriveRepository(),
+    this.uploadService = const DriveUploadService(),
+    super.key,
+  });
 
   static const route = '/home';
+
+  final DriveRepository repository;
+  final DriveUploadService uploadService;
 
   @override
   State<DriveWorkspaceScreen> createState() => _DriveWorkspaceScreenState();
 }
 
 class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
-  final repository = const DriveRepository();
-  final uploadService = const DriveUploadService();
+  late final DriveRepository repository;
+  late final DriveUploadService uploadService;
   DriveWorkspaceData data = DriveWorkspaceData.empty;
   WorkspaceRouteKey route = WorkspaceRouteKey.home;
   WorkspaceRouteKey searchReturnRoute = WorkspaceRouteKey.home;
@@ -76,6 +84,8 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
   @override
   void initState() {
     super.initState();
+    repository = widget.repository;
+    uploadService = widget.uploadService;
     _load();
   }
 
@@ -1168,7 +1178,9 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
             child: const Text('Vazgeç'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.clinicalError,
+            ),
             onPressed: () => Navigator.of(context).pop(true),
             child: Text(actionLabel),
           ),
@@ -1286,7 +1298,7 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 180),
       child: loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const _WorkspaceLoadingState()
           : errorMessage != null
           ? _ErrorState(
               message: 'Bir Sorun Oluştu',
@@ -1430,11 +1442,15 @@ class PlaceholderWorkspaceScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = ResponsiveLayout.isMobile(context)
+        ? SourceBaseBottomNav.contentBottomPadding(context)
+        : 80.0;
+
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(28, 80, 28, 160),
+          padding: EdgeInsets.fromLTRB(28, 80, 28, bottomPadding),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -1442,10 +1458,11 @@ class PlaceholderWorkspaceScreen extends StatelessWidget {
                 width: 92,
                 height: 92,
                 decoration: BoxDecoration(
-                  color: AppColors.selectedBlue,
+                  color: AppColors.clinicalActiveBg,
                   borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppColors.clinicalBorder),
                 ),
-                child: Icon(icon, color: AppColors.blue, size: 48),
+                child: Icon(icon, color: AppColors.clinicalActive, size: 48),
               ),
               const SizedBox(height: 22),
               Text(
@@ -1488,37 +1505,137 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = ResponsiveLayout.isMobile(context)
+        ? SourceBaseBottomNav.contentBottomPadding(context)
+        : 80.0;
+
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(28),
+        padding: EdgeInsets.fromLTRB(24, 80, 24, bottomPadding),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.clinicalBorder),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0B1F33).withValues(alpha: .07),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: AppColors.clinicalErrorBg,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: const Icon(
+                    Icons.cloud_off_rounded,
+                    size: 28,
+                    color: AppColors.clinicalError,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.clinicalInk,
+                    fontSize: 23,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  subtitle,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 15,
+                    height: 1.42,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                OutlinedButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_rounded, size: 19),
+                  label: const Text('Tekrar Dene'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.clinicalActive,
+                    side: const BorderSide(color: AppColors.clinicalBorder),
+                    minimumSize: const Size(156, 48),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkspaceLoadingState extends StatelessWidget {
+  const _WorkspaceLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = ResponsiveLayout.isMobile(context)
+        ? SourceBaseBottomNav.contentBottomPadding(context)
+        : 80.0;
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(24, 80, 24, bottomPadding),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_rounded, size: 64, color: AppColors.red),
+            Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppColors.clinicalBorder),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0B1F33).withValues(alpha: .07),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: const Center(child: SourceBaseMark(size: 38)),
+            ),
             const SizedBox(height: 18),
-            Text(
-              message,
-              style: const TextStyle(
-                color: AppColors.navy,
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
+            const Text(
+              'Çalışma alanı hazırlanıyor',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.clinicalInk,
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted, fontSize: 16),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: 160,
-              child: SBPrimaryButton(
-                label: 'Tekrar Dene',
-                icon: Icons.refresh_rounded,
-                onPressed: onRetry,
-                size: SBButtonSize.medium,
-                fullWidth: false,
+            const SizedBox(height: 10),
+            const SizedBox(
+              width: 108,
+              child: LinearProgressIndicator(
+                minHeight: 2,
+                color: AppColors.clinicalActive,
+                backgroundColor: AppColors.clinicalActiveBg,
               ),
             ),
           ],

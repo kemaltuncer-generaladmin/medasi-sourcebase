@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show User;
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/design_system/components/sourcebase_button.dart';
 import '../../../../core/design_system/components/sourcebase_card.dart';
 import '../../../../core/design_system/components/sourcebase_state.dart';
 import '../../../../core/design_system/constants/sb_dimensions.dart';
+import '../../../../core/design_system/layout/sourcebase_mobile_metrics.dart';
 import '../../../../core/design_system/layout/sourcebase_page_header.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
@@ -93,7 +96,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text('Vazgeç'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.clinicalError,
+            ),
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Oturumu kapat'),
           ),
@@ -131,7 +136,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           title: 'Profil',
           subtitle:
               'Hesap bilgilerini ve kullanım durumunu buradan takip edebilirsin.',
-          leading: const SourceBaseBrand(compact: true),
+          leading: SourceBaseMobileMetrics.isPhone(context)
+              ? const SourceBaseMark(size: 30)
+              : const SourceBaseBrand(compact: true),
           actions: [
             SBIconButton(
               icon: Icons.search_rounded,
@@ -145,7 +152,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           builder: (context, snapshot) {
             final loading = snapshot.connectionState == ConnectionState.waiting;
             final profile = snapshot.data;
-            final isMobile = MediaQuery.sizeOf(context).width < 600;
             if (loading && profile == null) {
               return const _StatePanel(
                 icon: Icons.person_search_rounded,
@@ -170,35 +176,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _ProfileHeader(profile: current, onEdit: _openProfileSetup),
-                if (isMobile) ...[
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SBSecondaryButton(
-                          label: 'Mağaza',
-                          icon: Icons.storefront_rounded,
-                          onPressed: widget.onOpenStore,
-                          size: SBButtonSize.small,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: SBPrimaryButton(
-                          label: _signingOut
-                              ? 'Kapatılıyor...'
-                              : 'Oturumu kapat',
-                          icon: Icons.logout_rounded,
-                          onPressed: _signingOut
-                              ? null
-                              : () => _signOut(context),
-                          loading: _signingOut,
-                          size: SBButtonSize.small,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                const SizedBox(height: 14),
+                _ProfileActionStrip(
+                  signingOut: _signingOut,
+                  onOpenStore: widget.onOpenStore,
+                  onEditProfile: _openProfileSetup,
+                  onSignOut: () => _signOut(context),
+                ),
                 if (!current.isComplete) ...[
                   const SizedBox(height: 12),
                   _ProfileCompletionPanel(onComplete: _openProfileSetup),
@@ -312,16 +296,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 32),
-                SBPrimaryButton(
-                  label: _signingOut
-                      ? 'Oturum kapatılıyor...'
-                      : 'Oturumu kapat',
-                  icon: Icons.logout_rounded,
-                  onPressed: _signingOut ? null : () => _signOut(context),
-                  loading: _signingOut,
-                  size: SBButtonSize.medium,
-                ),
               ],
             );
           },
@@ -357,7 +331,15 @@ class _ProfileSnapshot {
   bool get isComplete => faculty.isNotEmpty && department.isNotEmpty;
 
   static Future<_ProfileSnapshot> load() async {
-    final user = SourceBaseAuthBackend.currentUser;
+    try {
+      return await _loadFromSources();
+    } catch (_) {
+      return fromCurrentUser();
+    }
+  }
+
+  static Future<_ProfileSnapshot> _loadFromSources() async {
+    final user = _safeCurrentUser();
     final metadata = user?.userMetadata ?? const <String, dynamic>{};
     Map<String, dynamic> profileRow = const {};
     var profileLoadFailed = false;
@@ -369,7 +351,8 @@ class _ProfileSnapshot {
             .from('profiles')
             .select()
             .eq('id', user.id)
-            .maybeSingle();
+            .maybeSingle()
+            .timeout(const Duration(seconds: 5));
         if (row != null) {
           profileRow = Map<String, dynamic>.from(row);
         }
@@ -380,11 +363,17 @@ class _ProfileSnapshot {
 
     _UserStats stats = _UserStats.empty;
     var statsLoadFailed = false;
-    try {
-      final workspace = await const DriveRepository().loadWorkspace();
-      stats = _UserStats.fromWorkspace(workspace);
-    } catch (_) {
+    if (user == null) {
       statsLoadFailed = true;
+    } else {
+      try {
+        final workspace = await const DriveRepository().loadWorkspace().timeout(
+          const Duration(seconds: 5),
+        );
+        stats = _UserStats.fromWorkspace(workspace);
+      } catch (_) {
+        statsLoadFailed = true;
+      }
     }
 
     return _ProfileSnapshot(
@@ -423,7 +412,7 @@ class _ProfileSnapshot {
   }
 
   static _ProfileSnapshot fromCurrentUser() {
-    final user = SourceBaseAuthBackend.currentUser;
+    final user = _safeCurrentUser();
     final metadata = user?.userMetadata ?? const <String, dynamic>{};
     return _ProfileSnapshot(
       displayName: _firstText([
@@ -499,6 +488,14 @@ String _friendlyProfileError(Object? error) {
   return 'Profil bilgileri şu anda yüklenemiyor. Lütfen tekrar dene.';
 }
 
+User? _safeCurrentUser() {
+  try {
+    return SourceBaseAuthBackend.currentUser;
+  } catch (_) {
+    return null;
+  }
+}
+
 String _firstText(List<Object?> values, {String fallback = ''}) {
   for (final value in values) {
     final text = _safeText(value);
@@ -569,6 +566,140 @@ String _friendlyPurchaseError(String message) {
   return 'Ödeme başlatılamadı. Paket bilgileri doğrulanamadı. Lütfen tekrar dene.';
 }
 
+class _ProfileActionStrip extends StatelessWidget {
+  const _ProfileActionStrip({
+    required this.signingOut,
+    required this.onOpenStore,
+    required this.onEditProfile,
+    required this.onSignOut,
+  });
+
+  final bool signingOut;
+  final VoidCallback onOpenStore;
+  final VoidCallback onEditProfile;
+  final VoidCallback onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    return SourceBaseCard(
+      padding: const EdgeInsets.all(12),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final tight = constraints.maxWidth < 340;
+          final storeButton = SBPrimaryButton(
+            label: 'Paketler',
+            icon: Icons.storefront_rounded,
+            onPressed: onOpenStore,
+            size: SBButtonSize.small,
+          );
+          final editButton = SBSecondaryButton(
+            label: 'Düzenle',
+            icon: Icons.edit_outlined,
+            onPressed: onEditProfile,
+            size: SBButtonSize.small,
+          );
+          final signOutButton = _DangerOutlineButton(
+            label: signingOut ? 'Kapatılıyor...' : 'Çıkış',
+            icon: Icons.logout_rounded,
+            onPressed: signingOut ? null : onSignOut,
+            loading: signingOut,
+            height: 44,
+          );
+
+          if (constraints.maxWidth >= 620) {
+            return Row(
+              children: [
+                Expanded(child: storeButton),
+                const SizedBox(width: 10),
+                Expanded(child: editButton),
+                const SizedBox(width: 10),
+                Expanded(child: signOutButton),
+              ],
+            );
+          }
+
+          if (tight) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                storeButton,
+                const SizedBox(height: 8),
+                editButton,
+                const SizedBox(height: 8),
+                signOutButton,
+              ],
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              storeButton,
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(child: editButton),
+                  const SizedBox(width: 8),
+                  Expanded(child: signOutButton),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _DangerOutlineButton extends StatelessWidget {
+  const _DangerOutlineButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.loading = false,
+    this.height = 52,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool loading;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: loading ? null : onPressed,
+        icon: loading
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.clinicalError,
+                ),
+              )
+            : Icon(icon, size: 20),
+        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.clinicalError,
+          side: BorderSide(
+            color: AppColors.clinicalError.withValues(alpha: .24),
+          ),
+          backgroundColor: AppColors.clinicalErrorBg.withValues(alpha: .65),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(SBDimensions.buttonRadius),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w900),
+        ),
+      ),
+    );
+  }
+}
+
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({required this.profile, required this.onEdit});
   final _ProfileSnapshot profile;
@@ -599,9 +730,9 @@ class _ProfileHeader extends StatelessWidget {
                 profile.displayName,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.navy,
-                  fontSize: 24,
+                  fontSize: compact ? 21 : 24,
                   fontWeight: FontWeight.w900,
                   height: 1.08,
                 ),
@@ -611,7 +742,10 @@ class _ProfileHeader extends StatelessWidget {
                 profile.email,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppColors.muted, fontSize: 15),
+                style: TextStyle(
+                  color: AppColors.muted,
+                  fontSize: compact ? 13 : 15,
+                ),
               ),
               const SizedBox(height: 14),
               Wrap(
@@ -693,32 +827,13 @@ class _InfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 260),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: AppColors.selectedBlue,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.softLine),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: AppColors.blue, size: 16),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.navy,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
+      child: SourceBaseChip(
+        label: label,
+        icon: icon,
+        selected: true,
+        foregroundColor: AppColors.clinicalActive,
       ),
     );
   }
@@ -731,20 +846,13 @@ class _CompletionBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: completed ? AppColors.greenBg : AppColors.redBg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        completed ? 'Profil tamamlandı' : 'Profil bilgileri eksik',
-        style: TextStyle(
-          color: completed ? AppColors.green : AppColors.red,
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
+    return SourceBaseChip(
+      label: completed ? 'Profil tamamlandı' : 'Profil bilgileri eksik',
+      selected: true,
+      foregroundColor: completed ? AppColors.green : AppColors.clinicalError,
+      backgroundColor: completed
+          ? AppColors.greenBg
+          : AppColors.clinicalErrorBg,
     );
   }
 }
@@ -818,7 +926,7 @@ class _StatsPanel extends StatelessWidget {
               ),
               _StatTile(
                 width: width,
-                icon: Icons.auto_awesome_outlined,
+                icon: Icons.fact_check_outlined,
                 label: 'Üretim',
                 value: snapshot.stats.generatedCount.toString(),
               ),
@@ -1146,29 +1254,29 @@ class _MedasiCoinStoreScreenState extends State<MedasiCoinStoreScreen> {
           ],
         ),
         GlassPanel(
-          padding: const EdgeInsets.all(22),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 58,
-                height: 58,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
                   gradient: AppColors.brandGradient,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
                   Icons.monetization_on_rounded,
                   color: Colors.white,
-                  size: 34,
+                  size: 24,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               const Text(
                 'MC Paketleri',
                 style: TextStyle(
                   color: AppColors.navy,
-                  fontSize: 26,
+                  fontSize: 22,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -1394,18 +1502,21 @@ class _StorePackageTileState extends State<_StorePackageTile> {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final compact = constraints.maxWidth < 430;
+          final compact =
+              SourceBaseMobileMetrics.isPhone(context) ||
+              constraints.maxWidth < 560;
           final paymentsDisabled = !_storePaymentsEnabled;
           final leading = Container(
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: AppColors.selectedBlue,
+              color: AppColors.clinicalActiveBg,
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.clinicalBorder),
             ),
             child: const Icon(
               Icons.toll_rounded,
-              color: AppColors.blue,
+              color: AppColors.clinicalActive,
               size: 26,
             ),
           );
@@ -1434,6 +1545,29 @@ class _StorePackageTileState extends State<_StorePackageTile> {
                   height: 1.3,
                 ),
               ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _StorePackagePill(
+                    icon: widget.package.kind == _StorePackageKind.subscription
+                        ? Icons.verified_outlined
+                        : Icons.toll_rounded,
+                    label: widget.package.kind == _StorePackageKind.subscription
+                        ? 'Üyelik'
+                        : '${widget.package.coin} MC',
+                  ),
+                  _StorePackagePill(
+                    icon: widget.package.hasPrice
+                        ? Icons.lock_outline_rounded
+                        : Icons.info_outline_rounded,
+                    label: widget.package.hasPrice
+                        ? 'Backend onaylı'
+                        : 'Fiyat bekliyor',
+                  ),
+                ],
+              ),
             ],
           );
           final price = Text(
@@ -1441,23 +1575,25 @@ class _StorePackageTileState extends State<_StorePackageTile> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: widget.package.hasPrice ? AppColors.blue : AppColors.muted,
+              color: widget.package.hasPrice
+                  ? AppColors.clinicalActive
+                  : AppColors.muted,
               fontSize: 18,
               fontWeight: FontWeight.w900,
             ),
           );
           final button = SizedBox(
             width: compact ? double.infinity : 138,
-            height: 42,
+            height: compact ? 48 : 42,
             child: FilledButton(
               onPressed:
                   _buying || !widget.package.canPurchase || paymentsDisabled
                   ? null
                   : _purchase,
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.blue,
+                backgroundColor: AppColors.clinicalActive,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
               child: _buying
@@ -1492,12 +1628,7 @@ class _StorePackageTileState extends State<_StorePackageTile> {
                   ],
                 ),
                 const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(child: price),
-                    const SizedBox(width: 12),
-                  ],
-                ),
+                Row(children: [Expanded(child: price)]),
                 const SizedBox(height: 10),
                 button,
               ] else
@@ -1606,7 +1737,7 @@ class _PaymentStateNotice extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: color.withValues(alpha: .08),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withValues(alpha: .18)),
       ),
       child: Row(
@@ -1640,6 +1771,26 @@ class _PaymentStateNotice extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _StorePackagePill extends StatelessWidget {
+  const _StorePackagePill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 180),
+      child: SourceBaseChip(
+        label: label,
+        icon: icon,
+        selected: true,
+        foregroundColor: AppColors.clinicalActive,
       ),
     );
   }
@@ -1754,16 +1905,34 @@ class _CheckoutLinkActions extends StatelessWidget {
 
   final String url;
 
-  Future<void> _copyUrl(BuildContext context) async {
+  Future<void> _openUrl(BuildContext context) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || !(uri.isScheme('https') || uri.isScheme('http'))) {
+      await _copyToClipboard(
+        context,
+        message: 'Ödeme bağlantısı geçerli değil.',
+      );
+      return;
+    }
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (opened || !context.mounted) return;
+    await _copyToClipboard(
+      context,
+      message:
+          'Ödeme sayfası açılamadı. Bağlantı kopyalandı; tarayıcıya yapıştırarak devam edebilirsin.',
+    );
+  }
+
+  Future<void> _copyToClipboard(
+    BuildContext context, {
+    String message = 'Ödeme bağlantısı kopyalandı.',
+  }) async {
     await Clipboard.setData(ClipboardData(text: url));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(
-        const SnackBar(
-          content: Text('Ödeme bağlantısı kopyalandı.'),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
       );
   }
 
@@ -1776,27 +1945,68 @@ class _CheckoutLinkActions extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.softLine),
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.link_rounded, color: AppColors.blue, size: 20),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'Ödeme linki hazır. İşlemi tamamladıktan sonra bakiyeyi yenile.',
-              style: TextStyle(
-                color: AppColors.navy,
-                fontSize: 12,
-                height: 1.25,
-                fontWeight: FontWeight.w600,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final text = Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Icon(Icons.link_rounded, color: AppColors.blue, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Ödeme linki hazır. İşlemi tamamladıktan sonra bakiyeyi yenile.',
+                  style: TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 12,
+                    height: 1.25,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          TextButton(
-            onPressed: () => _copyUrl(context),
-            child: const Text('Kopyala'),
-          ),
-        ],
+            ],
+          );
+          final actions = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FilledButton.icon(
+                onPressed: () => _openUrl(context),
+                icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                label: const Text('Ödemeye git'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.clinicalActive,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: () => _copyToClipboard(context),
+                child: const Text('Kopyala'),
+              ),
+            ],
+          );
+
+          if (constraints.maxWidth < 430) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                text,
+                const SizedBox(height: 10),
+                Wrap(spacing: 8, runSpacing: 8, children: [actions]),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(child: text),
+              const SizedBox(width: 10),
+              actions,
+            ],
+          );
+        },
       ),
     );
   }
@@ -2102,60 +2312,63 @@ class _SettingsItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Opacity(
       opacity: enabled ? 1.0 : 0.45,
-      child: ListTile(
-        leading: Icon(icon, color: AppColors.navy),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
+          leading: Icon(icon, color: AppColors.navy),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: AppColors.navy,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-                if (!enabled)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.softBlue,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text(
-                      'Bağlı değil',
-                      style: TextStyle(
-                        color: AppColors.blue,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                  if (!enabled)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.softBlue,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'Bağlı değil',
+                        style: TextStyle(
+                          color: AppColors.blue,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              description,
-              style: const TextStyle(
-                color: AppColors.muted,
-                fontSize: 12,
-                height: 1.25,
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: const TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 12,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+          trailing: enabled
+              ? const Icon(Icons.chevron_right_rounded, color: AppColors.muted)
+              : null,
+          onTap: onTap,
         ),
-        trailing: enabled
-            ? const Icon(Icons.chevron_right_rounded, color: AppColors.muted)
-            : null,
-        onTap: onTap,
       ),
     );
   }

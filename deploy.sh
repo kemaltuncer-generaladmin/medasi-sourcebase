@@ -10,7 +10,10 @@ echo ""
 
 # .env dosyasından değişkenleri yükle
 if [ -f .env ]; then
-    export $(cat .env | grep -v '^#' | xargs)
+    set -a
+    # shellcheck source=/dev/null
+    . ./.env
+    set +a
 fi
 
 # Gerekli değişkenleri kontrol et
@@ -27,7 +30,22 @@ echo ""
 
 # Deployment'ı tetikle
 echo "🔄 Coolify deployment tetikleniyor..."
-RESPONSE=$(curl -s -X POST "$SOURCEBASE_DEPLOY_WEBHOOK")
+HTTP_CODE=$(curl -sS -o /tmp/sourcebase_deploy_response.json -w "%{http_code}" -X POST "$SOURCEBASE_DEPLOY_WEBHOOK")
+RESPONSE=$(cat /tmp/sourcebase_deploy_response.json)
+
+if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+    echo ""
+    echo "❌ Deployment tetiklenemedi (HTTP $HTTP_CODE)"
+    echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+    exit 1
+fi
+
+if echo "$RESPONSE" | grep -qi 'Unauthenticated'; then
+    echo ""
+    echo "❌ Deployment tetiklenemedi: webhook kimlik doğrulaması başarısız"
+    echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+    exit 1
+fi
 
 echo ""
 echo "✅ Deployment tetiklendi!"

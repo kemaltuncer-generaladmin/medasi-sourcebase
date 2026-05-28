@@ -78,7 +78,7 @@ class SourceBaseErrorState extends StatelessWidget {
   Widget build(BuildContext context) {
     return _StateContent(
       icon: icon,
-      iconColor: AppColors.red,
+      iconColor: AppColors.clinicalError,
       title: title,
       message: message,
       actionLabel: actionLabel,
@@ -92,7 +92,7 @@ class _StateContent extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.message,
-    this.iconColor = AppColors.blue,
+    this.iconColor = AppColors.clinicalActive,
     this.loading = false,
     this.actionLabel,
     this.onAction,
@@ -116,23 +116,23 @@ class _StateContent extends StatelessWidget {
         children: [
           loading
               ? const SizedBox(
-                  width: 30,
-                  height: 30,
-                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : Container(
-                  width: 52,
-                  height: 52,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
                     color: iconColor.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(icon, color: iconColor, size: 28),
+                  child: Icon(icon, color: iconColor, size: 21),
                 ),
-          const SizedBox(height: SBSpacing.md),
+          const SizedBox(height: SBSpacing.sm),
           Text(
             title,
-            style: SBTextStyles.heading3.copyWith(color: AppColors.navy),
+            style: SBTextStyles.heading3.copyWith(color: AppColors.clinicalInk),
           ),
           const SizedBox(height: SBSpacing.xs),
           Text(
@@ -140,7 +140,7 @@ class _StateContent extends StatelessWidget {
             style: SBTextStyles.bodySmall.copyWith(color: AppColors.muted),
           ),
           if (actionLabel != null && onAction != null) ...[
-            const SizedBox(height: SBSpacing.md),
+            const SizedBox(height: SBSpacing.sm),
             ConstrainedBox(
               constraints: const BoxConstraints(minWidth: 148),
               child: SBPrimaryButton(

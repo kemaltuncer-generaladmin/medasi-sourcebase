@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/design_system/design_system.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../drive/presentation/screens/drive_workspace_screen.dart';
 import '../../data/sourcebase_auth_backend.dart';
@@ -231,7 +230,7 @@ class _LoginScreenState extends State<LoginScreen> {
           subtitle: 'Kaynaklarını yükle, çıktıları üret, çalışmanı düzenle.',
           art: AuthArtType.login,
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 42),
         AuthTextField(
           icon: Icons.mail_outline_rounded,
           hint: 'E-posta',
@@ -240,7 +239,7 @@ class _LoginScreenState extends State<LoginScreen> {
           textInputAction: TextInputAction.next,
           autofillHints: const [AutofillHints.email],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 18),
         AuthTextField(
           icon: Icons.lock_outline_rounded,
           hint: 'Şifre',
@@ -259,7 +258,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
@@ -275,7 +274,7 @@ class _LoginScreenState extends State<LoginScreen> {
               fit: BoxFit.scaleDown,
               child: Text(
                 'Şifremi unuttum',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
               ),
             ),
           ),
@@ -288,17 +287,16 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 10),
           AuthStatusBox(message: successMessage!, error: false),
         ],
-        const SizedBox(height: 18),
-        SBPrimaryButton(
+        const SizedBox(height: 24),
+        AuthActionButton(
           label: 'Giriş Yap',
           onPressed: loading || _socialLoading ? null : _signIn,
           loading: loading,
-          size: SBButtonSize.large,
         ),
         if (hasSocialLogin) ...[
-          const SizedBox(height: 22),
+          const SizedBox(height: 30),
           const DividerLabel('veya'),
-          const SizedBox(height: 14),
+          const SizedBox(height: 18),
           if (googleOAuthEnabled) ...[
             SocialAuthButton(
               label: 'Google ile devam et',
@@ -316,22 +314,24 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 12),
           ],
         ] else ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 28),
+          const DividerLabel('veya'),
+          const SizedBox(height: 18),
           const AuthStatusBox(
             message:
                 'Google ve Apple girişi şu anda aktif değil. E-posta ile giriş yapabilirsin.',
             error: false,
           ),
         ],
-        const SizedBox(height: 18),
-        SBSecondaryButton(
+        const SizedBox(height: 26),
+        AuthActionButton(
           label: 'Hesap Oluştur',
           onPressed: loading || _socialLoading
               ? null
               : () => Navigator.pushNamed(context, RegisterScreen.route),
-          size: SBButtonSize.large,
+          outlined: true,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 28),
         Center(
           child: TextButton(
             onPressed: loading || _socialLoading
@@ -343,7 +343,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 text: 'Hesabın yok mu? ',
                 style: TextStyle(
                   color: AppColors.muted,
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: FontWeight.w500,
                 ),
                 children: [

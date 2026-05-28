@@ -4,6 +4,7 @@ import 'package:flutter/semantics.dart';
 import '../../../../core/design_system/components/sourcebase_section_header.dart';
 import '../../../../core/design_system/components/sourcebase_state.dart'
     as sourcebase_state;
+import '../../../../core/design_system/layout/sourcebase_mobile_metrics.dart';
 import '../../../../core/design_system/layout/sourcebase_page_header.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
@@ -15,6 +16,7 @@ import 'sourcebase_bottom_nav.dart';
 export '../../../../core/design_system/buttons/sb_primary_button.dart';
 export '../../../../core/design_system/buttons/sb_secondary_button.dart';
 export '../../../../core/design_system/buttons/sb_icon_button.dart';
+export '../../../../core/design_system/components/sourcebase_chip.dart';
 
 class WorkspacePage extends StatelessWidget {
   const WorkspacePage({required this.child, super.key});
@@ -44,15 +46,23 @@ class WorkspaceScroll extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDesktop = ResponsiveLayout.isDesktop(context);
     final isTablet = ResponsiveLayout.isTablet(context);
-    final horizontalPadding = ResponsiveLayout.getHorizontalPadding(context);
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final horizontalPadding = SourceBaseMobileMetrics.horizontalPadding(
+      context,
+    );
     final bottomPadding = isDesktop || isTablet
         ? 48.0
+        : keyboardInset > 0
+        ? keyboardInset + 24
         : SourceBaseBottomNav.scrollEndPadding(context);
-    final topSafe = MediaQuery.viewPaddingOf(context).top;
-    final topPadding = topSafe + (isDesktop || isTablet ? 18.0 : 8.0);
+    final topPadding = SourceBaseMobileMetrics.topSafePadding(
+      context,
+      extra: isDesktop || isTablet ? 14.0 : 6.0,
+    );
 
     final scroll = ListView(
       physics: const BouncingScrollPhysics(),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: EdgeInsets.fromLTRB(
         horizontalPadding,
         topPadding,
@@ -127,15 +137,18 @@ class DriveTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isPhone = SourceBaseMobileMetrics.isPhone(context);
     final Widget? leading = onBack != null
         ? IconButton(
             onPressed: onBack,
             tooltip: 'Geri dön',
-            icon: const Icon(Icons.arrow_back_rounded, size: 31),
+            icon: const Icon(Icons.arrow_back_rounded, size: 24),
             color: AppColors.navy,
           )
         : showBrand
-        ? const SourceBaseBrand(compact: true)
+        ? isPhone
+              ? const SourceBaseMark(size: 30)
+              : const SourceBaseBrand(compact: true)
         : null;
 
     final actions = <Widget>[
@@ -143,7 +156,7 @@ class DriveTopBar extends StatelessWidget {
         IconButton(
           onPressed: onMore,
           tooltip: 'Diğer işlemler',
-          icon: const Icon(Icons.more_horiz_rounded, size: 30),
+          icon: const Icon(Icons.more_horiz_rounded, size: 24),
           color: AppColors.navy,
         )
       else ...[
@@ -151,13 +164,13 @@ class DriveTopBar extends StatelessWidget {
           IconButton(
             onPressed: onSearch,
             tooltip: 'Ara',
-            icon: const Icon(Icons.search_rounded, size: 30),
+            icon: const Icon(Icons.search_rounded, size: 24),
             color: AppColors.navy,
           ),
         IconButton(
           onPressed: () => showSourceBaseNotifications(context),
           tooltip: 'Bildirimler',
-          icon: const Icon(Icons.notifications_none_rounded, size: 29),
+          icon: const Icon(Icons.notifications_none_rounded, size: 24),
           color: AppColors.navy,
         ),
       ],
@@ -174,11 +187,11 @@ class DriveTopBar extends StatelessWidget {
 
 String? _sourceBaseHeaderSubtitle(String title) {
   return switch (title) {
-    'Drive' => 'Kaynaklarını yükle, işle ve üretime hazır hale getir.',
-    'BaseForce' => 'Kaynaklarından hızlı çalışma çıktıları üret.',
-    'SourceLab' => 'Klinik ve akademik öğrenme çıktıları oluştur.',
-    'Profil' => 'Hesap, kullanım ve paket bilgilerini yönet.',
-    'Paketler' => 'MC bakiyeni ve mevcut paketleri yönet.',
+    'Drive' => null,
+    'BaseForce' => null,
+    'SourceLab' => null,
+    'Profil' => null,
+    'Paketler' => null,
     _ => null,
   };
 }
@@ -221,7 +234,7 @@ class _NotificationPanelState extends State<_NotificationPanel> {
             margin: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: AppColors.page,
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
                   color: AppColors.navy.withValues(alpha: .16),
@@ -427,9 +440,9 @@ class _SourceBaseNotification {
 class GlassPanel extends StatelessWidget {
   const GlassPanel({
     required this.child,
-    this.padding = const EdgeInsets.all(16),
+    this.padding = const EdgeInsets.all(12),
     this.borderColor,
-    this.radius = 16,
+    this.radius = 8,
     super.key,
   });
 
@@ -443,22 +456,26 @@ class GlassPanel extends StatelessWidget {
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      child: Container(
-        width: double.infinity,
-        padding: padding,
-        decoration: BoxDecoration(
-          color: AppColors.white.withValues(alpha: .92),
-          borderRadius: BorderRadius.circular(radius),
-          border: Border.all(color: borderColor ?? AppColors.line),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF1A4288).withValues(alpha: .055),
-              blurRadius: 22,
-              offset: const Offset(0, 10),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Container(
+            width: constraints.hasBoundedWidth ? double.infinity : null,
+            padding: padding,
+            decoration: BoxDecoration(
+              color: AppColors.white.withValues(alpha: .96),
+              borderRadius: BorderRadius.circular(radius),
+              border: Border.all(color: borderColor ?? AppColors.line),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1A4288).withValues(alpha: .035),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: child,
+            child: child,
+          );
+        },
       ),
     );
   }
@@ -479,7 +496,7 @@ class SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 22, 2, 10),
+      padding: const EdgeInsets.fromLTRB(2, 14, 2, 6),
       child: SourceBaseSectionHeader(
         title: title,
         actionLabel: actionLabel,
@@ -512,13 +529,13 @@ class PrimaryGradientButton extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: enabled ? AppColors.primaryGradient : null,
           color: enabled ? null : AppColors.line,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
           boxShadow: [
             if (enabled)
               BoxShadow(
-                color: AppColors.blue.withValues(alpha: .20),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
+                color: AppColors.clinicalActive.withValues(alpha: .14),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
           ],
         ),
@@ -531,10 +548,10 @@ class PrimaryGradientButton extends StatelessWidget {
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
             textStyle: const TextStyle(
-              fontSize: 18,
+              fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -576,9 +593,9 @@ class OutlineIconButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.blue,
+          foregroundColor: AppColors.clinicalActive,
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          side: const BorderSide(color: AppColors.blue, width: 1.3),
+          side: const BorderSide(color: AppColors.clinicalActive, width: 1.3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
@@ -619,7 +636,7 @@ class StatusPill extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             color: info.backgroundColor,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(color: info.color.withValues(alpha: .14)),
           ),
           child: Row(
@@ -693,22 +710,22 @@ DriveStatusInfo driveStatusInfo(DriveItemStatus status) {
     DriveItemStatus.processing => const DriveStatusInfo(
       label: 'İşleniyor',
       description: 'Kaynak hazır olduğunda üretim için kullanılabilir.',
-      color: AppColors.blue,
-      backgroundColor: AppColors.selectedBlue,
+      color: AppColors.clinicalActive,
+      backgroundColor: AppColors.clinicalActiveBg,
       icon: Icons.hourglass_top_rounded,
     ),
     DriveItemStatus.uploading => const DriveStatusInfo(
       label: 'Yükleniyor',
       description: 'Dosya yükleme tamamlanmadan üretim başlatılamaz.',
-      color: AppColors.blue,
-      backgroundColor: AppColors.selectedBlue,
+      color: AppColors.warning,
+      backgroundColor: AppColors.warningBg,
       icon: Icons.cloud_upload_outlined,
     ),
     DriveItemStatus.failed => const DriveStatusInfo(
       label: 'Hatalı',
       description: 'Bu kaynakla çıktı üretilemez.',
-      color: AppColors.red,
-      backgroundColor: AppColors.redBg,
+      color: AppColors.clinicalError,
+      backgroundColor: AppColors.clinicalErrorBg,
       icon: Icons.error_outline_rounded,
     ),
     DriveItemStatus.draft => const DriveStatusInfo(
@@ -911,35 +928,47 @@ class TrustStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-      child: Row(
-        children: const [
-          Expanded(
-            child: _TrustItem(
-              icon: Icons.verified_user_rounded,
-              title: 'Güvenli Yedekleme',
-              subtitle: 'Verilerin güvende',
-            ),
-          ),
-          _VerticalRule(),
-          Expanded(
-            child: _TrustItem(
-              icon: Icons.group_rounded,
-              title: 'Her Yerde Erişim',
-              subtitle: 'Tüm cihazlarında',
-            ),
-          ),
-          _VerticalRule(),
-          Expanded(
-            child: _TrustItem(
-              icon: Icons.auto_awesome_rounded,
-              title: 'Akıllı Dönüştürme',
-              subtitle: 'Öğrenmeye hazırla',
-            ),
-          ),
-        ],
+    final compact = MediaQuery.sizeOf(context).width < 430;
+    final items = const [
+      _TrustItem(
+        icon: Icons.verified_user_rounded,
+        title: 'Güvenli Yedekleme',
+        subtitle: 'Verilerin güvende',
       ),
+      _TrustItem(
+        icon: Icons.group_rounded,
+        title: 'Her Yerde Erişim',
+        subtitle: 'Tüm cihazlarında',
+      ),
+      _TrustItem(
+        icon: Icons.fact_check_outlined,
+        title: 'Çalışma Çıktısı',
+        subtitle: 'Kart, soru, özet',
+      ),
+    ];
+    return GlassPanel(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      child: compact
+          ? Column(
+              children: [
+                for (var i = 0; i < items.length; i++) ...[
+                  items[i],
+                  if (i != items.length - 1)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      child: Divider(height: 1, color: AppColors.line),
+                    ),
+                ],
+              ],
+            )
+          : Row(
+              children: [
+                for (var i = 0; i < items.length; i++) ...[
+                  Expanded(child: items[i]),
+                  if (i != items.length - 1) const _VerticalRule(),
+                ],
+              ],
+            ),
     );
   }
 }
@@ -962,7 +991,7 @@ class _TrustItem extends StatelessWidget {
       child: ExcludeSemantics(
         child: Row(
           children: [
-            Icon(icon, color: AppColors.blue, size: 28),
+            Icon(icon, color: AppColors.clinicalActive, size: 22),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
@@ -978,7 +1007,7 @@ class _TrustItem extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
                     maxLines: 1,

@@ -47,106 +47,104 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
         ),
         GlassPanel(
           padding: const EdgeInsets.all(18),
-          child: Column(
-            children: [
-              Row(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 430;
+              final fileTitle = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  FileKindBadge(kind: file.kind, large: true),
-                  const SizedBox(width: 18),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          file.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.navy,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.file_copy_outlined,
-                              color: AppColors.muted,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              file.sizeLabel,
-                              style: const TextStyle(color: AppColors.muted),
-                            ),
-                            const MetaDot(),
-                            const Icon(
-                              Icons.article_outlined,
-                              color: AppColors.muted,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              file.pageLabel,
-                              style: const TextStyle(color: AppColors.muted),
-                            ),
-                            const MetaDot(),
-                            const Icon(
-                              Icons.calendar_today_outlined,
-                              color: AppColors.muted,
-                              size: 17,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              file.updatedLabel,
-                              style: const TextStyle(color: AppColors.muted),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  StatusPill(status: file.status, compact: true),
-                ],
-              ),
-              const Divider(height: 28, color: AppColors.line),
-              Row(
-                children: [
-                  const Icon(Icons.folder_outlined, color: AppColors.muted),
-                  const SizedBox(width: 10),
-                  Flexible(
-                    child: Text(
-                      file.courseTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10),
-                    child: Icon(
-                      Icons.chevron_right_rounded,
+                  Text(
+                    file.title,
+                    maxLines: compact ? 3 : 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
                       color: AppColors.navy,
+                      fontSize: compact ? 21 : 24,
+                      fontWeight: FontWeight.w900,
+                      height: 1.12,
                     ),
                   ),
-                  Flexible(
-                    child: Text(
-                      file.sectionTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.blue,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _FileMetaChip(
+                        icon: Icons.file_copy_outlined,
+                        label: file.sizeLabel,
                       ),
-                    ),
+                      _FileMetaChip(
+                        icon: Icons.article_outlined,
+                        label: file.pageLabel,
+                      ),
+                      _FileMetaChip(
+                        icon: Icons.calendar_today_outlined,
+                        label: file.updatedLabel,
+                      ),
+                    ],
                   ),
                 ],
+              );
+              return Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      FileKindBadge(kind: file.kind, large: !compact),
+                      SizedBox(width: compact ? 14 : 18),
+                      Expanded(child: fileTitle),
+                      if (!compact) ...[
+                        const SizedBox(width: 10),
+                        StatusPill(status: file.status, compact: true),
+                      ],
+                    ],
+                  ),
+                  if (compact) ...[
+                    const SizedBox(height: 14),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: StatusPill(status: file.status, compact: true),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ),
+        GlassPanel(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              const Icon(Icons.folder_outlined, color: AppColors.muted),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  file.courseTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Icon(Icons.chevron_right_rounded, color: AppColors.navy),
+              ),
+              Flexible(
+                child: Text(
+                  file.sectionTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.clinicalActive,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
             ],
           ),
@@ -202,14 +200,22 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
         if (readyForGeneration)
           LayoutBuilder(
             builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 720 ? 3 : 2;
+              final columns = constraints.maxWidth >= 720
+                  ? 3
+                  : constraints.maxWidth < 390
+                  ? 1
+                  : 2;
               return GridView.count(
                 crossAxisCount: columns,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
-                childAspectRatio: columns == 2 ? 2.25 : 1.65,
+                childAspectRatio: columns == 1
+                    ? 4.1
+                    : columns == 2
+                    ? 2.05
+                    : 1.65,
                 children: [
                   _GenerateTile(
                     kind: GeneratedKind.flashcard,
@@ -320,7 +326,7 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
                     subMessage: readyForGeneration
                         ? 'Yukarıdaki üretim merkezlerinden birini kullanarak bu dosyadan içerik oluşturabilirsin.'
                         : 'Dosya hazır olduğunda üretilen çıktılar burada listelenir.',
-                    icon: Icons.auto_awesome_outlined,
+                    icon: Icons.library_add_check_outlined,
                   ),
                 ),
         ),
@@ -426,6 +432,40 @@ class _GenerationCenterAction extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FileMetaChip extends StatelessWidget {
+  const _FileMetaChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.clinicalSurface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.clinicalBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.muted, size: 14),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -543,8 +583,8 @@ class _GenerateTile extends StatelessWidget {
         radius: 12,
         child: Row(
           children: [
-            Icon(generatedIcon(kind), color: color, size: 21),
-            const SizedBox(width: 4),
+            Icon(generatedIcon(kind), color: color, size: 22),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -556,7 +596,7 @@ class _GenerateTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.navy,
-                      fontSize: 12.2,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -567,7 +607,8 @@ class _GenerateTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.muted,
-                      fontSize: 9.5,
+                      fontSize: 11.5,
+                      height: 1.15,
                     ),
                   ),
                 ],

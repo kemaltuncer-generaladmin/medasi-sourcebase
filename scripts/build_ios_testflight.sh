@@ -2,7 +2,15 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-FLUTTER_BIN="${FLUTTER_BIN:-/Users/veyselkemal/Developer/flutterv2/flutter_sdk_3_41_9/bin/flutter}"
+SDK_ROOT="${SDK_ROOT:-$HOME/SDKlar}"
+if [[ ! -d "$SDK_ROOT" ]]; then
+  SDK_ROOT="$(find "$HOME" -maxdepth 1 -type d -name "SDK*lar" | head -n 1)"
+fi
+if [[ -n "$SDK_ROOT" && -x "$SDK_ROOT/flutter/current/bin/flutter" ]]; then
+  FLUTTER_BIN="${FLUTTER_BIN:-$SDK_ROOT/flutter/current/bin/flutter}"
+else
+  FLUTTER_BIN="${FLUTTER_BIN:-flutter}"
+fi
 
 if [[ -f "$ROOT_DIR/.env" ]]; then
   set -a
@@ -17,7 +25,7 @@ SOURCEBASE_MOBILE_REDIRECT_URL="${SOURCEBASE_MOBILE_REDIRECT_URL:-sourcebase://a
 SOURCEBASE_GOOGLE_OAUTH_ENABLED="${SOURCEBASE_GOOGLE_OAUTH_ENABLED:-false}"
 SOURCEBASE_APPLE_OAUTH_ENABLED="${SOURCEBASE_APPLE_OAUTH_ENABLED:-false}"
 BUILD_NAME="${BUILD_NAME:-1.0.0}"
-BUILD_NUMBER="${BUILD_NUMBER:-4}"
+BUILD_NUMBER="${BUILD_NUMBER:-9}"
 
 missing=()
 [[ -n "${SOURCEBASE_SUPABASE_URL:-}" ]] || missing+=("SOURCEBASE_SUPABASE_URL")
@@ -31,6 +39,12 @@ fi
 
 cd "$ROOT_DIR"
 find . -path './.git' -prune -o -name '._*' -type f -delete
+
+printf 'Refreshing Flutter iOS generated artifacts...\n'
+rm -rf build/ios ios/Pods ios/.symlinks ios/Flutter/ephemeral
+"$FLUTTER_BIN" pub get
+
+printf 'Building iOS archive for TestFlight...\n'
 "$FLUTTER_BIN" build ipa --release \
   --build-name="$BUILD_NAME" \
   --build-number="$BUILD_NUMBER" \

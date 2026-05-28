@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design_system/layout/sourcebase_mobile_metrics.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/drive_models.dart';
 import '../widgets/drive_ui.dart';
@@ -47,15 +48,14 @@ class DriveHomeScreen extends StatelessWidget {
         DriveTopBar(title: 'Drive', onSearch: onSearch),
         LayoutBuilder(
           builder: (context, constraints) {
-            final compact = constraints.maxWidth < 760;
             final upload = _HeroPanel(onUpload: onOpenUploads);
             final stats = _DriveStatusSummary(
               files: files,
               onUpload: onOpenUploads,
             );
-            if (compact) {
+            if (constraints.maxWidth < 760) {
               return Column(
-                children: [upload, const SizedBox(height: 12), stats],
+                children: [upload, const SizedBox(height: 10), stats],
               );
             }
             return Row(
@@ -68,7 +68,7 @@ class DriveHomeScreen extends StatelessWidget {
             );
           },
         ),
-        SizedBox(height: mobile ? 12 : 16),
+        SizedBox(height: mobile ? 10 : 12),
         LayoutBuilder(
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 430;
@@ -90,10 +90,10 @@ class DriveHomeScreen extends StatelessWidget {
                 },
               ),
               _QuickAction(
-                icon: Icons.layers_rounded,
-                label: 'Koleksiyonlar',
+                icon: Icons.collections_bookmark_outlined,
+                label: 'Koleksiyon',
                 onTap: onOpenCollections,
-                color: AppColors.purple,
+                color: AppColors.clinicalActive,
               ),
             ];
             if (!compact) {
@@ -106,13 +106,14 @@ class DriveHomeScreen extends StatelessWidget {
                 ],
               );
             }
+            final phone = SourceBaseMobileMetrics.isCompactPhone(context);
             return GridView.count(
-              crossAxisCount: 2,
+              crossAxisCount: phone ? 1 : 3,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 1.95,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: phone ? 4.8 : 1.32,
               children: actions,
             );
           },
@@ -171,95 +172,84 @@ class _HeroPanel extends StatelessWidget {
       label: 'Kaynak yükleme alanı',
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final compact = constraints.maxWidth < 680;
           final mobile = constraints.maxWidth < 430;
           return GlassPanel(
             padding: EdgeInsets.fromLTRB(
-              mobile ? 22 : 28,
-              mobile ? 22 : 28,
-              mobile ? 20 : 22,
-              mobile ? 20 : (compact ? 22 : 26),
+              mobile ? 14 : 16,
+              mobile ? 14 : 16,
+              mobile ? 14 : 16,
+              mobile ? 14 : 16,
             ),
-            radius: 20,
-            child: Stack(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (!compact)
-                  const Positioned(
-                    right: 10,
-                    top: 8,
-                    bottom: 0,
-                    child: SizedBox(width: 280, child: _StackHeroArt()),
-                  ),
-                Padding(
-                  padding: EdgeInsets.only(right: compact ? 0 : 250),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.blue.withValues(alpha: .08),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: const Text(
-                          'Upload',
-                          style: TextStyle(
-                            color: AppColors.deepBlue,
-                            fontWeight: FontWeight.w800,
+                Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: AppColors.clinicalActiveBg,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.clinicalActive.withValues(
+                            alpha: .10,
                           ),
                         ),
                       ),
-                      SizedBox(height: mobile ? 14 : 20),
-                      Text(
-                        'Kaynağını buraya yükle',
-                        maxLines: 2,
+                      child: const Icon(
+                        Icons.cloud_upload_outlined,
+                        color: AppColors.clinicalActive,
+                        size: 19,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Kaynak yükle',
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: AppColors.navy,
-                          fontSize: mobile ? 28 : 34,
-                          fontWeight: FontWeight.w900,
-                          height: 1.08,
+                          color: AppColors.clinicalActive,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                      SizedBox(height: mobile ? 10 : 16),
-                      Text(
-                        'PDF, PPTX veya DOCX dosyanı ekleyerek çalışmaya başlayabilirsin.',
-                        style: TextStyle(
-                          color: AppColors.muted,
-                          fontSize: mobile ? 15 : 17,
-                          height: mobile ? 1.28 : 1.42,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const _FormatSupportText(),
-                      if (compact && !mobile) ...[
-                        const SizedBox(height: 10),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: SizedBox(
-                            width: 156,
-                            height: 88,
-                            child: const _StackHeroArt(),
-                          ),
-                        ),
-                      ],
-                      SizedBox(height: mobile ? 14 : 28),
-                      SizedBox(
-                        width: mobile ? double.infinity : 220,
-                        child: SBPrimaryButton(
-                          label: 'Kaynak yükle',
-                          icon: Icons.cloud_upload_outlined,
-                          onPressed: onUpload,
-                          size: mobile
-                              ? SBButtonSize.medium
-                              : SBButtonSize.large,
-                          fullWidth: mobile,
-                        ),
-                      ),
-                    ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Kaynaklarını Drive’a ekle',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.navy,
+                    fontSize: mobile ? 20 : 22,
+                    fontWeight: FontWeight.w800,
+                    height: 1.16,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'PDF, PPTX veya DOCX ekle. Hazır olunca çıktı üretimine geç.',
+                  style: TextStyle(
+                    color: AppColors.muted,
+                    fontSize: mobile ? 13 : 14,
+                    height: 1.34,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const _FormatSupportText(),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: mobile ? double.infinity : 176,
+                  child: SBPrimaryButton(
+                    label: 'Kaynak yükle',
+                    icon: Icons.cloud_upload_outlined,
+                    onPressed: onUpload,
+                    size: SBButtonSize.medium,
+                    fullWidth: mobile,
                   ),
                 ),
               ],
@@ -277,13 +267,13 @@ class _FormatSupportText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: 6,
+      runSpacing: 6,
       children: const [
         _SupportChip(label: 'PDF', message: 'Metin içeren PDF'),
-        _SupportChip(label: 'PPTX', message: 'Önerilen sunum formatı'),
-        _SupportChip(label: 'DOCX', message: 'Önerilen doküman formatı'),
-        _SupportChip(label: 'PPT/DOC', message: 'Sınırlı destek'),
+        _SupportChip(label: 'PPTX', message: 'Sunum'),
+        _SupportChip(label: 'DOCX', message: 'Doküman'),
+        _SupportChip(label: 'PPT/DOC', message: 'Sınırlı'),
       ],
     );
   }
@@ -299,21 +289,10 @@ class _SupportChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: message,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: AppColors.selectedBlue,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: AppColors.softLine),
-        ),
-        child: Text(
-          '$label · $message',
-          style: const TextStyle(
-            color: AppColors.navy,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+      child: SourceBaseChip(
+        label: label,
+        selected: true,
+        foregroundColor: AppColors.clinicalActive,
       ),
     );
   }
@@ -343,7 +322,7 @@ class _DriveStatusSummary extends StatelessWidget {
         : 'Hatalı kaynakları kontrol edip tekrar yüklemeyi dene.';
 
     return GlassPanel(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -351,30 +330,44 @@ class _DriveStatusSummary extends StatelessWidget {
             'Kaynak durumu',
             style: TextStyle(
               color: AppColors.navy,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 12),
-          _DriveMetricRow(label: 'Toplam kaynak', value: files.length),
-          _DriveMetricRow(label: 'Hazır', value: ready, color: AppColors.green),
-          _DriveMetricRow(
-            label: 'İşleniyor',
-            value: processing,
-            color: AppColors.blue,
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _DriveMetricPill(label: 'Toplam', value: files.length),
+              _DriveMetricPill(
+                label: 'Hazır',
+                value: ready,
+                color: AppColors.green,
+              ),
+              _DriveMetricPill(
+                label: 'İşleniyor',
+                value: processing,
+                color: AppColors.clinicalActive,
+              ),
+              _DriveMetricPill(
+                label: 'Hatalı',
+                value: failed,
+                color: AppColors.clinicalError,
+              ),
+            ],
           ),
-          _DriveMetricRow(label: 'Hatalı', value: failed, color: AppColors.red),
-          const Divider(height: 24, color: AppColors.line),
+          const Divider(height: 18, color: AppColors.line),
           Text(
             nextAction,
             style: const TextStyle(
               color: AppColors.muted,
-              fontSize: 14,
+              fontSize: 13,
               height: 1.35,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           SBSecondaryButton(
             label: 'Kaynak yükle',
             icon: Icons.cloud_upload_outlined,
@@ -387,8 +380,8 @@ class _DriveStatusSummary extends StatelessWidget {
   }
 }
 
-class _DriveMetricRow extends StatelessWidget {
-  const _DriveMetricRow({
+class _DriveMetricPill extends StatelessWidget {
+  const _DriveMetricPill({
     required this.label,
     required this.value,
     this.color = AppColors.navy,
@@ -400,26 +393,32 @@ class _DriveMetricRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+    return Container(
+      constraints: const BoxConstraints(minWidth: 86),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: .12)),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.muted,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
           Text(
             value.toString(),
             style: TextStyle(
               color: color,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -436,34 +435,34 @@ class _CourseEmptyPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 34),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
       child: Column(
         children: [
-          const SizedBox(width: 112, height: 96, child: _DriveEmptyArt()),
-          const SizedBox(height: 18),
+          const SizedBox(width: 78, height: 66, child: _DriveEmptyArt()),
+          const SizedBox(height: 12),
           const Text(
-            'Henüz ders oluşturulmadı.',
+            'Ders yok',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.navy,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           ConstrainedBox(
             constraints: BoxConstraints(maxWidth: 420),
             child: const Text(
-              'İlk PDF, PPTX veya DOCX kaynağını yüklemek için önce bir ders alanı oluştur.',
+              'Kaynaklarını düzenlemek için bir ders alanı oluştur.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.muted,
-                fontSize: 16,
-                height: 1.42,
+                fontSize: 13,
+                height: 1.34,
               ),
             ),
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 14),
           SizedBox(
             width: 180,
             child: SBSecondaryButton(
@@ -507,7 +506,7 @@ class _HomeStorageOverview extends StatelessWidget {
                   icon: Icons.folder_open_rounded,
                   message: 'Henüz yüklenmiş dosya yok.',
                   subMessage:
-                      'İlk PDF veya PPTX dosyanı yükleyerek SourceBase çıktıları üretmeye başlayabilirsin.',
+                      'İlk PDF veya PPTX dosyanı yükleyerek çalışma çıktıları oluşturabilirsin.',
                   onTap: onOpenUploads,
                 )
               : Column(
@@ -538,8 +537,10 @@ class _HomeStorageOverview extends StatelessWidget {
                     physics: const BouncingScrollPhysics(),
                     itemCount: collections.length,
                     separatorBuilder: (_, _) => const SizedBox(width: 12),
-                    itemBuilder: (context, index) =>
-                        _CollectionCard(bundle: collections[index]),
+                    itemBuilder: (context, index) => SizedBox(
+                      width: 300,
+                      child: _CollectionCard(bundle: collections[index]),
+                    ),
                   ),
                 ),
         );
@@ -579,43 +580,43 @@ class _StorageSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 34),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 76,
-              height: 76,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: AppColors.blue.withValues(alpha: .07),
-                shape: BoxShape.circle,
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 icon,
                 color: AppColors.blue.withValues(alpha: .46),
-                size: 38,
+                size: 24,
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 12),
             Text(
               message,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: AppColors.navy,
                 fontSize: 17,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             Text(
               subMessage,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: AppColors.muted,
-                fontSize: 15,
-                height: 1.42,
+                fontSize: 13,
+                height: 1.34,
               ),
             ),
           ],
@@ -684,103 +685,6 @@ class _DriveEmptyPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _StackHeroArt extends StatelessWidget {
-  const _StackHeroArt();
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      image: true,
-      label: 'Kaynak dosyaları illüstrasyonu',
-      child: CustomPaint(painter: _StackHeroPainter()),
-    );
-  }
-}
-
-class _StackHeroPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final shadow = Paint()
-      ..color = AppColors.blue.withValues(alpha: .13)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
-    final paper = Paint()..color = Colors.white.withValues(alpha: .86);
-    final folder = Paint()
-      ..shader = const LinearGradient(
-        colors: [Color(0xFFBFD7FF), Color(0xFF0B63FF)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ).createShader(Offset.zero & size);
-    final cloud = Paint()
-      ..shader = const LinearGradient(
-        colors: [Color(0xFFA8C9FF), Color(0xFF0D65FF)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ).createShader(Offset.zero & size);
-
-    final back = RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width * .33, 12, size.width * .48, size.height * .62),
-      const Radius.circular(18),
-    );
-    canvas.drawRRect(back.shift(const Offset(14, 18)), shadow);
-    canvas.drawRRect(back, paper);
-    for (var i = 0; i < 4; i++) {
-      final y = 38.0 + i * 28;
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(size.width * .39, y, size.width * .36, 13),
-          const Radius.circular(6),
-        ),
-        Paint()..color = const Color(0xFFA994F7).withValues(alpha: .64),
-      );
-    }
-
-    final folderRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width * .45, size.height * .48, size.width * .43, 68),
-      const Radius.circular(16),
-    );
-    canvas.drawRRect(folderRect.shift(const Offset(0, 12)), shadow);
-    canvas.drawRRect(folderRect, folder);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * .45,
-          size.height * .43,
-          size.width * .21,
-          28,
-        ),
-        const Radius.circular(8),
-      ),
-      Paint()..color = const Color(0xFF6FA2FF),
-    );
-
-    final card = RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width * .08, size.height * .52, 96, 96),
-      const Radius.circular(22),
-    );
-    canvas.drawRRect(card.shift(const Offset(8, 14)), shadow);
-    canvas.drawRRect(card, paper);
-    canvas.drawCircle(Offset(size.width * .24, size.height * .74), 25, cloud);
-    final arrow = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 5
-      ..strokeCap = StrokeCap.round;
-    final cx = size.width * .24;
-    final cy = size.height * .74;
-    canvas.drawLine(Offset(cx, cy + 14), Offset(cx, cy - 14), arrow);
-    canvas.drawLine(Offset(cx, cy - 14), Offset(cx - 10, cy - 3), arrow);
-    canvas.drawLine(Offset(cx, cy - 14), Offset(cx + 10, cy - 3), arrow);
-
-    final dot = Paint()..color = AppColors.blue.withValues(alpha: .72);
-    canvas.drawCircle(Offset(size.width * .10, size.height * .38), 6, dot);
-    canvas.drawCircle(Offset(size.width * .24, size.height * .18), 7, dot);
-    canvas.drawCircle(Offset(size.width * .92, size.height * .15), 5, dot);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
 class _QuickAction extends StatelessWidget {
   const _QuickAction({
     required this.icon,
@@ -801,36 +705,59 @@ class _QuickAction extends StatelessWidget {
       label: label,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(8),
         child: ExcludeSemantics(
           child: GlassPanel(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            radius: 18,
+            padding: EdgeInsets.symmetric(
+              horizontal: SourceBaseMobileMetrics.isCompactPhone(context)
+                  ? 12
+                  : 14,
+              vertical: SourceBaseMobileMetrics.isCompactPhone(context)
+                  ? 12
+                  : 14,
+            ),
+            radius: 8,
             child: Row(
               children: [
                 Container(
-                  width: 58,
-                  height: 58,
+                  width: SourceBaseMobileMetrics.isCompactPhone(context)
+                      ? 34
+                      : 38,
+                  height: SourceBaseMobileMetrics.isCompactPhone(context)
+                      ? 34
+                      : 38,
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: .10),
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(icon, color: color, size: 34),
+                  child: Icon(
+                    icon,
+                    color: color,
+                    size: SourceBaseMobileMetrics.isCompactPhone(context)
+                        ? 19
+                        : 21,
+                  ),
                 ),
-                const SizedBox(width: 20),
+                const SizedBox(width: 9),
                 Expanded(
                   child: Text(
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.navy,
-                      fontSize: 17,
+                      fontSize: SourceBaseMobileMetrics.isCompactPhone(context)
+                          ? 13
+                          : 14,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.navy),
+                if (!SourceBaseMobileMetrics.isCompactPhone(context))
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.navy,
+                  ),
               ],
             ),
           ),
@@ -864,31 +791,31 @@ class _CourseRow extends StatelessWidget {
           '${course.title}. ${course.sections.length} bölüm. ${course.fileCount} dosya. $statusLabel.',
       child: ExcludeSemantics(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+          padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
           child: Row(
             children: [
               Expanded(
                 child: InkWell(
                   onTap: onTap,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                   child: Column(
                     children: [
                       Row(
                         children: [
                           Container(
-                            width: 52,
-                            height: 52,
+                            width: 40,
+                            height: 40,
                             decoration: BoxDecoration(
                               color: course.iconBackground,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
                               course.icon,
                               color: course.iconColor,
-                              size: 34,
+                              size: 24,
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -899,16 +826,16 @@ class _CourseRow extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: AppColors.navy,
-                                    fontSize: 19,
+                                    fontSize: 15,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 2),
                                 Text(
                                   '${course.sections.length} bölüm  •  ${course.fileCount} dosya',
                                   style: const TextStyle(
                                     color: AppColors.muted,
-                                    fontSize: 15,
+                                    fontSize: 12.5,
                                   ),
                                 ),
                               ],
@@ -930,8 +857,8 @@ class _CourseRow extends StatelessWidget {
                     onTap: () => _showCourseActions(context),
                     borderRadius: BorderRadius.circular(24),
                     child: const SizedBox(
-                      width: 48,
-                      height: 48,
+                      width: 38,
+                      height: 38,
                       child: Icon(
                         Icons.more_vert_rounded,
                         color: AppColors.muted,
@@ -953,7 +880,7 @@ class _CourseRow extends StatelessWidget {
       showDragHandle: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
       ),
       builder: (context) {
         return SafeArea(
@@ -1213,8 +1140,8 @@ class _CollectionCard extends StatelessWidget {
     final details = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        FileKindBadge(kind: file.kind, large: true, plain: true),
-        const SizedBox(width: 18),
+        FileKindBadge(kind: file.kind, large: false, plain: true),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1223,23 +1150,23 @@ class _CollectionCard extends StatelessWidget {
                 file.title,
                 style: const TextStyle(
                   color: AppColors.navy,
-                  fontSize: 21,
+                  fontSize: 18,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 11),
+              const SizedBox(height: 8),
               Wrap(
-                spacing: 10,
-                runSpacing: 6,
+                spacing: 8,
+                runSpacing: 5,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   for (final output in bundle.outputs)
                     _OutputLabel(output: output),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               _MetaLine(icon: Icons.school_outlined, text: bundle.subject),
-              const SizedBox(height: 8),
+              const SizedBox(height: 5),
               _MetaLine(
                 icon: Icons.schedule_rounded,
                 text: 'Son güncelleme: ${file.updatedLabel}',
@@ -1250,26 +1177,28 @@ class _CollectionCard extends StatelessWidget {
       ],
     );
 
+    final viewButton = OutlinedButton(
+      onPressed: () => _showCollectionsToast(
+        context,
+        '${bundle.file.title} koleksiyonu görüntüleniyor.',
+      ),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.blue,
+        backgroundColor: AppColors.selectedBlue,
+        side: const BorderSide(color: AppColors.softLine),
+        minimumSize: const Size(0, 34),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      child: const Text('Görüntüle'),
+    );
+
     final preview = Column(
       children: [
-        OutlinedButton(
-          onPressed: () => _showCollectionsToast(
-            context,
-            '${bundle.file.title} koleksiyonu görüntüleniyor.',
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.blue,
-            backgroundColor: AppColors.selectedBlue,
-            side: const BorderSide(color: AppColors.softLine),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-          ),
-          child: const Text('Görüntüle'),
-        ),
-        const SizedBox(height: 10),
-        _CollectionPreview(kind: bundle.previewKind),
+        viewButton,
         const SizedBox(height: 8),
+        _CollectionPreview(kind: bundle.previewKind),
+        const SizedBox(height: 6),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(
@@ -1305,16 +1234,13 @@ class _CollectionCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth < 520) {
+            if (!constraints.hasBoundedWidth || constraints.maxWidth < 520) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   details,
-                  const SizedBox(height: 16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [preview, const Spacer(), menu],
-                  ),
+                  const SizedBox(height: 10),
+                  Row(children: [viewButton, const Spacer(), menu]),
                 ],
               );
             }

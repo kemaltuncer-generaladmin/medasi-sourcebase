@@ -72,75 +72,51 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     return WorkspaceScroll(
       children: [
         DriveTopBar(title: 'Koleksiyonlar', onSearch: widget.onSearch),
-        Row(
-          children: [
-            IconButton(
-              tooltip: 'Drive’a dön',
-              onPressed: widget.onBackToDrive,
-              color: AppColors.navy,
-              icon: const Icon(Icons.arrow_back_rounded, size: 30),
-            ),
-            const SizedBox(width: 6),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Koleksiyonlar',
-                    style: TextStyle(
-                      color: AppColors.navy,
-                      fontSize: 36,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Materyallerinden üretilen çıktılar',
-                    style: TextStyle(color: AppColors.muted, fontSize: 19),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(
-              width: 150,
-              height: 122,
-              child: _CollectionHeroArt(),
-            ),
-          ],
-        ),
+        _CollectionsHero(onBack: widget.onBackToDrive),
         const SizedBox(height: 16),
         GlassPanel(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-          child: Row(
-            children: [
-              _Metric(
-                icon: Icons.style_rounded,
-                color: AppColors.blue,
-                value: _count(GeneratedKind.flashcard).toString(),
-                label: 'Flashcard',
-              ),
-              const _MetricDivider(),
-              _Metric(
-                icon: Icons.help_rounded,
-                color: const Color(0xFF0BB0D4),
-                value: _count(GeneratedKind.question).toString(),
-                label: 'Soru',
-              ),
-              const _MetricDivider(),
-              _Metric(
-                icon: Icons.description_rounded,
-                color: AppColors.purple,
-                value: _count(GeneratedKind.summary).toString(),
-                label: 'Özet',
-              ),
-              const _MetricDivider(),
-              _Metric(
-                icon: Icons.account_tree_rounded,
-                color: AppColors.green,
-                value: _count(GeneratedKind.algorithm).toString(),
-                label: 'Algoritma',
-              ),
-            ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 430;
+              final metrics = [
+                _Metric(
+                  icon: Icons.style_rounded,
+                  color: AppColors.blue,
+                  value: _count(GeneratedKind.flashcard).toString(),
+                  label: 'Flashcard',
+                ),
+                _Metric(
+                  icon: Icons.help_rounded,
+                  color: const Color(0xFF0BB0D4),
+                  value: _count(GeneratedKind.question).toString(),
+                  label: 'Soru',
+                ),
+                _Metric(
+                  icon: Icons.description_rounded,
+                  color: AppColors.purple,
+                  value: _count(GeneratedKind.summary).toString(),
+                  label: 'Özet',
+                ),
+                _Metric(
+                  icon: Icons.account_tree_rounded,
+                  color: AppColors.green,
+                  value: _count(GeneratedKind.algorithm).toString(),
+                  label: 'Algoritma',
+                ),
+              ];
+              if (compact) {
+                return Wrap(spacing: 10, runSpacing: 10, children: metrics);
+              }
+              return Row(
+                children: [
+                  for (var i = 0; i < metrics.length; i++) ...[
+                    metrics[i],
+                    if (i != metrics.length - 1) const _MetricDivider(),
+                  ],
+                ],
+              );
+            },
           ),
         ),
         const SizedBox(height: 18),
@@ -239,7 +215,8 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           const GlassPanel(
             child: EmptyState(
               message: 'Henüz bir koleksiyonunuz yok.',
-              subMessage: 'Dosyalarınızdan AI çıktıları üreterek başlayın.',
+              subMessage:
+                  'Dosyalarınızdan çalışma çıktıları oluşturarak başlayın.',
             ),
           )
         else if (visibleCollections.isEmpty)
@@ -275,6 +252,71 @@ class _CollectionHeroArt extends StatelessWidget {
       image: true,
       label: 'Koleksiyon kartları illüstrasyonu',
       child: CustomPaint(painter: _CollectionHeroPainter()),
+    );
+  }
+}
+
+class _CollectionsHero extends StatelessWidget {
+  const _CollectionsHero({required this.onBack});
+
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      padding: const EdgeInsets.all(16),
+      radius: 18,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 430;
+          return Row(
+            children: [
+              IconButton(
+                tooltip: 'Drive’a dön',
+                onPressed: onBack,
+                color: AppColors.navy,
+                icon: const Icon(Icons.arrow_back_rounded, size: 28),
+              ),
+              SizedBox(width: compact ? 4 : 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Koleksiyonlar',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.navy,
+                        fontSize: compact ? 24 : 32,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Kaynaklarından üretilen çalışma çıktıları',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 14,
+                        height: 1.3,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!compact)
+                const SizedBox(
+                  width: 126,
+                  height: 96,
+                  child: _CollectionHeroArt(),
+                ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -323,6 +365,55 @@ class _Metric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 430;
+    final content = Semantics(
+      label: '$label sayısı: $value',
+      child: ExcludeSemantics(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: compact ? 22 : 30),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: AppColors.navy,
+                      fontSize: compact ? 20 : 25,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (compact) {
+      return Container(
+        width: 142,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .07),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: .10)),
+        ),
+        child: content,
+      );
+    }
     return Expanded(
       child: Semantics(
         label: '$label sayısı: $value',
@@ -397,40 +488,15 @@ class _CollectionFilter extends StatelessWidget {
       button: true,
       selected: selected,
       label: '$label filtresi',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+      child: Padding(
+        padding: const EdgeInsets.only(right: 8),
         child: ExcludeSemantics(
-          child: Container(
-            margin: const EdgeInsets.only(right: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-            decoration: BoxDecoration(
-              color: selected ? AppColors.blue : Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: selected ? AppColors.blue : AppColors.line,
-              ),
-            ),
-            child: Row(
-              children: [
-                if (icon != null) ...[
-                  Icon(
-                    icon,
-                    color: selected ? Colors.white : AppColors.blue,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 7),
-                ],
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: selected ? Colors.white : AppColors.navy,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
+          child: SourceBaseChip(
+            label: label,
+            icon: icon,
+            selected: selected,
+            foregroundColor: AppColors.clinicalActive,
+            onTap: onTap,
           ),
         ),
       ),
@@ -584,7 +650,7 @@ class _CollectionCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth < 520) {
+            if (!constraints.hasBoundedWidth || constraints.maxWidth < 520) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

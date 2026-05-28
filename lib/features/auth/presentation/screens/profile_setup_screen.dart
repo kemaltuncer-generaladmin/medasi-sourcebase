@@ -138,7 +138,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           subtitle: 'Hesap ve çalışma alanı bilgilerini düzenle.',
           art: AuthArtType.register,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         AuthTextField(
           icon: Icons.account_balance_outlined,
           hint: 'Fakülte / Üniversite',
@@ -181,7 +181,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           const SizedBox(height: 14),
           AuthStatusBox(message: errorMessage!),
         ],
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         GradientActionButton(
           label: loading ? 'Kaydediliyor...' : 'Devam Et',
           onPressed: loading ? null : _completeProfile,

@@ -806,11 +806,7 @@ async function persistGeneratedOutput(
 ): Promise<GeneratedOutputRow | null> {
   const fileId = input.job.source_file_id?.trim();
   if (!fileId) {
-    throw new SafeError(
-      "SOURCE_FILE_REQUIRED_FOR_OUTPUT",
-      "Üretilen içerik kaydı için kaynak dosya gerekli.",
-      400,
-    );
+    return null;
   }
   if (isEmptyGeneratedContent(input.content)) {
     throw new SafeError(

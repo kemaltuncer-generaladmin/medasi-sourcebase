@@ -432,43 +432,72 @@ class _ClearFiltersPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassPanel(
       padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const CircleAvatar(
-            radius: 25,
-            backgroundColor: AppColors.selectedBlue,
-            child: Icon(Icons.search_rounded, color: AppColors.blue, size: 28),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Text.rich(
-              TextSpan(
-                text: 'Aradığını bulamadın mı?\n',
-                style: TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 420;
+          final message = Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: AppColors.selectedBlue,
+                child: Icon(
+                  Icons.search_rounded,
+                  color: AppColors.clinicalActive,
+                  size: 26,
                 ),
-                children: [
-                  TextSpan(
-                    text:
-                        'Daha geniş sonuçlar için filtreleri kaldırmayı deneyebilirsin.',
-                    style: TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
               ),
-            ),
-          ),
-          TextButton(
+              SizedBox(width: 13),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    text: 'Aradığını bulamadın mı?\n',
+                    style: TextStyle(
+                      color: AppColors.navy,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                    children: [
+                      TextSpan(
+                        text:
+                            'Daha geniş sonuçlar için filtreleri kaldırmayı deneyebilirsin.',
+                        style: TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 14,
+                          height: 1.32,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+          final action = TextButton.icon(
             onPressed: enabled ? onClear : null,
-            child: const Text('Temizle'),
-          ),
-        ],
+            icon: const Icon(Icons.filter_alt_off_rounded, size: 18),
+            label: const Text('Temizle'),
+          );
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                message,
+                const SizedBox(height: 10),
+                Align(alignment: Alignment.centerLeft, child: action),
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: message),
+              const SizedBox(width: 10),
+              action,
+            ],
+          );
+        },
       ),
     );
   }
@@ -492,20 +521,13 @@ class _KindChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(right: 9),
-      child: FilterChip(
+      padding: const EdgeInsets.only(right: 8),
+      child: SourceBaseChip(
+        label: label,
+        icon: icon,
         selected: selected,
-        onSelected: (_) => onTap(),
-        avatar: Icon(icon, color: selected ? Colors.white : color, size: 19),
-        label: Text(label),
-        labelStyle: TextStyle(
-          color: selected ? Colors.white : AppColors.navy,
-          fontWeight: FontWeight.w700,
-        ),
-        selectedColor: color,
-        backgroundColor: Colors.white,
-        checkmarkColor: Colors.white,
-        side: BorderSide(color: color.withValues(alpha: .22)),
+        foregroundColor: color,
+        onTap: onTap,
       ),
     );
   }

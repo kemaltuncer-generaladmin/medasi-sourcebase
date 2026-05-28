@@ -955,6 +955,8 @@ ${context ? `Drive bağlamı:\n${context}\n` : ""}
 Cevabı kısa paragraflar ve gerektiğinde maddelerle ver.`;
 
     const result = await this.callVertexAI(prompt, systemInstruction, {
+      provider: options.provider,
+      model: options.model,
       temperature: options.temperature ?? 0.4,
       maxTokens: options.maxTokens ?? 1200,
       topP: options.topP,

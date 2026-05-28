@@ -43,6 +43,7 @@ export function resolveTextRoute(
     DEFAULT_TEXT_PROVIDER;
   const cheap = textModel("TEXT_MODEL_CHEAP", "gemini-2.5-flash-lite");
   const standard = textModel("TEXT_MODEL_STANDARD", "gemini-2.5-flash");
+  const centralAi = textModel("TEXT_MODEL_CENTRAL_AI", "gpt-4o-mini");
   const reasoning = textModel("TEXT_MODEL_REASONING", "gpt-5.4-mini");
   const reviewer = textModel("TEXT_MODEL_REVIEWER", "gpt-5.4");
 
@@ -142,11 +143,9 @@ export function resolveTextRoute(
       reason = "infographic:spec_reasoning";
       break;
     case "central_ai_chat":
-      selected = options.premium || options.clinical ? reasoning : standard;
-      tier = options.premium || options.clinical ? "reasoning" : "standard";
-      reason = options.premium || options.clinical
-        ? "central_ai:reasoning"
-        : "central_ai:standard";
+      selected = centralAi;
+      tier = "standard";
+      reason = "central_ai:gpt_4o_mini";
       break;
   }
 

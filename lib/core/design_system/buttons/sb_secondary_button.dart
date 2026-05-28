@@ -40,10 +40,10 @@ class SBSecondaryButton extends StatelessWidget {
 
   double get _fontSize {
     return switch (size) {
-      SBButtonSize.small => 16,
-      SBButtonSize.medium => 18,
-      SBButtonSize.large => 20,
-      SBButtonSize.xLarge => 22,
+      SBButtonSize.small => 13,
+      SBButtonSize.medium => 14,
+      SBButtonSize.large => 15,
+      SBButtonSize.xLarge => 16,
     };
   }
 
@@ -73,7 +73,7 @@ class SBSecondaryButton extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border.all(
               color: isDisabled ? AppColors.line : AppColors.blue,
-              width: 1.3,
+              width: 1,
             ),
             borderRadius: BorderRadius.circular(SBDimensions.buttonRadius),
           ),
@@ -84,7 +84,7 @@ class SBSecondaryButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(SBDimensions.buttonRadius),
               child: Container(
                 padding: EdgeInsets.symmetric(
-                  horizontal: SBSpacing.lg,
+                  horizontal: SBSpacing.md,
                   vertical: 0,
                 ),
                 child: loading

@@ -139,6 +139,7 @@ class _UploadsScreenState extends State<UploadsScreen> {
             _UploadFilter(
               label: 'Aktif',
               icon: Icons.sync_rounded,
+              color: AppColors.clinicalActive,
               active: _filter == _UploadFilterKind.active,
               onTap: () => setState(() => _filter = _UploadFilterKind.active),
             ),
@@ -152,7 +153,7 @@ class _UploadsScreenState extends State<UploadsScreen> {
             _UploadFilter(
               label: 'Hatalı',
               icon: Icons.warning_amber_rounded,
-              color: AppColors.red,
+              color: AppColors.clinicalError,
               active: _filter == _UploadFilterKind.failed,
               onTap: () => setState(() => _filter = _UploadFilterKind.failed),
             ),
@@ -344,35 +345,12 @@ class _UploadFilter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return SourceBaseChip(
+      label: label,
+      icon: icon,
+      selected: active,
+      foregroundColor: color,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 13),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: active ? AppColors.blue : AppColors.line,
-            width: active ? 1.3 : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: active ? AppColors.blue : color, size: 22),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: active ? AppColors.blue : AppColors.navy,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -520,11 +498,11 @@ class _UploadState extends StatelessWidget {
         );
       case DriveItemStatus.processing:
         return _ProgressStatus(
-          icon: Icons.auto_awesome_rounded,
+          icon: Icons.rule_folder_outlined,
           title: 'Kaynak işleniyor',
           subtitle: 'Metin çıkarılıyor ve üretime hazırlanıyor.',
           progress: upload.progress,
-          color: AppColors.purple,
+          color: AppColors.clinicalActive,
         );
       case DriveItemStatus.uploading:
         return _ProgressStatus(
@@ -532,7 +510,7 @@ class _UploadState extends StatelessWidget {
           title: 'Dosya yükleniyor',
           subtitle: 'Bu işlem dosya boyutuna göre kısa sürebilir.',
           progress: upload.progress,
-          color: AppColors.blue,
+          color: AppColors.warning,
           bigPercent: true,
         );
       case DriveItemStatus.draft:
@@ -567,12 +545,16 @@ class _ProgressStatus extends StatelessWidget {
           children: [
             Icon(icon, color: color, size: 24),
             const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                color: color,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
+            Flexible(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
           ],

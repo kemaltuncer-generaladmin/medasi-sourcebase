@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/design_system/layout/sourcebase_mobile_metrics.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
 import '../../../drive/data/drive_models.dart';
@@ -445,7 +446,7 @@ class _BaseForceScreenState extends State<BaseForceScreen> {
       final data = createResponse['data'];
       final jobId = data is Map ? data['jobId']?.toString().trim() ?? '' : '';
       if (jobId.isEmpty) {
-        throw StateError('AI üretim işi başlatılamadı.');
+        throw StateError('İçerik üretimi başlatılamadı.');
       }
       _updateJob(job.localId, jobId: jobId, status: _JobUiStatus.running);
       await _api.processGenerationJob(jobId);
@@ -1310,18 +1311,19 @@ class _BaseForcePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final isMobile = width < 600;
-    final horizontalPadding = width < 600
-        ? 16.0
-        : width < 1024
-        ? 24.0
-        : 32.0;
-    final topPadding = MediaQuery.viewPaddingOf(context).top + 12;
+    final horizontalPadding = SourceBaseMobileMetrics.horizontalPadding(
+      context,
+    );
+    final topPadding = SourceBaseMobileMetrics.topSafePadding(
+      context,
+      extra: isMobile ? 6 : 10,
+    );
     final bottomPadding = isMobile
         ? SourceBaseBottomNav.scrollEndPadding(context)
         : 48.0;
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1180),
+        constraints: const BoxConstraints(maxWidth: 1120),
         child: ListView(
           physics: const BouncingScrollPhysics(),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -1412,7 +1414,7 @@ class _BaseForceTopBar extends StatelessWidget {
           'BaseForce',
           style: TextStyle(
             color: AppColors.blue,
-            fontSize: 23,
+            fontSize: 20,
             fontWeight: FontWeight.w900,
             height: 1,
           ),
@@ -1502,8 +1504,8 @@ class _RoundIconButton extends StatelessWidget {
         customBorder: const CircleBorder(),
         child: ExcludeSemantics(
           child: Container(
-            width: 50,
-            height: 50,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.white,
@@ -1511,12 +1513,12 @@ class _RoundIconButton extends StatelessWidget {
               boxShadow: [
                 BoxShadow(
                   color: AppColors.navy.withValues(alpha: .04),
-                  blurRadius: 14,
-                  offset: const Offset(0, 8),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
-            child: Icon(icon, color: AppColors.navy, size: 28),
+            child: Icon(icon, color: AppColors.navy, size: 22),
           ),
         ),
       ),
@@ -1551,31 +1553,31 @@ class _BaseForceHero extends StatelessWidget {
               title,
               style: TextStyle(
                 color: AppColors.navy,
-                fontSize: compact ? 32 : 44,
-                fontWeight: FontWeight.w900,
-                height: 1.04,
+                fontSize: compact ? 22 : 26,
+                fontWeight: FontWeight.w800,
+                height: 1.12,
                 letterSpacing: 0,
               ),
             ),
-            SizedBox(height: compact ? 10 : 14),
+            SizedBox(height: compact ? 4 : 6),
             Text(
               subtitle,
               style: TextStyle(
                 color: AppColors.muted,
-                fontSize: compact ? 16 : 20,
-                height: compact ? 1.22 : 1.42,
+                fontSize: compact ? 13 : 14,
+                height: 1.34,
                 fontWeight: FontWeight.w500,
               ),
             ),
             if (actions.isNotEmpty) ...[
-              SizedBox(height: compact ? 12 : 24),
-              Wrap(spacing: 10, runSpacing: 10, children: actions),
+              SizedBox(height: compact ? 8 : 10),
+              Wrap(spacing: 6, runSpacing: 6, children: actions),
             ],
           ],
         );
         if (constraints.maxWidth < 620) {
           return Container(
-            margin: EdgeInsets.only(bottom: tight ? 12 : 18),
+            margin: EdgeInsets.only(bottom: tight ? 8 : 12),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [Color(0x00FFFFFF), Color(0xFFEAF5FF)],
@@ -1594,8 +1596,8 @@ class _BaseForceHero extends StatelessWidget {
                   Align(
                     alignment: Alignment.centerRight,
                     child: SizedBox(
-                      width: 176,
-                      height: 104,
+                      width: 132,
+                      height: 78,
                       child: _BaseForceHeroArt(kind: art),
                     ),
                   ),
@@ -1605,8 +1607,8 @@ class _BaseForceHero extends StatelessWidget {
         }
 
         return Container(
-          margin: EdgeInsets.only(bottom: tight ? 18 : 26),
-          constraints: BoxConstraints(minHeight: tight ? 180 : 238),
+          margin: EdgeInsets.only(bottom: tight ? 10 : 14),
+          constraints: BoxConstraints(minHeight: tight ? 120 : 150),
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [Color(0x00FFFFFF), Color(0xFFEAF5FF)],
@@ -1622,7 +1624,7 @@ class _BaseForceHero extends StatelessWidget {
                   child: Opacity(
                     opacity: .8,
                     child: CustomPaint(
-                      size: const Size(240, 190),
+                      size: const Size(160, 120),
                       painter: _NetworkGridPainter(),
                     ),
                   ),
@@ -1632,13 +1634,13 @@ class _BaseForceHero extends StatelessWidget {
                 top: tight ? 0 : 10,
                 right: 0,
                 child: SizedBox(
-                  width: tight ? 190 : 230,
-                  height: tight ? 150 : 190,
+                  width: tight ? 120 : 150,
+                  height: tight ? 96 : 120,
                   child: _BaseForceHeroArt(kind: art),
                 ),
               ),
               Padding(
-                padding: EdgeInsets.fromLTRB(0, tight ? 8 : 26, 150, 10),
+                padding: EdgeInsets.fromLTRB(0, tight ? 4 : 12, 104, 8),
                 child: titleBlock,
               ),
             ],
@@ -1902,6 +1904,7 @@ class _BaseForceHome extends StatelessWidget {
           minItemWidth: 155,
           children: [
             _FactoryCard(
+              key: const ValueKey('baseforce-factory-flashcard'),
               kind: GeneratedKind.flashcard,
               title: 'Flashcard Factory',
               subtitle: 'Kaynağından tekrar kartları oluştur.',
@@ -1909,6 +1912,7 @@ class _BaseForceHome extends StatelessWidget {
               onTap: () => onOpenFactory('flashcard'),
             ),
             _FactoryCard(
+              key: const ValueKey('baseforce-factory-question'),
               kind: GeneratedKind.question,
               title: 'Soru Fabrikası',
               subtitle: 'Kaynağından çalışma soruları üret.',
@@ -1916,6 +1920,7 @@ class _BaseForceHome extends StatelessWidget {
               onTap: () => onOpenFactory('question'),
             ),
             _FactoryCard(
+              key: const ValueKey('baseforce-factory-summary'),
               kind: GeneratedKind.summary,
               title: 'Sınav Sabahı Özeti',
               subtitle: 'Son tekrar için kısa ve yoğun özet çıkar.',
@@ -1929,6 +1934,7 @@ class _BaseForceHome extends StatelessWidget {
           minItemWidth: 155,
           children: [
             _FactoryCard(
+              key: const ValueKey('baseforce-factory-algorithm'),
               kind: GeneratedKind.algorithm,
               title: 'Akış Şeması / Algoritma',
               subtitle: 'Süreçleri adım adım görselleştir.',
@@ -1936,6 +1942,7 @@ class _BaseForceHome extends StatelessWidget {
               onTap: () => onOpenFactory('algorithm'),
             ),
             _FactoryCard(
+              key: const ValueKey('baseforce-factory-comparison'),
               kind: GeneratedKind.comparison,
               title: 'Karşılaştırma Tablosu',
               subtitle: 'Benzer kavramları tablo halinde karşılaştır.',
@@ -1943,6 +1950,7 @@ class _BaseForceHome extends StatelessWidget {
               onTap: () => onOpenFactory('comparison'),
             ),
             _FactoryCard(
+              key: const ValueKey('baseforce-queue'),
               kind: GeneratedKind.mindMap,
               title: 'Üretim\nKuyruğu',
               subtitle: 'Başlattığın işleri tek yerden izler.',
@@ -1983,7 +1991,7 @@ class _BaseForceHome extends StatelessWidget {
         if (data.recentFiles.every((file) => file.generated.isEmpty))
           const _BasePanel(
             child: _EmptyBaseForceState(
-              icon: Icons.auto_awesome_rounded,
+              icon: Icons.inventory_2_outlined,
               title: 'Henüz üretim yok',
               message:
                   'Bir kaynak seçip üretim fabrikalarından birini başlatın.',
@@ -2307,7 +2315,7 @@ class _FlashcardFactoryScreen extends StatelessWidget {
               AppColors.orange,
             ),
             _SummaryItemData(
-              Icons.auto_awesome_rounded,
+              Icons.folder_open_rounded,
               sourceStatus,
               'Seçili Kaynak',
               AppColors.purple,
@@ -2317,7 +2325,7 @@ class _FlashcardFactoryScreen extends StatelessWidget {
         const SizedBox(height: 14),
         PrimaryGradientButton(
           label: canGenerate ? 'Flashcard oluştur' : 'Kaynak seç',
-          icon: Icons.auto_awesome_rounded,
+          icon: Icons.style_outlined,
           height: 58,
           onTap: canGenerate ? onGenerate : null,
         ),
@@ -2633,7 +2641,7 @@ class _SummaryFactoryScreen extends StatelessWidget {
         const SizedBox(height: 14),
         PrimaryGradientButton(
           label: canGenerate ? 'Özet oluştur' : 'Kaynak seç',
-          icon: Icons.auto_awesome_rounded,
+          icon: Icons.subject_rounded,
           height: 58,
           onTap: canGenerate ? onGenerate : null,
         ),
@@ -2959,7 +2967,7 @@ class _AlgorithmFactoryScreen extends StatelessWidget {
         const SizedBox(height: 14),
         PrimaryGradientButton(
           label: canGenerate ? 'Akış oluştur' : 'Kaynak seç',
-          icon: Icons.auto_awesome_rounded,
+          icon: Icons.device_hub_rounded,
           height: 58,
           onTap: canGenerate ? onGenerate : null,
         ),
@@ -3391,7 +3399,7 @@ class _FlashcardResultsScreen extends StatelessWidget {
           padding: const EdgeInsets.all(22),
           child: current == null
               ? const _EmptyBaseForceState(
-                  icon: Icons.auto_awesome_rounded,
+                  icon: Icons.inventory_2_outlined,
                   title: 'Sonuç bekleniyor',
                   message:
                       'Bir üretim fabrikasından içerik üretip görüntülemek için Üret butonuna basın.',
@@ -3416,7 +3424,7 @@ class _FlashcardResultsScreen extends StatelessWidget {
         if (current == null)
           PrimaryGradientButton(
             label: 'Yeniden Üretime Git',
-            icon: Icons.auto_awesome_rounded,
+            icon: Icons.replay_rounded,
             height: 58,
             onTap: onRegenerate,
           )
@@ -3436,7 +3444,7 @@ class _FlashcardResultsScreen extends StatelessWidget {
                 onTap: onExport,
               ),
               _QuickResultAction(
-                icon: Icons.auto_awesome_rounded,
+                icon: Icons.replay_rounded,
                 label: 'Yeniden Üret',
                 color: AppColors.purple,
                 onTap: onRegenerate,
@@ -4768,8 +4776,8 @@ const TextStyle _titleStyle = TextStyle(
 class _BasePanel extends StatelessWidget {
   const _BasePanel({
     required this.child,
-    this.padding = const EdgeInsets.all(18),
-    this.radius = 16,
+    this.padding = const EdgeInsets.all(12),
+    this.radius = 8,
   });
 
   final Widget child;
@@ -4787,9 +4795,9 @@ class _BasePanel extends StatelessWidget {
         border: Border.all(color: AppColors.line),
         boxShadow: [
           BoxShadow(
-            color: AppColors.navy.withValues(alpha: .055),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
+            color: AppColors.navy.withValues(alpha: .04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -4961,21 +4969,21 @@ class _HeroAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 420;
     return SizedBox(
-      height: compact ? 48 : 58,
+      height: compact ? 40 : 44,
       child: ElevatedButton.icon(
         onPressed: onTap,
-        icon: Icon(icon, size: compact ? 22 : 27),
+        icon: Icon(icon, size: compact ? 18 : 20),
         label: Text(label, maxLines: 1),
         style: ElevatedButton.styleFrom(
           elevation: 0,
           backgroundColor: cyan ? AppColors.cyan : AppColors.blue,
           foregroundColor: Colors.white,
-          padding: EdgeInsets.symmetric(horizontal: compact ? 16 : 22),
+          padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
           textStyle: TextStyle(
-            fontSize: compact ? 16 : 20,
+            fontSize: compact ? 13 : 14,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -5000,7 +5008,7 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 24, 0, 10),
+      padding: const EdgeInsets.fromLTRB(0, 12, 0, 6),
       child: Row(
         children: [
           Expanded(
@@ -5008,8 +5016,8 @@ class _SectionHeader extends StatelessWidget {
               title,
               style: const TextStyle(
                 color: AppColors.navy,
-                fontSize: 23,
-                fontWeight: FontWeight.w900,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
@@ -5018,7 +5026,7 @@ class _SectionHeader extends StatelessWidget {
               trailing!,
               style: const TextStyle(
                 color: AppColors.muted,
-                fontSize: 17,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
             )
@@ -5032,12 +5040,12 @@ class _SectionHeader extends StatelessWidget {
                   Text(
                     action!,
                     style: const TextStyle(
-                      fontSize: 16.5,
+                      fontSize: 13,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right_rounded, size: 24),
+                  const Icon(Icons.chevron_right_rounded, size: 18),
                 ],
               ),
             ),
@@ -5048,7 +5056,7 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _RoundGeneratedIcon extends StatelessWidget {
-  const _RoundGeneratedIcon({required this.kind, this.size = 62});
+  const _RoundGeneratedIcon({required this.kind, this.size = 44});
 
   final GeneratedKind kind;
   final double size;
@@ -5076,6 +5084,7 @@ class _FactoryCard extends StatelessWidget {
     required this.subtitle,
     required this.buttonColor,
     required this.onTap,
+    super.key,
   });
 
   final GeneratedKind kind;
@@ -5087,62 +5096,85 @@ class _FactoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 420;
-    return _BasePanel(
-      padding: EdgeInsets.fromLTRB(12, compact ? 14 : 20, 12, 12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _RoundGeneratedIcon(kind: kind, size: compact ? 54 : 64),
-          SizedBox(height: compact ? 10 : 16),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: AppColors.navy,
-              fontSize: compact ? 15.5 : 17,
-              height: 1.14,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          SizedBox(height: compact ? 8 : 12),
-          SizedBox(
-            height: compact ? 42 : 48,
-            child: Text(
-              subtitle,
-              maxLines: compact ? 2 : 3,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: AppColors.muted,
-                fontSize: compact ? 12 : 12.5,
-                height: 1.25,
-              ),
-            ),
-          ),
-          SizedBox(height: compact ? 10 : 14),
-          SizedBox(
-            width: double.infinity,
-            height: compact ? 40 : 42,
-            child: ElevatedButton(
-              onPressed: onTap,
-              style: ElevatedButton.styleFrom(
-                elevation: 0,
-                backgroundColor: buttonColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                textStyle: const TextStyle(
-                  fontSize: 17,
+    return Semantics(
+      button: true,
+      label: title,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: _BasePanel(
+          padding: EdgeInsets.fromLTRB(10, compact ? 10 : 12, 10, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _RoundGeneratedIcon(kind: kind, size: compact ? 38 : 44),
+              SizedBox(height: compact ? 8 : 10),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: AppColors.navy,
+                  fontSize: compact ? 13.5 : 14.5,
+                  height: 1.14,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              child: const Text('Aç'),
-            ),
+              SizedBox(height: compact ? 6 : 8),
+              SizedBox(
+                height: compact ? 36 : 40,
+                child: Text(
+                  subtitle,
+                  maxLines: compact ? 2 : 3,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.muted,
+                    fontSize: compact ? 12 : 12.5,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+              SizedBox(height: compact ? 8 : 10),
+              Align(
+                alignment: Alignment.center,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: buttonColor.withValues(alpha: .08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: buttonColor.withValues(alpha: .14),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Aç',
+                        style: TextStyle(
+                          color: buttonColor,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        color: buttonColor,
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -7264,29 +7296,33 @@ class _QueueFilter extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Container(
-        height: 54,
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: selected ? AppColors.blue : Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: selected ? AppColors.blue : AppColors.line),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (dot != null) ...[
-              CircleAvatar(radius: 5, backgroundColor: dot),
-              const SizedBox(width: 10),
-            ],
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? Colors.white : AppColors.navy,
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (dot != null) ...[
+                CircleAvatar(radius: 4, backgroundColor: dot),
+                const SizedBox(width: 7),
+              ],
+              Text(
+                label,
+                maxLines: 1,
+                style: TextStyle(
+                  color: selected ? Colors.white : AppColors.navy,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

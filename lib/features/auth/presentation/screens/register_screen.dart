@@ -125,7 +125,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               'SourceBase hesabını oluştur ve kaynaklarını düzenlemeye başla.',
           art: AuthArtType.register,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         AuthTextField(
           icon: Icons.person_outline_rounded,
           hint: 'Ad Soyad',
@@ -228,7 +228,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               : () => Navigator.pushNamed(context, LoginScreen.route),
           size: SBButtonSize.large,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         Center(
           child: TextButton(
             onPressed: loading

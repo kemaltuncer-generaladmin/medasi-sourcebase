@@ -11,8 +11,8 @@ class SourceBaseBrand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final markSize = compact ? 38.0 : 54.0;
-    final textSize = compact ? 22.0 : 34.0;
+    final markSize = compact ? 30.0 : 42.0;
+    final textSize = compact ? 18.0 : 26.0;
     return Semantics(
       container: true,
       label: 'SourceBase',

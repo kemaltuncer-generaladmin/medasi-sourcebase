@@ -27,18 +27,24 @@ class ResponsiveScaffold extends StatelessWidget {
             left: 0,
             right: 0,
             top: 0,
-            child: LinearProgressIndicator(minHeight: 3),
+            child: LinearProgressIndicator(
+              minHeight: 2,
+              color: AppColors.clinicalActive,
+              backgroundColor: Colors.transparent,
+            ),
           )
         : null;
 
     if (breakpoint == SourceBaseBreakpoint.mobile) {
+      final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
       return Scaffold(
         backgroundColor: AppColors.page,
         extendBody: true,
+        resizeToAvoidBottomInset: true,
         body: Stack(
           children: [
             Positioned.fill(child: body),
-            ?mobileNavigation,
+            if (!keyboardVisible) ?mobileNavigation,
             ?progress,
           ],
         ),

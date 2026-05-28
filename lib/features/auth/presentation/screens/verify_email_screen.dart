@@ -184,7 +184,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
               'E-posta adresini doğrulayarak hesabını güvenli hale getir.',
           art: AuthArtType.verify,
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 16),
         if (email.isNotEmpty)
           Text(
             email,
@@ -243,7 +243,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 30),
+        const SizedBox(height: 18),
         Container(
           constraints: const BoxConstraints(minHeight: 58),
           padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -305,7 +305,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
             error: errorMessage != null,
           ),
         ],
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         GradientActionButton(
           label: loading ? 'Doğrulanıyor...' : 'Doğrula',
           onPressed: loading ? null : () => _verify(email),

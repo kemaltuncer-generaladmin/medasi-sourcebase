@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 import '../design_system/constants/sb_dimensions.dart';
 import '../design_system/typography/sb_text_styles.dart';
@@ -40,8 +41,8 @@ class SourceBaseTheme {
         filled: true,
         fillColor: AppColors.white,
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
+          horizontal: 12,
+          vertical: 10,
         ),
         hintStyle: SBTextStyles.bodyMedium.copyWith(color: AppColors.softText),
         labelStyle: SBTextStyles.bodySmall.copyWith(color: AppColors.muted),
@@ -68,8 +69,8 @@ class SourceBaseTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          minimumSize: const Size(48, SBDimensions.buttonHeight),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          minimumSize: const Size(44, SBDimensions.buttonHeight),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(SBDimensions.buttonRadius),
           ),
@@ -78,8 +79,8 @@ class SourceBaseTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(48, SBDimensions.buttonHeight),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          minimumSize: const Size(44, SBDimensions.buttonHeight),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           side: const BorderSide(color: AppColors.line),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(SBDimensions.buttonRadius),
@@ -90,9 +91,9 @@ class SourceBaseTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.blue,
-          minimumSize: const Size(44, 44),
+          minimumSize: const Size(40, 40),
           textStyle: const TextStyle(
-            fontSize: 15,
+            fontSize: 13,
             fontWeight: FontWeight.w700,
             letterSpacing: 0,
           ),
@@ -102,25 +103,33 @@ class SourceBaseTheme {
         backgroundColor: AppColors.white,
         selectedColor: AppColors.selectedBlue,
         disabledColor: AppColors.softLine,
-        side: const BorderSide(color: AppColors.softLine),
+        side: const BorderSide(color: AppColors.line),
         labelStyle: const TextStyle(
           color: AppColors.navy,
-          fontWeight: FontWeight.w700,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
         ),
         secondaryLabelStyle: const TextStyle(
-          color: AppColors.blue,
-          fontWeight: FontWeight.w800,
+          color: AppColors.clinicalActive,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0,
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: AppColors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(SBDimensions.radiusLg),
+        ),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: AppColors.white,
-        modalBackgroundColor: AppColors.white,
+        backgroundColor: Colors.transparent,
+        modalBackgroundColor: Colors.transparent,
         showDragHandle: true,
+        dragHandleColor: AppColors.clinicalBorder,
+        surfaceTintColor: Colors.transparent,
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
@@ -129,7 +138,7 @@ class SourceBaseTheme {
           color: AppColors.white,
           fontWeight: FontWeight.w600,
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
       splashFactory: InkRipple.splashFactory,
       pageTransitionsTheme: const PageTransitionsTheme(

@@ -7,11 +7,11 @@ import 'package:flutter/material.dart';
 class SBSpacing {
   const SBSpacing._();
 
-  static const double mobilePagePadding = 16;
-  static const double tabletPagePadding = 24;
-  static const double desktopPagePadding = 32;
-  static const double sectionGap = 24;
-  static const double cardGap = 16;
+  static const double mobilePagePadding = 14;
+  static const double tabletPagePadding = 20;
+  static const double desktopPagePadding = 28;
+  static const double sectionGap = 18;
+  static const double cardGap = 10;
 
   /// Extra small spacing: 4px (0.5x base)
   /// Use for: Tight icon-text gaps, minimal separators
@@ -27,19 +27,19 @@ class SBSpacing {
 
   /// Large spacing: 24px (3x base)
   /// Use for: Section padding, card internal spacing
-  static const double lg = 24;
+  static const double lg = 20;
 
   /// Extra large spacing: 32px (4x base)
   /// Use for: Major section gaps, screen padding
-  static const double xl = 32;
+  static const double xl = 24;
 
   /// 2X large spacing: 48px (6x base)
   /// Use for: Large section separators
-  static const double xxl = 48;
+  static const double xxl = 32;
 
   /// 3X large spacing: 64px (8x base)
   /// Use for: Hero section spacing, major layout gaps
-  static const double xxxl = 64;
+  static const double xxxl = 40;
 
   // Convenience methods for EdgeInsets
   static EdgeInsets all(double value) => EdgeInsets.all(value);
@@ -54,6 +54,6 @@ class SBSpacing {
   static const EdgeInsets allLg = EdgeInsets.all(lg);
   static const EdgeInsets allXl = EdgeInsets.all(xl);
 
-  static const EdgeInsets cardPadding = EdgeInsets.all(20);
-  static const EdgeInsets compactCardPadding = EdgeInsets.all(16);
+  static const EdgeInsets cardPadding = EdgeInsets.all(14);
+  static const EdgeInsets compactCardPadding = EdgeInsets.all(12);
 }

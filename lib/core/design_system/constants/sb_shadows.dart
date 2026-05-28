@@ -7,17 +7,17 @@ class SBShadows {
 
   static List<BoxShadow> get card => [
     BoxShadow(
-      color: AppColors.navy.withValues(alpha: 0.055),
-      blurRadius: 24,
-      offset: const Offset(0, 10),
+      color: AppColors.navy.withValues(alpha: 0.04),
+      blurRadius: 12,
+      offset: const Offset(0, 4),
     ),
   ];
 
   static List<BoxShadow> get elevated => [
     BoxShadow(
-      color: AppColors.blue.withValues(alpha: 0.18),
-      blurRadius: 18,
-      offset: const Offset(0, 10),
+      color: AppColors.blue.withValues(alpha: 0.12),
+      blurRadius: 12,
+      offset: const Offset(0, 5),
     ),
   ];
 }

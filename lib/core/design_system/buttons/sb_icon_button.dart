@@ -65,9 +65,9 @@ class SBIconButton extends StatelessWidget {
                 ? null
                 : [
                     BoxShadow(
-                      color: AppColors.navy.withValues(alpha: 0.05),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+                      color: AppColors.navy.withValues(alpha: 0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
                     ),
                   ],
           ),
