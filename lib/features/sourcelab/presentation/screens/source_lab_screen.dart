@@ -2086,7 +2086,7 @@ class _MindMapBuilder extends StatelessWidget {
         _LabHero(
           title: 'Zihin Haritası',
           subtitle:
-              'Kavramları düğümler halinde gör,\nilişkileri keşfet ve öğrenmeyi\norganize et.',
+              'Kavramları düğümler halinde gör,\nilişkileri bağla ve konuyu\norganize et.',
           art: _HeroArtKind.mindMap,
           tight: true,
         ),
