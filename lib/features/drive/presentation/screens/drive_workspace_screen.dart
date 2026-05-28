@@ -77,9 +77,11 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
         loading = false;
       });
     } catch (e) {
+      debugPrint('SourceBase workspace load failed: $e');
       if (!mounted) return;
       setState(() {
-        errorMessage = e.toString();
+        errorMessage =
+            'Drive alanın şu anda açılamadı. Bağlantını kontrol edip tekrar dene.';
         loading = false;
       });
     }
