@@ -44,7 +44,9 @@ class WorkspaceScroll extends StatelessWidget {
     final isDesktop = ResponsiveLayout.isDesktop(context);
     final isTablet = ResponsiveLayout.isTablet(context);
     final horizontalPadding = ResponsiveLayout.getHorizontalPadding(context);
-    final bottomPadding = isDesktop ? 48.0 : (isTablet ? 48.0 : 138.0);
+    final bottomPadding = isDesktop || isTablet
+        ? 48.0
+        : 132.0 + MediaQuery.viewPaddingOf(context).bottom;
     final topPadding = isDesktop || isTablet
         ? 18.0
         : MediaQuery.viewPaddingOf(context).top + 8.0;
@@ -693,8 +695,8 @@ class TrustStrip extends StatelessWidget {
           Expanded(
             child: _TrustItem(
               icon: Icons.auto_awesome_rounded,
-              title: 'Akıllı Dönüştürme',
-              subtitle: 'Öğrenmeye hazırla',
+              title: 'Kolay Dönüştürme',
+              subtitle: 'Çalışmaya hazırla',
             ),
           ),
         ],

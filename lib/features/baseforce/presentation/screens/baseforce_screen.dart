@@ -771,7 +771,7 @@ class _BaseForceHome extends StatelessWidget {
             _FactoryCard(
               kind: GeneratedKind.flashcard,
               title: 'Flashcard\nFabrikası',
-              subtitle: 'Kaynaklarından akıllı flashcard setleri üretir.',
+              subtitle: 'Kaynaklarından hızlı tekrar kartları üretir.',
               buttonColor: AppColors.blue,
               onTap: () => onOpenFactory('flashcard'),
             ),
@@ -1015,7 +1015,7 @@ class _FlashcardFactoryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return _BaseForcePage(
       title: 'Flashcard Fabrikası',
-      subtitle: 'Kaynaklarından akıllı flashcard’lar üret.',
+      subtitle: 'Bu kaynaktan hızlı tekrar kartları oluştur.',
       onSearch: onSearch,
       art: _BaseForceArtKind.cardSet,
       children: [
@@ -1161,8 +1161,8 @@ class _FlashcardFactoryScreen extends StatelessWidget {
             ),
             _SummaryItemData(
               Icons.auto_awesome_rounded,
-              'AI Destekli',
-              'Akıllı Üretim',
+              'Hızlı',
+              'Üretim',
               AppColors.purple,
             ),
           ],
@@ -1201,7 +1201,7 @@ class _QuestionFactoryScreen extends StatelessWidget {
     return _BaseForcePage(
       title: 'Soru Fabrikası',
       subtitle:
-          'Seçtiğiniz kaynaklardan, yapay zeka ile\nözelleştirilmiş sorular üretin.',
+          'Seçtiğin kaynaklardan sınav\ntarzı sorular üret.',
       onSearch: onSearch,
       children: [
         _SelectedSourceChips(data: data, onPickSources: onPickSources),

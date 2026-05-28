@@ -22,15 +22,17 @@ class SourceBaseBottomNav extends StatelessWidget {
       _BottomItem(Icons.manage_accounts_outlined, 'Profil ve Ayarlar'),
     ];
 
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+
     return Positioned(
       left: 14,
       right: 14,
-      bottom: 10,
+      bottom: 10 + bottomInset,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 500),
           child: Container(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 18),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: .96),
               borderRadius: BorderRadius.circular(24),
