@@ -695,8 +695,8 @@ class TrustStrip extends StatelessWidget {
           Expanded(
             child: _TrustItem(
               icon: Icons.auto_awesome_rounded,
-              title: 'Akıllı Dönüştürme',
-              subtitle: 'Öğrenmeye hazırla',
+              title: 'Kolay Dönüştürme',
+              subtitle: 'Çalışmaya hazırla',
             ),
           ),
         ],

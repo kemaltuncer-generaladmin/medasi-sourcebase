@@ -484,7 +484,7 @@ class _SourceLabHome extends StatelessWidget {
           chips: const [
             _MiniHeroChip(icon: Icons.verified_user_outlined, label: 'Güvenli'),
             _MiniHeroChip(icon: Icons.bolt_outlined, label: 'Hızlı'),
-            _MiniHeroChip(icon: Icons.auto_awesome_outlined, label: 'Akıllı'),
+            _MiniHeroChip(icon: Icons.auto_awesome_outlined, label: 'Pratik'),
           ],
         ),
         _HomeContinuePanel(
@@ -763,7 +763,7 @@ class _SmartSuggestionsPanel extends StatelessWidget {
         children: [
           _InlineHeader(
             icon: Icons.auto_awesome_outlined,
-            title: 'Akıllı Öneriler',
+            title: 'Öneriler',
             action: 'Tümünü gör',
             onAction: () => onToast('Öneriler güncellendi.'),
           ),
@@ -1213,7 +1213,7 @@ class _LearningPlanBuilder extends StatelessWidget {
               icon: Icons.verified_user_outlined,
               label: 'Kişiselleştirilmiş',
             ),
-            _MiniHeroChip(icon: Icons.bolt_outlined, label: 'Akıllı Planlama'),
+            _MiniHeroChip(icon: Icons.bolt_outlined, label: 'Adım Adım'),
             _MiniHeroChip(
               icon: Icons.analytics_outlined,
               label: 'Veriye Dayalı',

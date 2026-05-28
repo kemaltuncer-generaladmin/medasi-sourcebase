@@ -117,7 +117,7 @@ class FolderScreen extends StatelessWidget {
           ],
         _SelectionTray(onOpenCollections: onOpenCollections),
         SectionTitle(
-          title: 'Akıllı Öneriler',
+          title: 'Öneriler',
           actionLabel: 'Tümünü Gör',
           onAction: () {},
         ),

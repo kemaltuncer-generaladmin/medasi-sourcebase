@@ -77,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         const AuthHeader(
           title: 'Hoş geldin',
-          subtitle: 'Kaynaklarını akıllı öğrenme\naraçlarına dönüştür.',
+          subtitle: 'Kaynaklarına ve çalışma\nçıktılarına devam et.',
           art: AuthArtType.login,
         ),
         const SizedBox(height: 38),
