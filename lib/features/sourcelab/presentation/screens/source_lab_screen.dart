@@ -5488,17 +5488,31 @@ class _LabNotice extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF7E8),
+        color: AppColors.warningBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFFDCA8)),
+        border: Border.all(color: AppColors.warning.withValues(alpha: .35)),
       ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Color(0xFF9A5A00),
-          height: 1.35,
-          fontWeight: FontWeight.w700,
-        ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.info_outline_rounded,
+            color: AppColors.warning,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: AppColors.navy,
+                fontSize: 13.5,
+                height: 1.4,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
