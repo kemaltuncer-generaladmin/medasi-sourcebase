@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:responsive_builder/responsive_builder.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/theme/app_colors.dart';
 import '../core/theme/app_theme.dart';
 import '../features/auth/data/sourcebase_auth_backend.dart';
 import '../features/auth/presentation/screens/auth_callback_screen.dart';
@@ -31,7 +32,8 @@ class _SourceBaseAppState extends State<SourceBaseApp> {
     if (client == null) return;
     client.auth.onAuthStateChange.listen((event) {
       final isSignedOut = event.event == AuthChangeEvent.signedOut;
-      final tokenExpired = event.event == AuthChangeEvent.tokenRefreshed &&
+      final tokenExpired =
+          event.event == AuthChangeEvent.tokenRefreshed &&
           event.session == null;
       if ((isSignedOut || tokenExpired) && mounted) {
         _rootNavigatorKey.currentState?.pushNamedAndRemoveUntil(
@@ -45,32 +47,32 @@ class _SourceBaseAppState extends State<SourceBaseApp> {
   @override
   Widget build(BuildContext context) {
     return ResponsiveApp(
-        builder: (context) => MaterialApp(
-              title: 'SourceBase',
-              debugShowCheckedModeBanner: false,
-              theme: SourceBaseTheme.light(),
-              builder: (context, child) {
-                return Semantics(
-                  container: true,
-                  explicitChildNodes: true,
-                  label: 'SourceBase uygulaması',
-                  child: child ?? const SizedBox.shrink(),
-                );
-              },
-              navigatorKey: _rootNavigatorKey,
-              initialRoute: _initialRoute,
-              routes: {
-                LoginScreen.route: (_) => const LoginScreen(),
-                RegisterScreen.route: (_) => const RegisterScreen(),
-                ForgotPasswordScreen.route: (_) => const ForgotPasswordScreen(),
-                VerifyEmailScreen.route: (_) => const VerifyEmailScreen(),
-                ProfileSetupScreen.route: (_) => const ProfileSetupScreen(),
-                AuthCallbackScreen.route: (_) => const AuthCallbackScreen(),
-                DriveWorkspaceScreen.route: (_) => const _AuthProtectedRoute(
-                      child: DriveWorkspaceScreen(),
-                    ),
-              },
-            ));
+      builder: (context) => MaterialApp(
+        title: 'SourceBase',
+        debugShowCheckedModeBanner: false,
+        theme: SourceBaseTheme.light(),
+        builder: (context, child) {
+          return Semantics(
+            container: true,
+            explicitChildNodes: true,
+            label: 'SourceBase uygulaması',
+            child: child ?? const SizedBox.shrink(),
+          );
+        },
+        navigatorKey: _rootNavigatorKey,
+        initialRoute: _initialRoute,
+        routes: {
+          LoginScreen.route: (_) => const LoginScreen(),
+          RegisterScreen.route: (_) => const RegisterScreen(),
+          ForgotPasswordScreen.route: (_) => const ForgotPasswordScreen(),
+          VerifyEmailScreen.route: (_) => const VerifyEmailScreen(),
+          ProfileSetupScreen.route: (_) => const ProfileSetupScreen(),
+          AuthCallbackScreen.route: (_) => const AuthCallbackScreen(),
+          DriveWorkspaceScreen.route: (_) =>
+              const _AuthProtectedRoute(child: DriveWorkspaceScreen()),
+        },
+      ),
+    );
   }
 
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -112,16 +114,12 @@ class _AuthProtectedRoute extends StatelessWidget {
         redirectRoute,
         (_) => false,
         arguments: redirectRoute == LoginScreen.route
-            ? const {
-                'error': 'Oturum doğrulanamadı. Lütfen tekrar giriş yap.',
-              }
+            ? const {'error': 'Oturum doğrulanamadı. Lütfen tekrar giriş yap.'}
             : null,
       );
     });
 
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
+    return const _SourceBaseBootScreen();
   }
 
   String? get _redirectRoute {
@@ -136,5 +134,73 @@ class _AuthProtectedRoute extends StatelessWidget {
       return ProfileSetupScreen.route;
     }
     return null;
+  }
+}
+
+class _SourceBaseBootScreen extends StatelessWidget {
+  const _SourceBaseBootScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.page,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: AppColors.selectedBlue,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: AppColors.blue.withValues(alpha: .18),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.auto_stories_rounded,
+                    color: AppColors.blue,
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'SourceBase',
+                  style: TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Hesabın hazırlanıyor',
+                  style: TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: AppColors.blue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

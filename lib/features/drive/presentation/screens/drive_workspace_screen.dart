@@ -1365,7 +1365,7 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 180),
       child: loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const _WorkspaceBootLoader()
           : errorMessage != null
           ? _ErrorState(
               message: 'Bir Sorun Oluştu',
@@ -1598,6 +1598,71 @@ class _ErrorState extends StatelessWidget {
                 onPressed: onRetry,
                 size: SBButtonSize.medium,
                 fullWidth: false,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkspaceBootLoader extends StatelessWidget {
+  const _WorkspaceBootLoader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.page,
+      alignment: Alignment.center,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: AppColors.selectedBlue,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppColors.blue.withValues(alpha: .16),
+                ),
+              ),
+              child: const Icon(
+                Icons.cloud_sync_rounded,
+                color: AppColors.blue,
+                size: 30,
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Çalışma alanın hazırlanıyor',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.navy,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Kaynaklarını ve son durumları getiriyoruz',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.muted,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 22),
+            const SizedBox(
+              width: 26,
+              height: 26,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: AppColors.blue,
               ),
             ),
           ],
