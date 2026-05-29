@@ -272,6 +272,8 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
                   ),
                   for (final message in _messages)
                     _ChatBubble(message: message),
+                  if (_isSending && (_messages.isEmpty || !_messages.last.isAi))
+                    const _ChatThinkingBubble(),
                 ],
               ),
             ),
@@ -636,6 +638,117 @@ class _ChatBubble extends StatelessWidget {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatThinkingBubble extends StatefulWidget {
+  const _ChatThinkingBubble();
+
+  @override
+  State<_ChatThinkingBubble> createState() => _ChatThinkingBubbleState();
+}
+
+class _ChatThinkingBubbleState extends State<_ChatThinkingBubble>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: const BoxDecoration(
+                color: AppColors.selectedBlue,
+                shape: BoxShape.circle,
+              ),
+              child: const Padding(
+                padding: EdgeInsets.all(7),
+                child: SourceBaseMark(size: 24),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                  bottomLeft: Radius.circular(4),
+                  bottomRight: Radius.circular(20),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.navy.withValues(alpha: .06),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < 3; i++) ...[
+                    if (i != 0) const SizedBox(width: 6),
+                    AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, _) {
+                        final phase = (_controller.value + i * 0.18) % 1.0;
+                        final t = (phase < 0.5) ? phase * 2 : (1 - phase) * 2;
+                        return Opacity(
+                          opacity: 0.35 + (0.55 * t),
+                          child: Container(
+                            width: 7,
+                            height: 7,
+                            decoration: const BoxDecoration(
+                              color: AppColors.blue,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Yanıt hazırlanıyor',
+                    style: TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
