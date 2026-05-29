@@ -398,6 +398,7 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -423,94 +424,99 @@ class _SourceLabScreenState extends State<SourceLabScreen> {
             }
 
             return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Drive Kaynakları',
-                      style: TextStyle(
-                        color: AppColors.navy,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.86,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Drive Kaynakları',
+                        style: TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'SourceLab araçlarında kullanılacak dosyaları seç.',
-                      style: TextStyle(color: AppColors.muted, fontSize: 15),
-                    ),
-                    const SizedBox(height: 18),
-                    if (pool.isEmpty)
-                      _LabPanel(
-                        child: _LabEmptyStateWithAction(
-                          icon: Icons.folder_off_outlined,
-                          title: 'Henüz hazır kaynak yok',
-                          message:
-                              'SourceLab çıktısı oluşturmak için önce Drive’a metin içeren PDF veya PPTX yükle.',
-                          actionLabel: widget.onOpenDrive == null
-                              ? null
-                              : 'Drive’a git',
-                          onAction: widget.onOpenDrive == null
-                              ? null
-                              : () {
-                                  Navigator.of(context).pop();
-                                  widget.onOpenDrive!();
-                                },
+                      const SizedBox(height: 8),
+                      const Text(
+                        'SourceLab araçlarında kullanılacak dosyaları seç.',
+                        style: TextStyle(color: AppColors.muted, fontSize: 15),
+                      ),
+                      const SizedBox(height: 18),
+                      if (pool.isEmpty)
+                        _LabPanel(
+                          child: _LabEmptyStateWithAction(
+                            icon: Icons.folder_off_outlined,
+                            title: 'Henüz hazır kaynak yok',
+                            message:
+                                'SourceLab çıktısı oluşturmak için önce Drive’a metin içeren PDF veya PPTX yükle.',
+                            actionLabel: widget.onOpenDrive == null
+                                ? null
+                                : 'Drive’a git',
+                            onAction: widget.onOpenDrive == null
+                                ? null
+                                : () {
+                                    Navigator.of(context).pop();
+                                    widget.onOpenDrive!();
+                                  },
+                          ),
+                        )
+                      else ...[
+                        if (!hasReadySource) ...[
+                          const _LabNotice(
+                            text:
+                                'Henüz hazır kaynak yok. Hazır olmayan dosyalar aşağıda nedenleriyle gösteriliyor.',
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        Flexible(
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            itemBuilder: (context, index) {
+                              final source = pool[index];
+                              final selected = selectedIds.contains(source.id);
+                              return _SourcePickerRow(
+                                source: source,
+                                selected: selected,
+                                onTap: () => toggle(source),
+                              );
+                            },
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 10),
+                            itemCount: pool.length,
+                          ),
                         ),
-                      )
-                    else ...[
-                      if (!hasReadySource) ...[
-                        const _LabNotice(
-                          text:
-                              'Henüz hazır kaynak yok. Hazır olmayan dosyalar aşağıda nedenleriyle gösteriliyor.',
-                        ),
-                        const SizedBox(height: 12),
                       ],
-                      Flexible(
-                        child: ListView.separated(
-                          shrinkWrap: true,
-                          itemBuilder: (context, index) {
-                            final source = pool[index];
-                            final selected = selectedIds.contains(source.id);
-                            return _SourcePickerRow(
-                              source: source,
-                              selected: selected,
-                              onTap: () => toggle(source),
-                            );
-                          },
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: 10),
-                          itemCount: pool.length,
-                        ),
+                      const SizedBox(height: 18),
+                      _PrimaryLabButton(
+                        label: 'Seçimi Kullan',
+                        icon: Icons.check_rounded,
+                        onTap: selectedIds.isEmpty
+                            ? null
+                            : () {
+                                if (selectedIds.isEmpty) {
+                                  _toast('En az bir kaynak seçin.');
+                                  return;
+                                }
+                                setState(() {
+                                  selectedSources = pool
+                                      .where(
+                                        (source) =>
+                                            source.isSelectable &&
+                                            selectedIds.contains(source.id),
+                                      )
+                                      .toList();
+                                });
+                                Navigator.of(context).pop();
+                              },
                       ),
                     ],
-                    const SizedBox(height: 18),
-                    _PrimaryLabButton(
-                      label: 'Seçimi Kullan',
-                      icon: Icons.check_rounded,
-                      onTap: selectedIds.isEmpty
-                          ? null
-                          : () {
-                              if (selectedIds.isEmpty) {
-                                _toast('En az bir kaynak seçin.');
-                                return;
-                              }
-                              setState(() {
-                                selectedSources = pool
-                                    .where(
-                                      (source) =>
-                                          source.isSelectable &&
-                                          selectedIds.contains(source.id),
-                                    )
-                                    .toList();
-                              });
-                              Navigator.of(context).pop();
-                            },
-                    ),
-                  ],
+                  ),
                 ),
               ),
             );
