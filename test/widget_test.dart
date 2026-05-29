@@ -11,7 +11,7 @@ void main() {
 
     expect(find.text('Hoş geldin'), findsOneWidget);
     expect(find.text('Giriş Yap'), findsOneWidget);
-    expect(find.text('Hesap Oluştur'), findsOneWidget);
+    expect(find.textContaining('Kayıt ol'), findsWidgets);
     expect(find.text('Şifremi unuttum'), findsOneWidget);
   });
 

@@ -323,15 +323,7 @@ class _LoginScreenState extends State<LoginScreen> {
             error: false,
           ),
         ],
-        const SizedBox(height: 18),
-        SBSecondaryButton(
-          label: 'Hesap Oluştur',
-          onPressed: loading || _socialLoading
-              ? null
-              : () => Navigator.pushNamed(context, RegisterScreen.route),
-          size: SBButtonSize.large,
-        ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 22),
         Center(
           child: TextButton(
             onPressed: loading || _socialLoading
@@ -343,7 +335,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 text: 'Hesabın yok mu? ',
                 style: TextStyle(
                   color: AppColors.muted,
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
                 children: [
@@ -351,7 +343,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     text: 'Kayıt ol',
                     style: TextStyle(
                       color: AppColors.blue,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],

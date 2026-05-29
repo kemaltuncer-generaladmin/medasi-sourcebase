@@ -220,15 +220,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           loading: loading,
           size: SBButtonSize.large,
         ),
-        const SizedBox(height: 12),
-        SBSecondaryButton(
-          label: 'Giriş Yap',
-          onPressed: loading
-              ? null
-              : () => Navigator.pushNamed(context, LoginScreen.route),
-          size: SBButtonSize.large,
-        ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 22),
         Center(
           child: TextButton(
             onPressed: loading
@@ -238,13 +230,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: const Text.rich(
               TextSpan(
                 text: 'Zaten hesabın var mı? ',
-                style: TextStyle(color: AppColors.muted, fontSize: 17),
+                style: TextStyle(color: AppColors.muted, fontSize: 16),
                 children: [
                   TextSpan(
                     text: 'Giriş yap',
                     style: TextStyle(
                       color: AppColors.blue,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
