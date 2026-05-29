@@ -3473,8 +3473,13 @@ class _ExamLoadingState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Column(
         children: [
-          const CircularProgressIndicator(color: AppColors.blue),
-          const SizedBox(height: 20),
+          const _LabLoadingHeader(
+            icon: Icons.menu_book_rounded,
+            title: 'Sınav sabahı özeti hazırlanıyor',
+            message:
+                'Kaynak taranıp önemli noktalar kısa ve okunur biçimde toparlanıyor.',
+          ),
+          const SizedBox(height: 16),
           for (var i = 0; i < messages.length; i++)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -4683,8 +4688,13 @@ class _InfographicLoadingState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 14),
       child: Column(
         children: [
-          const CircularProgressIndicator(color: AppColors.blue),
-          const SizedBox(height: 18),
+          const _LabLoadingHeader(
+            icon: Icons.dashboard_customize_outlined,
+            title: 'İnfografik hazırlanıyor',
+            message:
+                'Kaynak görsel anlatım bloklarına ayrılıyor; sonuç birkaç saniye içinde hazır olacak.',
+          ),
+          const SizedBox(height: 16),
           for (var i = 0; i < stages.length; i++)
             Padding(
               padding: EdgeInsets.only(bottom: i == stages.length - 1 ? 0 : 10),
@@ -5383,6 +5393,86 @@ class _LabLoadingState extends StatelessWidget {
       message:
           'Kaynağın analiz ediliyor ve sonuç ekranı hazır olduğunda buraya düşecek.',
       tags: steps.take(3).toList(),
+    );
+  }
+}
+
+class _LabLoadingHeader extends StatelessWidget {
+  const _LabLoadingHeader({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+      decoration: BoxDecoration(
+        color: AppColors.selectedBlue,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.blue.withValues(alpha: .14)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: AppColors.blue.withValues(alpha: .18)),
+            ),
+            alignment: Alignment.center,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    color: AppColors.blue,
+                  ),
+                ),
+                Icon(icon, color: AppColors.blue, size: 16),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 13.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
