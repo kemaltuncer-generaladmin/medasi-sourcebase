@@ -153,7 +153,7 @@ class _FileDetailScreenState extends State<FileDetailScreen> {
         ),
         if (!readyForGeneration) ...[
           const SizedBox(height: 12),
-          _ReadinessNotice(message: readinessMessage),
+          _ReadinessNotice(status: file.status, message: readinessMessage),
         ],
         const SectionTitle(title: 'Dosya Özeti'),
         GlassPanel(
@@ -432,34 +432,137 @@ class _GenerationCenterAction extends StatelessWidget {
 }
 
 class _ReadinessNotice extends StatelessWidget {
-  const _ReadinessNotice({required this.message});
+  const _ReadinessNotice({required this.status, required this.message});
 
+  final DriveItemStatus status;
   final String message;
 
   @override
   Widget build(BuildContext context) {
+    final tone = _toneFor(status);
     return GlassPanel(
       padding: const EdgeInsets.all(14),
-      borderColor: AppColors.softLine,
+      borderColor: tone.border,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline_rounded, color: AppColors.blue),
-          const SizedBox(width: 10),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: tone.tint,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            alignment: Alignment.center,
+            child: tone.spinning
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      valueColor: AlwaysStoppedAnimation<Color>(tone.color),
+                    ),
+                  )
+                : Icon(tone.icon, color: tone.color, size: 20),
+          ),
+          const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                color: AppColors.muted,
-                fontSize: 14,
-                height: 1.35,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tone.title,
+                  style: TextStyle(
+                    color: tone.color,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.1,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 14,
+                    height: 1.35,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+
+  _ReadinessTone _toneFor(DriveItemStatus status) {
+    switch (status) {
+      case DriveItemStatus.processing:
+        return _ReadinessTone(
+          title: 'Kaynak işleniyor',
+          icon: Icons.autorenew_rounded,
+          color: AppColors.blue,
+          tint: AppColors.selectedBlue,
+          border: AppColors.blue.withValues(alpha: .18),
+          spinning: true,
+        );
+      case DriveItemStatus.uploading:
+        return _ReadinessTone(
+          title: 'Yükleniyor',
+          icon: Icons.cloud_upload_outlined,
+          color: AppColors.blue,
+          tint: AppColors.selectedBlue,
+          border: AppColors.blue.withValues(alpha: .18),
+          spinning: true,
+        );
+      case DriveItemStatus.failed:
+        return _ReadinessTone(
+          title: 'Bu kaynak kullanılamıyor',
+          icon: Icons.error_outline_rounded,
+          color: AppColors.red,
+          tint: AppColors.redBg,
+          border: AppColors.red.withValues(alpha: .22),
+          spinning: false,
+        );
+      case DriveItemStatus.draft:
+        return _ReadinessTone(
+          title: 'Taslak — yükleme tamamlanmadı',
+          icon: Icons.edit_note_rounded,
+          color: AppColors.warning,
+          tint: AppColors.warningBg,
+          border: AppColors.warning.withValues(alpha: .22),
+          spinning: false,
+        );
+      case DriveItemStatus.completed:
+        return _ReadinessTone(
+          title: 'Bu kaynak için kontrol gerekli',
+          icon: Icons.info_outline_rounded,
+          color: AppColors.blue,
+          tint: AppColors.selectedBlue,
+          border: AppColors.softLine,
+          spinning: false,
+        );
+    }
+  }
+}
+
+class _ReadinessTone {
+  const _ReadinessTone({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.tint,
+    required this.border,
+    required this.spinning,
+  });
+
+  final String title;
+  final IconData icon;
+  final Color color;
+  final Color tint;
+  final Color border;
+  final bool spinning;
 }
 
 class _SummaryMetric extends StatelessWidget {
