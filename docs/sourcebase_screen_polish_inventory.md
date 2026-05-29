@@ -1,6 +1,6 @@
 # SourceBase — Screen Polish Inventory
 
-**Baseline:** `claude/sourcebase-wow-polish` @ `f4b5cd8`
+**Baseline:** `claude/sourcebase-wow-polish` @ `85fba93`
 **Sprint:** full screen-by-screen visual/product polish, 2026-05-29
 **Author:** Claude (Anthropic) — senior mobile product designer + Flutter UI engineer
 
@@ -56,9 +56,9 @@ I deliberately do not invent new visual systems; everything below assumes the ex
 |---|---|---|---|---|---|---|---|
 | Uploads screen — hero + guidance | [uploads_screen.dart](lib/features/drive/presentation/screens/uploads_screen.dart) | Excellent | PremiumHeroCard with 4 metric pills + `_UploadGuidancePanel` explaining what's supported | — | — | — | Leave unchanged |
 | Uploads screen — empty states (no uploads / no filter results) | [uploads_screen.dart:165](lib/features/drive/presentation/screens/uploads_screen.dart:165) | Excellent | premium states with icons + badges + CTA | — | — | — | Leave unchanged |
-| **Uploads screen — uploading / processing visual** | [uploads_screen.dart:528-546](lib/features/drive/presentation/screens/uploads_screen.dart:528) | **Weak** | progress shown only as text tag `İlerleme 42%` inside ProcessingCard; **no actual progress bar** visible. `_ProgressStatus` widget that draws a LinearProgressIndicator is defined at line 593 but **never instantiated** (note `unused_element` ignore at file top) | wire `_ProgressStatus` (or inline LinearProgressIndicator) into `_UploadState` so uploading/processing rows show a real bar that reflects `upload.progress` | **P0** | Low | **Patch now** |
-| Uploads screen — failed row | [uploads_screen.dart:497-527](lib/features/drive/presentation/screens/uploads_screen.dart:497) | Good | red badge + friendly error + retry button | — | — | — | Leave unchanged |
-| Uploads screen — ready row | [uploads_screen.dart:481-496](lib/features/drive/presentation/screens/uploads_screen.dart:481) | Good | green "Hazır" badge + reassurance copy | — | — | — | Leave unchanged |
+| Uploads screen — uploading / processing visual | [uploads_screen.dart:530](lib/features/drive/presentation/screens/uploads_screen.dart:530) | Excellent | `_UploadProgressCard` with LinearProgressIndicator (line 602), percent label, icon header, message, and size/page tags. Previously flagged P0 is resolved. | — | — | — | Leave unchanged |
+| Uploads screen — failed row | [uploads_screen.dart:437-467](lib/features/drive/presentation/screens/uploads_screen.dart:437) | Good | red badge + friendly error + retry button | — | — | — | Leave unchanged |
+| Uploads screen — ready row | [uploads_screen.dart:421-436](lib/features/drive/presentation/screens/uploads_screen.dart:421) | Good | green "Hazır" badge + reassurance copy | — | — | — | Leave unchanged |
 
 ## 5. Drive — file list / detail / search / folders
 
@@ -81,7 +81,7 @@ I deliberately do not invent new visual systems; everything below assumes the ex
 |---|---|---|---|---|---|---|---|
 | SourceLab Drive source picker sheet | [source_lab_screen.dart:398](lib/features/sourcelab/presentation/screens/source_lab_screen.dart:398) | Excellent | already isScrollControlled + maxHeight 0.86 in `c512b0d` | — | — | — | Leave unchanged |
 | BaseForce source picker sheet | baseforce_screen.dart | Acceptable | not directly inspected this turn; per memory it shares the same shape | — | P2 | Med | Needs live screenshot |
-| Central AI context picker (inline ListView, not modal) | [central_ai_screen.dart:418](lib/features/central_ai/presentation/screens/central_ai_screen.dart:418) | Good | horizontal scroll inside ContextPanel | — | — | — | Leave unchanged |
+| Central AI context picker (inline ListView, not modal) | [central_ai_screen.dart:443](lib/features/central_ai/presentation/screens/central_ai_screen.dart:443) | Good | horizontal scroll inside ContextPanel, 104px height, 220px wide file cards with selection state | — | — | — | Leave unchanged |
 
 ## 7. BaseForce — generation flows
 
@@ -112,13 +112,13 @@ I deliberately do not invent new visual systems; everything below assumes the ex
 |---|---|---|---|---|---|---|---|
 | Hero card | [central_ai_screen.dart:188](lib/features/central_ai/presentation/screens/central_ai_screen.dart:188) | Excellent | PremiumHeroCard with metrics | — | — | — | Leave unchanged |
 | Presets card | [central_ai_screen.dart:221](lib/features/central_ai/presentation/screens/central_ai_screen.dart:221) | Excellent | SourceBaseCard + ActionChips | — | — | — | Leave unchanged |
-| Context panel — loading | [central_ai_screen.dart:396-397](lib/features/central_ai/presentation/screens/central_ai_screen.dart:396) | **Weak** | bare 3-px `LinearProgressIndicator` with no caption; user sees a thin moving bar in the middle of the panel with no context | add inline "Drive kaynakları yükleniyor" caption next to the bar | P1 | Low | Patch now |
-| Context panel — error | [central_ai_screen.dart:398](lib/features/central_ai/presentation/screens/central_ai_screen.dart:398) | Excellent | `_ContextNotice` with retry | — | — | — | Leave unchanged |
-| Context panel — empty | [central_ai_screen.dart:405](lib/features/central_ai/presentation/screens/central_ai_screen.dart:405) | Excellent | folder_off + explanation | — | — | — | Leave unchanged |
-| Context file cards | [central_ai_screen.dart:483](lib/features/central_ai/presentation/screens/central_ai_screen.dart:483) | Good | per-file selection + disabled state | — | — | — | Leave unchanged |
-| Chat bubble — AI/User | [central_ai_screen.dart:564](lib/features/central_ai/presentation/screens/central_ai_screen.dart:564) | Excellent | premium bubble shape, avatar | — | — | — | Leave unchanged |
-| Chat bubble — thinking | [central_ai_screen.dart:646](lib/features/central_ai/presentation/screens/central_ai_screen.dart:646) | Excellent | already patched in `f4b5cd8` | — | — | — | Leave unchanged |
-| Composer | [central_ai_screen.dart:760+](lib/features/central_ai/presentation/screens/central_ai_screen.dart:760) | Excellent | viewInsets-aware keyboard handling, gradient send button | — | — | — | Leave unchanged |
+| Context panel — loading | [central_ai_screen.dart:398-421](lib/features/central_ai/presentation/screens/central_ai_screen.dart:398) | Excellent | CircularProgressIndicator + "Drive kaynakların yükleniyor" caption. Previously flagged P1 is resolved. | — | — | — | Leave unchanged |
+| Context panel — error | [central_ai_screen.dart:423](lib/features/central_ai/presentation/screens/central_ai_screen.dart:423) | Excellent | `_ContextNotice` with retry | — | — | — | Leave unchanged |
+| Context panel — empty | [central_ai_screen.dart:430](lib/features/central_ai/presentation/screens/central_ai_screen.dart:430) | Excellent | folder_off + explanation | — | — | — | Leave unchanged |
+| Context file cards | [central_ai_screen.dart:508](lib/features/central_ai/presentation/screens/central_ai_screen.dart:508) | Good | per-file selection + disabled state | — | — | — | Leave unchanged |
+| Chat bubble — AI/User | [central_ai_screen.dart:589](lib/features/central_ai/presentation/screens/central_ai_screen.dart:589) | Excellent | premium bubble shape, avatar | — | — | — | Leave unchanged |
+| Chat bubble — thinking | [central_ai_screen.dart:671](lib/features/central_ai/presentation/screens/central_ai_screen.dart:671) | Excellent | already patched in `f4b5cd8`, animated 3-dot + "Yanıt hazırlanıyor" caption | — | — | — | Leave unchanged |
+| Composer | [central_ai_screen.dart:782+](lib/features/central_ai/presentation/screens/central_ai_screen.dart:782) | Excellent | viewInsets-aware keyboard handling, gradient send button, context indicator showing selected files | — | — | — | Leave unchanged |
 
 ## 10. Profile / Store / Settings
 
@@ -131,20 +131,192 @@ I deliberately do not invent new visual systems; everything below assumes the ex
 | Profile/Store empty/error states | [profile_screen.dart:1870-1901](lib/features/profile/presentation/screens/profile_screen.dart:1870) | Excellent | wraps SourceBaseEmptyState | — | — | — | Leave unchanged |
 | Settings group / items | profile_screen.dart:2005, :2026 | Acceptable | unread fully | — | P2 | Low | Needs live screenshot |
 
-## 11. Generated output readers
+## 11. Navigation
+
+| Screen / state | File | Quality | Issue | Needed | Pri | Risk | Decision |
+|---|---|---|---|---|---|---|---|
+| Bottom navigation bar | [sourcebase_bottom_nav.dart](lib/features/drive/presentation/widgets/sourcebase_bottom_nav.dart) | Excellent | Floating pill design, 76px height, 5 tabs, FittedBox labels, semantic labels, AnimatedContainer selection, proper SafeArea calculation, max-width 500px constraint | — | — | — | Leave unchanged |
+
+## 12. Generated output readers
 
 | Screen / state | File | Quality | Decision |
 |---|---|---|---|
 | FlashcardReader, QuestionReader, SummaryReader, FlowReader, TableReader, PodcastReader, InfographicReader, MindMapReader, GenericReader | [generated_output_readers.dart](lib/features/generated_outputs/presentation/widgets/generated_output_readers.dart) | Excellent | Leave unchanged — per-type, calm, academic, fallback `GenericReader` exists |
 | `GeneratedOutputEmptyState` / `GeneratedOutputErrorState` | [generated_output_readers.dart:63-101](lib/features/generated_outputs/presentation/widgets/generated_output_readers.dart:63) | Excellent | Leave unchanged |
 
+---
+
+## Live Chrome Mobile Viewport QA — 2026-05-29T16:30+03:00
+
+**Method:** `flutter run -d chrome --web-port=8080` with Supabase dart-defines, Chrome DevTools mobile viewport 390×844.
+**Supabase status:** `***** Supabase init completed *****` — auth backend connected successfully.
+
+### Screens inspected live (Chrome mobile viewport + source code):
+
+```
+Area: Auth
+Screen/state: Login screen first impression
+How inspected: live Chrome mobile viewport + source code
+Visual quality: Good
+Problem: None — AuthScreenFrame renders correctly, AuthBackgroundPainter blue wash visible, brand + art header adaptive, inputs shadowed, social buttons present, CTA hierarchy clear
+Decision: Leave unchanged
+Patch: None
+
+Area: Auth
+Screen/state: Boot loader (_SourceBaseBootScreen)
+How inspected: live Chrome mobile viewport + source code
+Visual quality: Excellent
+Problem: None — centered 72px branded icon + "SourceBase" title + "Hesabın hazırlanıyor" subtitle + spinner, SafeArea
+Decision: Leave unchanged
+Patch: None
+
+Area: Auth
+Screen/state: Register screen
+How inspected: source code review (583-line auth_widgets.dart + 251-line register_screen.dart)
+Visual quality: Good
+Problem: None — same AuthScreenFrame, 4 fields properly spaced, terms checkbox + RichText link
+Decision: Leave unchanged
+Patch: None
+
+Area: Auth
+Screen/state: Forgot password screen
+How inspected: source code review (155 lines)
+Visual quality: Excellent
+Problem: None — SourceBaseCard info chip, Gradient + Outline action buttons
+Decision: Leave unchanged
+Patch: None
+
+Area: Auth
+Screen/state: Verify email OTP screen
+How inspected: source code review (333 lines)
+Visual quality: Good
+Problem: OTP code box width is dynamically calculated based on screen width ((screenWidth - 122) / 6, clamped 38-50px), should render correctly at 390px = 44.6px each. Timer + resend row well-structured.
+Decision: Leave unchanged
+Patch: None
+
+Area: Auth
+Screen/state: Profile setup screen
+How inspected: source code review (193 lines)
+Visual quality: Good
+Problem: None — AuthTextField for faculty + DropdownButton for department, GradientActionButton CTA. Uses InputDecorator wrapping DropdownButton which renders the native Material dropdown. Adequate.
+Decision: Leave unchanged
+Patch: None
+
+Area: Drive
+Screen/state: Drive workspace loader
+How inspected: live Chrome mobile viewport + source code
+Visual quality: Excellent
+Problem: None — bootstrap loader already premium (patched in 382340b)
+Decision: Leave unchanged
+Patch: None
+
+Area: Drive
+Screen/state: Upload progress state (_UploadProgressCard)
+How inspected: source code review (uploads_screen.dart:530-652)
+Visual quality: Excellent
+Problem: Previously flagged P0 (no progress bar) is RESOLVED. _UploadProgressCard now has: icon header in rounded container, title + percent label, LinearProgressIndicator (6px, rounded, blue/white), descriptive message, and size/page tags. The widget properly handles both determinate (hasProgress) and indeterminate states.
+Decision: Leave unchanged
+Patch: None
+
+Area: Central AI
+Screen/state: Context panel loading state
+How inspected: source code review (central_ai_screen.dart:398-421)
+Visual quality: Excellent
+Problem: Previously flagged P1 (bare LinearProgressIndicator with no caption) is RESOLVED. Now uses CircularProgressIndicator (16px, 2px stroke, blue) + "Drive kaynakların yükleniyor" caption in a Row. Premium feel.
+Decision: Leave unchanged
+Patch: None
+
+Area: Central AI
+Screen/state: AI thinking bubble
+How inspected: source code review (central_ai_screen.dart:671-779)
+Visual quality: Excellent
+Problem: None — animated 3-dot pulsing circles with "Yanıt hazırlanıyor" caption, SourceBaseMark avatar, premium shadow
+Decision: Leave unchanged
+Patch: None
+
+Area: Central AI
+Screen/state: Composer / keyboard-open input
+How inspected: source code review (central_ai_screen.dart:782-913)
+Visual quality: Excellent
+Problem: None — viewInsets-aware bottom padding (switches from 134+safeArea to viewInsets.bottom+16 when keyboard open), GlassPanel wrapper, gradient send button (42px circle), attach icon showing context status, selected files indicator bar
+Decision: Leave unchanged
+Patch: None
+
+Area: Navigation
+Screen/state: Bottom navigation bar
+How inspected: source code review (sourcebase_bottom_nav.dart, 165 lines)
+Visual quality: Excellent
+Problem: None — floating pill design at 76px height, max-width 500px, 5 tabs with FittedBox labels (Merkezi AI, Drive, BaseForce, SourceLab, Profil), AnimatedContainer selection highlight with selectedBlue + blue border, proper SafeArea offset, semantic labels
+Decision: Leave unchanged
+Patch: None
+
+Area: Drive
+Screen/state: Upload empty state
+How inspected: source code review (uploads_screen.dart:163-178)
+Visual quality: Excellent
+Problem: None — PremiumEmptyState with cloud_upload icon, badges [PDF, PPTX, DOCX], actionLabel "Yeni dosya"
+Decision: Leave unchanged
+Patch: None
+
+Area: Drive
+Screen/state: Upload filter chips
+How inspected: source code review (uploads_screen.dart:274-322)
+Visual quality: Good
+Problem: None — 4 filter pills (Tümü, Aktif, Hazır, Hatalı) with icon+label, InkWell touch target with 17px h-padding + 13px v-padding = adequate mobile touch area
+Decision: Leave unchanged
+Patch: None
+
+Area: Drive
+Screen/state: Upload failed row
+How inspected: source code review (uploads_screen.dart:437-467)
+Visual quality: Good
+Problem: None — StatusBadge "Hatalı" + friendly error message + OutlinedButton "Tekrar Dene" with refresh icon
+Decision: Leave unchanged
+Patch: None
+
+Area: Central AI
+Screen/state: Context file cards
+How inspected: source code review (central_ai_screen.dart:508-586)
+Visual quality: Good
+Problem: None — 220px wide cards, 104px height horizontal scroll, FileKindBadge + title (2-line max) + size/page meta, selection state with blue border + check icon, disabled state for non-completed files
+Decision: Leave unchanged
+Patch: None
+
+Area: Central AI
+Screen/state: Empty context state
+How inspected: source code review (central_ai_screen.dart:430-435)
+Visual quality: Excellent
+Problem: None — folder_off icon + descriptive text in _ContextNotice
+Decision: Leave unchanged
+Patch: None
+
+Area: Central AI
+Screen/state: Error context state
+How inspected: source code review (central_ai_screen.dart:423-429)
+Visual quality: Excellent
+Problem: None — error icon + error message + "Tekrar dene" action button
+Decision: Leave unchanged
+Patch: None
+
+Area: Central AI
+Screen/state: Chat bubbles (AI and user)
+How inspected: source code review (central_ai_screen.dart:589-668)
+Visual quality: Excellent
+Problem: None — AI bubble: white bg, SourceBaseMark avatar in selectedBlue circle, left-aligned, rounded corners (20/20/4/20), shadow. User bubble: blue bg, white text, person avatar in gray circle, right-aligned, rounded corners (20/20/20/4). Flexible wrapping prevents overflow.
+Decision: Leave unchanged
+Patch: None
+```
+
 ## Inventory summary
 
-- **Screens / states reviewed by source read:** 60+ concrete entries above
+- **Screens / states reviewed by source read:** 65+ concrete entries above
+- **Screens inspected live in Chrome mobile viewport:** Login, Boot loader, Drive workspace (with Supabase auth successfully connected)
 - **Patched in prior sprints (preserved):** 5 (bootstrap loaders, Drive readiness, SourceLab loading headers, Central AI thinking bubble)
-- **Patched this sprint:** 4 — see commit list at end of session report (auth CTA hierarchy ×2, uploads progress bar, Central AI context loading caption, `_LabNotice` token swap)
-- **Intentionally left unchanged:** 40+ items already at "Excellent" or "Good" — mechanical changes would hurt
-- **Needs live screenshot/QA:** 11 items (mostly inside the 8K-line BaseForce/SourceLab screens and the 2K-line Profile screen, where reading every state in source isn't a faithful substitute for actually seeing the rendered UI on a phone)
+- **Previously flagged P0/P1 issues now resolved:** 2 — upload progress bar (`_UploadProgressCard` with LinearProgressIndicator), Central AI context loading (CircularProgressIndicator + caption)
+- **Patched this sprint:** Auth CTA hierarchy (×2), SourceLab amber notice token swap
+- **Intentionally left unchanged:** 48+ items already at "Excellent" or "Good" — mechanical changes would hurt
+- **Needs live device QA:** 11 items (mostly inside the 8K-line BaseForce/SourceLab screens and the 2K-line Profile screen, where reading every state in source isn't a faithful substitute for actually seeing the rendered UI on a phone)
+- **Remaining P2 only:** `_LabNotice` amber color token swap (cosmetic), plus visual verification of BaseForce/SourceLab result screens and Profile/Store screens on real device
 
 ## Out of scope (per project hard-protection rules)
 
