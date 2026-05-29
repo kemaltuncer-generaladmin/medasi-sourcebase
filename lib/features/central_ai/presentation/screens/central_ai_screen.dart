@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/design_system/components/sourcebase_card.dart';
 import '../../../../core/design_system/layout/sourcebase_page_header.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
@@ -6,6 +7,7 @@ import '../../../drive/data/drive_models.dart';
 import '../../../drive/data/drive_repository.dart';
 import '../../../drive/data/sourcebase_drive_api.dart';
 import '../../../drive/presentation/widgets/drive_ui.dart';
+import '../../../drive/presentation/widgets/premium_workspace_components.dart';
 
 class CentralAiScreen extends StatefulWidget {
   const CentralAiScreen({required this.onSearch, super.key});
@@ -22,7 +24,8 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
   final TextEditingController _controller = TextEditingController();
   final List<_ChatMessage> _messages = [
     const _ChatMessage(
-      text: 'Merhaba! Ben SourceBase AI. Bugün size nasıl yardımcı olabilirim?',
+      text:
+          'Hazır bir kaynak seçtiğinde içerik üzerinden soru çözebilir, zorlandığın yerleri toparlayabilir ve kısa tekrar notları çıkarabilirim.',
       isAi: true,
     ),
   ];
@@ -141,6 +144,13 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
     });
   }
 
+  Future<void> _sendPresetPrompt(String prompt) async {
+    _controller
+      ..text = prompt
+      ..selection = TextSelection.collapsed(offset: prompt.length);
+    await _sendMessage();
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -149,6 +159,9 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final selectedFiles = _contextFiles()
+        .where((file) => _selectedFileIds.contains(file.id))
+        .toList();
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 900),
@@ -169,26 +182,97 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
               ),
             ),
             Expanded(
-              child: ListView.builder(
+              child: ListView(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-                reverse: true,
-                itemCount: _messages.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == _messages.length) {
-                    return _ContextPanel(
-                      files: _contextFiles(),
-                      selectedFileIds: _selectedFileIds,
-                      loading: _loadingSources,
-                      error: _sourceError,
-                      mode: _mode,
-                      onMode: (value) => setState(() => _mode = value),
-                      onToggleFile: _toggleFile,
-                      onRetry: _loadSources,
-                    );
-                  }
-                  final message = _messages[_messages.length - 1 - index];
-                  return _ChatBubble(message: message);
-                },
+                children: [
+                  PremiumHeroCard(
+                    eyebrow: 'Kaynak odaklı çalışma',
+                    title: 'Kaynağına göre çalış',
+                    description:
+                        'Bir PDF veya PPTX seç; sorularını doğrudan o kaynak üzerinden ilerletelim.',
+                    tint: AppColors.blue,
+                    anchorIcon: Icons.forum_rounded,
+                    anchorLabel: _selectedFileIds.isEmpty
+                        ? 'Kaynak seç'
+                        : '${_selectedFileIds.length} kaynak',
+                    metrics: [
+                      MetricPillData(
+                        label: 'Hazır kaynak',
+                        value:
+                            '${_contextFiles().where((file) => file.status == DriveItemStatus.completed).length}',
+                        tint: AppColors.green,
+                        icon: Icons.check_circle_rounded,
+                      ),
+                      MetricPillData(
+                        label: 'Seçili',
+                        value: '${_selectedFileIds.length}',
+                        tint: AppColors.blue,
+                        icon: Icons.folder_special_rounded,
+                      ),
+                      MetricPillData(
+                        label: 'Mod',
+                        value: _mode,
+                        tint: AppColors.purple,
+                        icon: Icons.tune_rounded,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  SourceBaseCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Önerilen başlangıçlar',
+                          style: TextStyle(
+                            color: AppColors.navy,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final prompt in const [
+                              'Bu kaynaktan sınav sorusu çıkar',
+                              'Özetle',
+                              'Zorlandığım yerleri anlat',
+                              'Klinik bağlantı kur',
+                            ])
+                              ActionChip(
+                                label: Text(prompt),
+                                onPressed: () => _sendPresetPrompt(prompt),
+                                backgroundColor: AppColors.page,
+                                side: const BorderSide(
+                                  color: AppColors.softLine,
+                                ),
+                                labelStyle: const TextStyle(
+                                  color: AppColors.navy,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _ContextPanel(
+                    files: _contextFiles(),
+                    selectedFileIds: _selectedFileIds,
+                    loading: _loadingSources,
+                    error: _sourceError,
+                    mode: _mode,
+                    onMode: (value) => setState(() => _mode = value),
+                    onToggleFile: _toggleFile,
+                    onRetry: _loadSources,
+                  ),
+                  for (final message in _messages)
+                    _ChatBubble(message: message),
+                ],
               ),
             ),
             _AiInputArea(
@@ -196,6 +280,7 @@ class _CentralAiScreenState extends State<CentralAiScreen> {
               onSend: _sendMessage,
               sending: _isSending,
               hasContext: _selectedFileIds.isNotEmpty,
+              selectedFiles: selectedFiles,
             ),
           ],
         ),
@@ -564,11 +649,13 @@ class _AiInputArea extends StatelessWidget {
     required this.onSend,
     required this.sending,
     required this.hasContext,
+    required this.selectedFiles,
   });
   final TextEditingController controller;
   final Future<void> Function() onSend;
   final bool sending;
   final bool hasContext;
+  final List<DriveFile> selectedFiles;
 
   void _showContextHint(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -604,32 +691,85 @@ class _AiInputArea extends StatelessWidget {
         ),
       ),
       child: GlassPanel(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         radius: 24,
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            IconButton(
-              onPressed: () => _showContextHint(context),
-              tooltip: 'Drive bağlamı',
-              icon: Icon(
-                hasContext
-                    ? Icons.attach_file_rounded
-                    : Icons.attach_file_outlined,
-                color: hasContext ? AppColors.green : AppColors.blue,
-              ),
-            ),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                decoration: const InputDecoration(
-                  hintText: "SourceBase AI'ya bir şey sor...",
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12),
+            if (selectedFiles.isNotEmpty)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
                 ),
-                onSubmitted: (_) => onSend(),
+                decoration: BoxDecoration(
+                  color: AppColors.page,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.softLine),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.folder_special_rounded,
+                      color: AppColors.blue,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        selectedFiles.length == 1
+                            ? selectedFiles.first.title
+                            : '${selectedFiles.length} kaynak seçili',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      selectedFiles.length == 1
+                          ? FileKindBadge.kindLabel(selectedFiles.first.kind)
+                          : 'Hazır bağlam',
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () => _showContextHint(context),
+                  tooltip: 'Drive bağlamı',
+                  icon: Icon(
+                    hasContext
+                        ? Icons.attach_file_rounded
+                        : Icons.attach_file_outlined,
+                    color: hasContext ? AppColors.green : AppColors.blue,
+                  ),
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      hintText: 'Kaynağın içeriğiyle ilgili bir soru yaz...',
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    onSubmitted: (_) => onSend(),
+                  ),
+                ),
+                _SendButton(onTap: onSend, sending: sending),
+              ],
             ),
-            _SendButton(onTap: onSend, sending: sending),
           ],
         ),
       ),

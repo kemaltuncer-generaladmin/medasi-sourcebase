@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element
+
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' hide Color, Gradient, Image, TextStyle;
@@ -11,6 +13,7 @@ import '../../../../core/widgets/sourcebase_brand.dart';
 import '../../../drive/data/drive_models.dart';
 import '../../../drive/data/sourcebase_drive_api.dart';
 import '../../../drive/presentation/widgets/drive_ui.dart';
+import '../../../drive/presentation/widgets/premium_workspace_components.dart';
 import '../../../drive/presentation/widgets/sourcebase_bottom_nav.dart';
 import '../../../generated_outputs/presentation/widgets/generated_output_readers.dart';
 
@@ -1616,6 +1619,56 @@ class _SourceLabHome extends StatelessWidget {
             ),
           ],
         ),
+        PremiumHeroCard(
+          eyebrow: 'Akademik laboratuvar',
+          title: 'SourceLab',
+          description:
+              'Kaynaklarını klinik senaryo, öğrenme planı ve görsel çalışma çıktısına dönüştür.',
+          tint: AppColors.cyan,
+          anchorIcon: Icons.science_outlined,
+          anchorLabel: selectedSources.isEmpty
+              ? 'Kaynak seç'
+              : '${selectedSources.length} kaynak',
+          metrics: [
+            MetricPillData(
+              label: 'Seçili kaynak',
+              value: '${selectedSources.length}',
+              tint: AppColors.green,
+              icon: Icons.check_circle_rounded,
+            ),
+            const MetricPillData(
+              label: 'Modül',
+              value: '6',
+              tint: AppColors.purple,
+              icon: Icons.grid_view_rounded,
+            ),
+            MetricPillData(
+              label: 'Akış',
+              value: selectedSources.isEmpty ? 'Bekliyor' : 'Hazır',
+              tint: AppColors.blue,
+              icon: Icons.play_arrow_rounded,
+            ),
+          ],
+          actions: [
+            SBPrimaryButton(
+              label: selectedSources.isEmpty
+                  ? 'Kaynak seç'
+                  : 'Kaynakları yönet',
+              icon: Icons.folder_open_rounded,
+              onPressed: onPickSources,
+              size: SBButtonSize.small,
+              fullWidth: false,
+            ),
+            if (selectedSources.isNotEmpty)
+              SBSecondaryButton(
+                label: 'Son akışa dön',
+                icon: Icons.arrow_forward_rounded,
+                onPressed: onContinue,
+                size: SBButtonSize.small,
+                fullWidth: false,
+              ),
+          ],
+        ),
         _HomeContinuePanel(
           sources: selectedSources,
           onPickSources: onPickSources,
@@ -1635,23 +1688,44 @@ class _SourceLabHome extends StatelessWidget {
         _LabPanel(
           padding: EdgeInsets.zero,
           child: selectedSources.isEmpty
-              ? _LabEmptyStateWithAction(
+              ? PremiumEmptyState(
                   icon: Icons.folder_open_outlined,
-                  title: 'Henüz hazır kaynak yok',
+                  title: 'Henüz SourceLab kaynağı seçilmedi',
                   message:
                       'SourceLab çıktısı oluşturmak için önce Drive’a metin içeren PDF veya PPTX yükle.',
-                  actionLabel: onOpenDrive == null ? null : 'Drive’a git',
-                  onAction: onOpenDrive,
+                  badges: const ['PDF', 'PPTX', 'Hazır kaynak'],
+                  actionLabel: onOpenDrive == null
+                      ? 'Kaynak seç'
+                      : 'Drive’a git',
+                  onAction: onOpenDrive ?? onPickSources,
                 )
-              : Column(
-                  children: [
-                    for (var i = 0; i < selectedSources.length; i++)
-                      _RecentSourceRow(
-                        source: selectedSources[i],
-                        trailing: 'Şimdi',
-                        onTap: onPickSources,
-                      ),
-                  ],
+              : Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      for (final source in selectedSources) ...[
+                        SourcePreviewCard(
+                          file: DriveFile(
+                            id: source.id,
+                            title: source.title,
+                            kind: source.kind,
+                            sizeLabel: source.size,
+                            pageLabel: source.detail,
+                            updatedLabel: 'Şimdi',
+                            courseTitle: 'Drive Kaynağı',
+                            sectionTitle: source.tag,
+                            status: source.status,
+                            statusMessage: source.disabledReason,
+                            tag: source.tag,
+                          ),
+                          ctaLabel: 'Kaynakları yönet',
+                          onTap: onPickSources,
+                        ),
+                        if (source != selectedSources.last)
+                          const SizedBox(height: 12),
+                      ],
+                    ],
+                  ),
                 ),
         ),
       ],
@@ -1766,39 +1840,66 @@ class _ToolGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final tools = [
       _ToolSpec(
-        _ToolKind.clinical,
-        Icons.medical_services_outlined,
-        'Klinik Senaryo',
-        'Kaynağındaki bilgileri klinik karar verme pratiğine dönüştür.',
-        AppColors.purple,
+        kind: _ToolKind.examMorning,
+        icon: Icons.bolt_outlined,
+        title: 'Sınav Sabahı',
+        subtitle: 'Son tekrar için hızlı ve temiz kritik özet hazırla.',
+        color: AppColors.orange,
+        tags: const ['Özet', 'Kritik', 'Son tekrar'],
+        metric: 'Kısa tekrar',
+        note: 'Sınav sabahı taraması için uygun.',
       ),
       _ToolSpec(
-        _ToolKind.plan,
-        Icons.fact_check_outlined,
-        'Öğrenme Planı',
-        'Kaynağına göre adım adım çalışma planı oluştur.',
-        AppColors.green,
+        kind: _ToolKind.clinical,
+        icon: Icons.medical_services_outlined,
+        title: 'Klinik Senaryo',
+        subtitle:
+            'Kaynağındaki bilgileri klinik karar verme pratiğine dönüştür.',
+        color: AppColors.purple,
+        tags: const ['Vaka', 'Klinik bağlantı', 'Karar'],
+        metric: 'Klinik akış',
+        note: 'Vaka temelli tekrar için güçlü.',
       ),
       _ToolSpec(
-        _ToolKind.podcast,
-        Icons.keyboard_voice_outlined,
-        'Podcast Özeti',
-        'Kaynağını dinlenebilir özet akışına dönüştür.',
-        const Color(0xFF8C5BFF),
+        kind: _ToolKind.plan,
+        icon: Icons.fact_check_outlined,
+        title: 'Öğrenme Planı',
+        subtitle: 'Kaynağına göre adım adım çalışma planı oluştur.',
+        color: AppColors.green,
+        tags: const ['Plan', 'Günlük akış', 'Takip'],
+        metric: 'Çalışma planı',
+        note: 'Düzenli tekrar için uygundur.',
       ),
       _ToolSpec(
-        _ToolKind.infographic,
-        Icons.insert_chart_outlined_rounded,
-        'İnfografik',
-        'Önemli bilgileri görsel anlatım düzeninde yapılandır.',
-        AppColors.cyan,
+        kind: _ToolKind.podcast,
+        icon: Icons.keyboard_voice_outlined,
+        title: 'Podcast',
+        subtitle: 'Kaynağını dinlenebilir özet akışına dönüştür.',
+        color: const Color(0xFF8C5BFF),
+        tags: const ['Sesli tekrar', 'Özet', 'Mobil çalışma'],
+        metric: 'Dinlenebilir akış',
+        note: 'Yolda ve kısa aralarda kullanışlı.',
       ),
       _ToolSpec(
-        _ToolKind.mindMap,
-        Icons.hub_outlined,
-        'Zihin Haritası',
-        'Kavramlar arasındaki ilişkileri düzenli bir haritaya dönüştür.',
-        AppColors.blue,
+        kind: _ToolKind.infographic,
+        icon: Icons.insert_chart_outlined_rounded,
+        title: 'İnfografik',
+        subtitle: 'Önemli bilgileri görsel anlatım düzeninde yapılandır.',
+        color: AppColors.cyan,
+        tags: const ['Görsel', 'Özet', 'Akademik düzen'],
+        metric: 'Görsel çıktı',
+        note: 'Karmaşık bilgiyi sadeleştirir.',
+      ),
+      _ToolSpec(
+        kind: _ToolKind.mindMap,
+        icon: Icons.hub_outlined,
+        title: 'Zihin Haritası',
+        subtitle:
+            'Kavramlar arasındaki ilişkileri düzenli bir haritaya dönüştür.',
+        color: AppColors.blue,
+        tags: const ['Harita', 'İlişki', 'Konu bütünlüğü'],
+        metric: 'Kavramsal yapı',
+        note: 'Bağlantıları tek bakışta gösterir.',
       ),
     ];
     return LayoutBuilder(
@@ -1830,13 +1931,25 @@ class _ToolGrid extends StatelessWidget {
 }
 
 class _ToolSpec {
-  const _ToolSpec(this.kind, this.icon, this.title, this.subtitle, this.color);
+  const _ToolSpec({
+    required this.kind,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.tags,
+    required this.metric,
+    required this.note,
+  });
 
   final _ToolKind kind;
   final IconData icon;
   final String title;
   final String subtitle;
   final Color color;
+  final List<String> tags;
+  final String metric;
+  final String note;
 }
 
 class _ToolCard extends StatelessWidget {
@@ -1847,50 +1960,17 @@ class _ToolCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < 420;
-    return _LabPanel(
-      padding: EdgeInsets.fromLTRB(12, compact ? 14 : 18, 12, 12),
-      radius: 16,
-      child: Column(
-        children: [
-          Container(
-            width: compact ? 48 : 58,
-            height: compact ? 48 : 58,
-            decoration: BoxDecoration(
-              color: spec.color.withValues(alpha: .16),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(spec.icon, color: spec.color, size: compact ? 28 : 34),
-          ),
-          SizedBox(height: compact ? 10 : 15),
-          Text(
-            spec.title,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            style: TextStyle(
-              color: AppColors.navy,
-              fontSize: compact ? 16 : 18,
-              height: 1.08,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          SizedBox(height: compact ? 7 : 9),
-          Text(
-            spec.subtitle,
-            textAlign: TextAlign.center,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: AppColors.muted,
-              fontSize: compact ? 12 : 13,
-              height: 1.23,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          SizedBox(height: compact ? 9 : 13),
-          _SmallActionButton(label: 'Başlat', onTap: onTap),
-        ],
-      ),
+    return DenseFeatureCard(
+      icon: spec.icon,
+      title: spec.title,
+      description: spec.subtitle,
+      tags: spec.tags,
+      primaryMetric: spec.metric,
+      secondaryMetric: 'Hazır kaynak gerekir',
+      trailingNote: spec.note,
+      tint: spec.color,
+      ctaLabel: 'Başlat',
+      onTap: onTap,
     );
   }
 }

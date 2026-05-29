@@ -13,6 +13,7 @@ import '../../../auth/presentation/screens/profile_setup_screen.dart';
 import '../../../drive/data/drive_models.dart';
 import '../../../drive/data/drive_repository.dart';
 import '../../../drive/presentation/widgets/drive_ui.dart';
+import '../../../drive/presentation/widgets/premium_workspace_components.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
@@ -170,6 +171,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _ProfileHeader(profile: current, onEdit: _openProfileSetup),
+                const SizedBox(height: 12),
+                PremiumHeroCard(
+                  eyebrow: 'Hesap merkezi',
+                  title: current.displayName,
+                  description:
+                      'Profil, kullanım ve cüzdan durumunu tek yerden yönet. Hesap güvenliği ve destek adımları burada düzenli şekilde toplanır.',
+                  tint: AppColors.blue,
+                  anchorIcon: Icons.verified_user_outlined,
+                  anchorLabel: current.isComplete
+                      ? 'Profil tamamlandı'
+                      : 'Profil eksik',
+                  metrics: [
+                    MetricPillData(
+                      label: 'Ders',
+                      value: '${current.stats.courseCount}',
+                      tint: AppColors.blue,
+                      icon: Icons.menu_book_rounded,
+                    ),
+                    MetricPillData(
+                      label: 'Dosya',
+                      value: '${current.stats.fileCount}',
+                      tint: AppColors.green,
+                      icon: Icons.description_outlined,
+                    ),
+                    MetricPillData(
+                      label: 'Koleksiyon',
+                      value: '${current.stats.collectionCount}',
+                      tint: AppColors.purple,
+                      icon: Icons.collections_bookmark_outlined,
+                    ),
+                  ],
+                  actions: [
+                    SBSecondaryButton(
+                      label: 'Profili düzenle',
+                      icon: Icons.edit_outlined,
+                      onPressed: _openProfileSetup,
+                      size: SBButtonSize.small,
+                      fullWidth: false,
+                    ),
+                  ],
+                ),
                 if (isMobile) ...[
                   const SizedBox(height: 14),
                   Row(
@@ -912,93 +954,16 @@ class _WalletPanel extends StatelessWidget {
       child: InkWell(
         onTap: loadFailed ? null : onOpenStore,
         borderRadius: BorderRadius.circular(16),
-        child: GlassPanel(
-          padding: const EdgeInsets.all(20),
-          borderColor: AppColors.blue.withValues(alpha: .18),
-          child: Row(
-            children: [
-              Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  gradient: AppColors.brandGradient,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.account_balance_wallet_rounded,
-                  color: Colors.white,
-                  size: 30,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Mevcut MC',
-                      style: TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      loadFailed ? 'Yüklenemedi' : balance.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: loadFailed ? AppColors.red : AppColors.navy,
-                        fontSize: 30,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      loadFailed
-                          ? 'Bakiye bilgisi şu anda alınamadı.'
-                          : balance.rightsLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (!loadFailed &&
-                        balance.amount <= 0 &&
-                        balance.rights <= 0) ...[
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Yeni çıktı oluşturmak için paket satın alman gerekebilir.',
-                        style: TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 12,
-                          height: 1.25,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: AppColors.selectedBlue,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.storefront_rounded,
-                  color: AppColors.blue,
-                  size: 22,
-                ),
-              ),
-            ],
-          ),
+        child: WalletMiniCard(
+          balanceLabel: loadFailed ? 'Yüklenemedi' : balance.label,
+          rightsLabel: loadFailed
+              ? 'Bakiye bilgisi şu anda alınamadı.'
+              : balance.amount <= 0 && balance.rights <= 0
+              ? '${balance.rightsLabel} • Yeni çıktı için paket gerekebilir.'
+              : balance.rightsLabel,
+          onOpenStore: onOpenStore,
+          actionLabel: 'Store',
+          loadFailed: loadFailed,
         ),
       ),
     );
@@ -1145,44 +1110,34 @@ class _MedasiCoinStoreScreenState extends State<MedasiCoinStoreScreen> {
             ),
           ],
         ),
-        GlassPanel(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  gradient: AppColors.brandGradient,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Icon(
-                  Icons.monetization_on_rounded,
-                  color: Colors.white,
-                  size: 34,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'MC Paketleri',
-                style: TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Paketler gerçek mağaza verisinden yüklenir. Bakiye yalnızca onaylı ödeme sonrası güncellenir.',
-                style: TextStyle(
-                  color: AppColors.muted,
-                  fontSize: 15,
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ),
+        PremiumHeroCard(
+          eyebrow: 'Güvenli ödeme',
+          title: 'MC Paketleri',
+          description:
+              'Çalışma çıktıları ve üretim hakları için bakiye yükle. Bakiye yalnızca onaylı ödeme sonrası güncellenir.',
+          tint: AppColors.blue,
+          anchorIcon: Icons.account_balance_wallet_outlined,
+          anchorLabel: 'Onaylı ödeme',
+          metrics: const [
+            MetricPillData(
+              label: 'Paket türü',
+              value: 'MC',
+              tint: AppColors.blue,
+              icon: Icons.toll_rounded,
+            ),
+            MetricPillData(
+              label: 'Teslim',
+              value: 'Anlık kontrol',
+              tint: AppColors.green,
+              icon: Icons.verified_rounded,
+            ),
+            MetricPillData(
+              label: 'Kanal',
+              value: 'iOS / Web',
+              tint: AppColors.purple,
+              icon: Icons.devices_outlined,
+            ),
+          ],
         ),
         const SizedBox(height: 14),
         _StoreWalletSummary(future: _walletFuture, onRefresh: _refreshWallet),
@@ -1390,6 +1345,10 @@ class _StorePackageTileState extends State<_StorePackageTile> {
 
   @override
   Widget build(BuildContext context) {
+    final unitPriceText = widget.package.hasPrice && widget.package.coin > 0
+        ? '${((widget.package.priceCents! / 100) / widget.package.coin).toStringAsFixed(2)} ${widget.package.currency.isEmpty ? 'TL' : widget.package.currency}/MC'
+        : null;
+    final recommended = widget.package.coin >= 500;
     return GlassPanel(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       child: LayoutBuilder(
@@ -1412,6 +1371,14 @@ class _StorePackageTileState extends State<_StorePackageTile> {
           final details = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (recommended) ...[
+                const StatusBadge(
+                  label: 'Önerilen',
+                  status: PremiumStatus.recommended,
+                  compact: true,
+                ),
+                const SizedBox(height: 8),
+              ],
               Text(
                 widget.package.title,
                 maxLines: 2,
@@ -1433,6 +1400,20 @@ class _StorePackageTileState extends State<_StorePackageTile> {
                   fontSize: 13,
                   height: 1.3,
                 ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (widget.package.coin > 0)
+                    _InfoChip(
+                      icon: Icons.toll_rounded,
+                      label: '${widget.package.coin} MC',
+                    ),
+                  if (unitPriceText != null)
+                    _InfoChip(icon: Icons.sell_outlined, label: unitPriceText),
+                ],
               ),
             ],
           );
@@ -1673,76 +1654,34 @@ class _StoreWalletSummary extends StatelessWidget {
       builder: (context, snapshot) {
         final loading = snapshot.connectionState == ConnectionState.waiting;
         final balance = snapshot.data ?? const _MedasiWalletBalance(0);
-        return GlassPanel(
-          padding: const EdgeInsets.all(18),
-          borderColor: AppColors.blue.withValues(alpha: .16),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.selectedBlue,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.account_balance_wallet_rounded,
-                  color: AppColors.blue,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Mevcut Bakiye',
-                      style: TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      loading
-                          ? 'Bakiye yükleniyor'
-                          : snapshot.hasError
-                          ? 'Bakiye alınamadı'
-                          : balance.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: snapshot.hasError
-                            ? AppColors.red
-                            : AppColors.navy,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    if (!loading && !snapshot.hasError) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        balance.rightsLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              IconButton(
+        return Stack(
+          children: [
+            WalletMiniCard(
+              title: 'Mevcut bakiye',
+              balanceLabel: loading
+                  ? 'Yükleniyor'
+                  : snapshot.hasError
+                  ? 'Alınamadı'
+                  : balance.label,
+              rightsLabel: loading
+                  ? 'Cüzdan bilgisi hazırlanıyor.'
+                  : snapshot.hasError
+                  ? 'Bakiye şu anda doğrulanamadı.'
+                  : balance.rightsLabel,
+              actionLabel: 'Yenile',
+              onOpenStore: onRefresh,
+              loadFailed: snapshot.hasError,
+            ),
+            Positioned(
+              right: 8,
+              top: 8,
+              child: IconButton(
                 tooltip: 'Bakiyeyi yenile',
                 onPressed: onRefresh,
                 icon: const Icon(Icons.refresh_rounded, color: AppColors.blue),
               ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );

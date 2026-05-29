@@ -25,10 +25,19 @@ class WorkspacePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final maxWidth = ResponsiveLayout.getContentMaxWidth(context);
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFF6FAFE), Color(0xFFFDFEFF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: child,
+        ),
       ),
     );
   }

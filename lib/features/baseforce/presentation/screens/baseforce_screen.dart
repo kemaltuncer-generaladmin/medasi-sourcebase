@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element
+
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -9,6 +11,7 @@ import '../../../../core/widgets/sourcebase_brand.dart';
 import '../../../drive/data/drive_models.dart';
 import '../../../drive/data/sourcebase_drive_api.dart';
 import '../../../drive/presentation/widgets/drive_ui.dart';
+import '../../../drive/presentation/widgets/premium_workspace_components.dart';
 import '../../../drive/presentation/widgets/sourcebase_bottom_nav.dart';
 import '../../../generated_outputs/presentation/widgets/generated_output_readers.dart';
 
@@ -1880,9 +1883,14 @@ class _BaseForceHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final readyFiles = data.recentFiles.where(_isBaseForceReadySource).toList();
+    final latestGenerations = [
+      for (final file in data.recentFiles)
+        for (final gen in file.generated.take(1)) (file, gen),
+    ].take(3).toList();
     return _BaseForcePage(
       title: 'BaseForce',
-      subtitle: 'Kaynaklarından hızlı ve odaklı çalışma çıktıları üret.',
+      subtitle: 'Kaynaklarından sınav odaklı çalışma çıktıları üret.',
       onSearch: onSearch,
       heroTight: true,
       actions: [
@@ -1893,60 +1901,143 @@ class _BaseForceHome extends StatelessWidget {
         ),
       ],
       children: [
+        PremiumHeroCard(
+          eyebrow: 'Üretim merkezi',
+          title: 'BaseForce',
+          description: readyFiles.isEmpty
+              ? 'Önce bir kaynak seç. Hazır PDF ve PPTX dosyalarından üretim yapabilirsin.'
+              : 'Seçtiğin kaynaklardan flashcard, soru, özet ve tablo üretimini tek merkezden yönet.',
+          tint: AppColors.blue,
+          anchorIcon: Icons.auto_awesome_mosaic_rounded,
+          anchorLabel: readyFiles.isEmpty ? 'Kaynak seç' : 'Üretime hazır',
+          metrics: [
+            MetricPillData(
+              label: 'Seçili kaynak',
+              value: readyFiles.isEmpty ? '0' : '${readyFiles.length}',
+              tint: AppColors.green,
+              icon: Icons.check_circle_rounded,
+            ),
+            MetricPillData(
+              label: 'Üretim türü',
+              value: '5',
+              tint: AppColors.purple,
+              icon: Icons.grid_view_rounded,
+            ),
+            MetricPillData(
+              label: 'Kalan MC',
+              value: 'Takip et',
+              tint: AppColors.orange,
+              icon: Icons.toll_rounded,
+            ),
+          ],
+          actions: [
+            SBPrimaryButton(
+              label: 'Kaynak seç',
+              icon: Icons.change_history_rounded,
+              onPressed: onOpenSources,
+              size: SBButtonSize.small,
+              fullWidth: false,
+            ),
+            SBSecondaryButton(
+              label: 'Üretim kuyruğu',
+              icon: Icons.schedule_rounded,
+              onPressed: onOpenQueue,
+              size: SBButtonSize.small,
+              fullWidth: false,
+            ),
+          ],
+        ),
         _SectionHeader(
           title: 'Üretim Merkezleri',
           action: 'Tümünü Gör',
           onTap: onOpenAll,
         ),
         _ResponsiveGrid(
-          minItemWidth: 155,
+          minItemWidth: 250,
           children: [
-            _FactoryCard(
-              kind: GeneratedKind.flashcard,
+            DenseFeatureCard(
+              icon: Icons.style_outlined,
               title: 'Flashcard Factory',
-              subtitle: 'Kaynağından tekrar kartları oluştur.',
-              buttonColor: AppColors.blue,
+              description:
+                  'Kaynağından tekrar kartları hazırlayıp aktif hatırlama düzeni kur.',
+              tags: const ['Kart', 'Tekrar', 'Sınav'],
+              primaryMetric: 'Flashcard seti',
+              secondaryMetric: 'Tahmini 10-30 MC',
+              trailingNote: readyFiles.isEmpty
+                  ? 'Üretim için önce hazır kaynak seç.'
+                  : 'Son kullanılan kaynaklarla hızlıca devam edebilirsin.',
+              tint: AppColors.blue,
+              ctaLabel: 'Başlat',
               onTap: () => onOpenFactory('flashcard'),
             ),
-            _FactoryCard(
-              kind: GeneratedKind.question,
+            DenseFeatureCard(
+              icon: Icons.quiz_outlined,
               title: 'Soru Fabrikası',
-              subtitle: 'Kaynağından çalışma soruları üret.',
-              buttonColor: AppColors.green,
+              description:
+                  'Kaynağındaki kritik noktaları soru formatına dönüştür.',
+              tags: const ['MCQ', 'Açıklama', 'Hazır kaynak'],
+              primaryMetric: 'Sınav sorusu',
+              secondaryMetric: 'Tahmini 12-24 MC',
+              trailingNote:
+                  'Konu sonu tekrar ve deneme öncesi kullanım için uygun.',
+              tint: AppColors.green,
+              ctaLabel: 'Başlat',
               onTap: () => onOpenFactory('question'),
             ),
-            _FactoryCard(
-              kind: GeneratedKind.summary,
+            DenseFeatureCard(
+              icon: Icons.summarize_outlined,
               title: 'Sınav Sabahı Özeti',
-              subtitle: 'Son tekrar için kısa ve yoğun özet çıkar.',
-              buttonColor: AppColors.purple,
+              description:
+                  'Yoğun tekrar için kısa, temiz ve sınav odaklı özetler çıkar.',
+              tags: const ['Özet', 'Kritik nokta', 'Son tekrar'],
+              primaryMetric: 'Kısa özet',
+              secondaryMetric: 'Tahmini 8-18 MC',
+              trailingNote: 'Sınav öncesi hızlı tarama için ideal.',
+              tint: AppColors.purple,
+              ctaLabel: 'Başlat',
               onTap: () => onOpenFactory('summary'),
             ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        _ResponsiveGrid(
-          minItemWidth: 155,
-          children: [
-            _FactoryCard(
-              kind: GeneratedKind.algorithm,
+            DenseFeatureCard(
+              icon: Icons.account_tree_outlined,
               title: 'Akış Şeması / Algoritma',
-              subtitle: 'Süreçleri adım adım görselleştir.',
-              buttonColor: AppColors.orange,
+              description:
+                  'Tanı ve yönetim akışlarını karar adımlarıyla düzenle.',
+              tags: const ['Algoritma', 'Karar', 'Akış'],
+              primaryMetric: 'Adım adım şema',
+              secondaryMetric: 'Tahmini 10-20 MC',
+              trailingNote:
+                  'Ayırıcı tanı ve yönetim basamakları için güçlü bir çıktı.',
+              tint: AppColors.orange,
+              ctaLabel: 'Başlat',
               onTap: () => onOpenFactory('algorithm'),
             ),
-            _FactoryCard(
-              kind: GeneratedKind.comparison,
+            DenseFeatureCard(
+              icon: Icons.table_chart_outlined,
               title: 'Karşılaştırma Tablosu',
-              subtitle: 'Benzer kavramları tablo halinde karşılaştır.',
-              buttonColor: AppColors.cyan,
+              description:
+                  'Benzer konuları tek tabloda ayırt ettiren farklarla sun.',
+              tags: const ['Tablo', 'Ayırt et', 'Karşılaştır'],
+              primaryMetric: 'Karşılaştırma',
+              secondaryMetric: 'Tahmini 10-18 MC',
+              trailingNote:
+                  'Benzer hastalık ve kavramları yan yana görmek için uygun.',
+              tint: AppColors.cyan,
+              ctaLabel: 'Başlat',
               onTap: () => onOpenFactory('comparison'),
             ),
-            _FactoryCard(
-              kind: GeneratedKind.mindMap,
-              title: 'Üretim\nKuyruğu',
-              subtitle: 'Başlattığın işleri tek yerden izler.',
-              buttonColor: AppColors.blue,
+            DenseFeatureCard(
+              icon: Icons.schedule_rounded,
+              title: 'Üretim Kuyruğu',
+              description:
+                  'Hazırlanan çıktıları ve işlem durumlarını tek listeden izle.',
+              tags: const ['Kuyruk', 'Durum', 'Takip'],
+              primaryMetric: 'Aktif işler',
+              secondaryMetric:
+                  '${data.recentFiles.where((file) => file.status == DriveItemStatus.processing).length} izleniyor',
+              trailingNote:
+                  'İşlenmekte olan kaynaklar tamamlandığında üretime devam edebilirsin.',
+              tint: AppColors.blue,
+              ctaLabel: 'Aç',
               onTap: onOpenQueue,
             ),
           ],
@@ -1958,21 +2049,31 @@ class _BaseForceHome extends StatelessWidget {
         ),
         _BasePanel(
           padding: EdgeInsets.zero,
-          child: data.recentFiles.isEmpty
-              ? const _EmptyBaseForceState(
+          child: readyFiles.isEmpty
+              ? PremiumEmptyState(
                   icon: Icons.drive_folder_upload_outlined,
-                  title: 'Drive kaynağı yok',
+                  title: 'Henüz üretime hazır kaynak yok',
                   message:
                       'BaseForce çıktısı üretmek için önce Drive’a metin içeren PDF veya PPTX yükle.',
+                  badges: const ['PDF', 'PPTX', 'Hazır kaynak'],
+                  actionLabel: 'Kaynak seç',
+                  onAction: onOpenSources,
                 )
-              : Column(
-                  children: [
-                    for (final file in data.recentFiles.take(3))
-                      _RecentSourceRow(
-                        source: _bfSourceFromFile(file),
-                        onTap: onOpenSources,
-                      ),
-                  ],
+              : Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      for (final file in readyFiles.take(3)) ...[
+                        SourcePreviewCard(
+                          file: file,
+                          ctaLabel: 'Kaynaktan üret',
+                          onTap: onOpenSources,
+                        ),
+                        if (file != readyFiles.take(3).last)
+                          const SizedBox(height: 12),
+                      ],
+                    ],
+                  ),
                 ),
         ),
         _SectionHeader(
@@ -1980,30 +2081,44 @@ class _BaseForceHome extends StatelessWidget {
           action: 'Tümünü Gör',
           onTap: onOpenAll,
         ),
-        if (data.recentFiles.every((file) => file.generated.isEmpty))
-          const _BasePanel(
-            child: _EmptyBaseForceState(
+        if (latestGenerations.isEmpty)
+          _BasePanel(
+            child: PremiumEmptyState(
               icon: Icons.auto_awesome_rounded,
               title: 'Henüz üretim yok',
               message:
-                  'Bir kaynak seçip üretim fabrikalarından birini başlatın.',
+                  'Bir kaynak seçip üretim modlarından birini başlattığında sonuçların burada görünür.',
+              badges: const ['Flashcard', 'Soru', 'Özet'],
+              actionLabel: 'Üretime başla',
+              onAction: onOpenSources,
             ),
           )
         else
           _ResponsiveGrid(
-            minItemWidth: 220,
+            minItemWidth: 260,
             children: [
-              for (final file in data.recentFiles)
-                for (final gen in file.generated)
-                  _RecentGenerationCard(
-                    kind: gen.kind,
-                    title: gen.title,
-                    value: gen.detail,
-                    label: _baseForceKindLabel(gen.kind),
-                    source: file.title,
-                    time: gen.updatedLabel,
-                    onTap: onOpenResult,
-                  ),
+              for (final entry in latestGenerations)
+                ResultPreviewCard(
+                  icon: generatedIcon(entry.$2.kind),
+                  title: _baseForceKindLabel(entry.$2.kind),
+                  source: entry.$1.title,
+                  createdAt: entry.$2.updatedLabel,
+                  preview: entry.$2.detail,
+                  statusLabel: 'Hazır',
+                  primaryActionLabel: 'Detayı aç',
+                  onPrimaryAction: onOpenResult,
+                  secondaryActionLabel: 'Tekrar üret',
+                  onSecondaryAction: () =>
+                      onOpenFactory(switch (entry.$2.kind) {
+                        GeneratedKind.question => 'question',
+                        GeneratedKind.summary => 'summary',
+                        GeneratedKind.algorithm => 'algorithm',
+                        GeneratedKind.comparison ||
+                        GeneratedKind.table => 'comparison',
+                        _ => 'flashcard',
+                      }),
+                  tint: generatedColor(entry.$2.kind),
+                ),
             ],
           ),
       ],

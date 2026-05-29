@@ -1,8 +1,12 @@
+// ignore_for_file: unused_element
+
 import 'package:flutter/material.dart';
 
+import '../../../../core/design_system/components/sourcebase_card.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/drive_models.dart';
 import '../widgets/drive_ui.dart';
+import '../widgets/premium_workspace_components.dart';
 
 class DriveHomeScreen extends StatelessWidget {
   const DriveHomeScreen({
@@ -35,40 +39,74 @@ class DriveHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasCourses = data.courses.isNotEmpty;
-    final mobile = MediaQuery.sizeOf(context).width < 430;
     final files = [
       for (final course in data.courses)
         for (final section in course.sections) ...section.files,
     ];
+    final readyCount = files.where(driveFileUsableForGeneration).length;
+    final processingCount = files
+        .where(
+          (file) =>
+              file.status == DriveItemStatus.processing ||
+              file.status == DriveItemStatus.uploading,
+        )
+        .length;
+    final latestFiles = data.recentFiles.take(4).toList();
+    final latestOutputs = [
+      for (final bundle in data.collections.take(3))
+        if (bundle.outputs.isNotEmpty) (bundle, bundle.outputs.first),
+    ];
 
-    return WorkspaceScroll(
+    return PremiumPageScaffold(
       onRefresh: onRefresh,
       children: [
         DriveTopBar(title: 'Drive', onSearch: onSearch),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxWidth < 760;
-            final upload = _HeroPanel(onUpload: onOpenUploads);
-            final stats = _DriveStatusSummary(
-              files: files,
-              onUpload: onOpenUploads,
-            );
-            if (compact) {
-              return Column(
-                children: [upload, const SizedBox(height: 12), stats],
-              );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 6, child: upload),
-                const SizedBox(width: 14),
-                Expanded(flex: 4, child: stats),
-              ],
-            );
-          },
+        PremiumHeroCard(
+          eyebrow: 'Drive',
+          title: 'Kaynak Kütüphanen',
+          description:
+              'PDF, PPTX ve DOCX kaynaklarını düzenle; bu kaynaklardan çalışma çıktıları üret.',
+          tint: AppColors.blue,
+          anchorIcon: Icons.library_books_rounded,
+          anchorLabel: 'PDF • PPTX • DOCX',
+          metrics: [
+            MetricPillData(
+              label: 'Hazır kaynak',
+              value: '$readyCount',
+              tint: AppColors.green,
+              icon: Icons.check_circle_rounded,
+            ),
+            MetricPillData(
+              label: 'İşleniyor',
+              value: '$processingCount',
+              tint: AppColors.blue,
+              icon: Icons.hourglass_top_rounded,
+            ),
+            MetricPillData(
+              label: 'Koleksiyon',
+              value: '${data.collections.length}',
+              tint: AppColors.purple,
+              icon: Icons.collections_bookmark_rounded,
+            ),
+          ],
+          actions: [
+            SBPrimaryButton(
+              label: 'Kaynak yükle',
+              icon: Icons.cloud_upload_outlined,
+              onPressed: onOpenUploads,
+              size: SBButtonSize.small,
+              fullWidth: false,
+            ),
+            SBSecondaryButton(
+              label: 'Ders oluştur',
+              icon: Icons.note_add_rounded,
+              onPressed: onCreateCourse,
+              size: SBButtonSize.small,
+              fullWidth: false,
+            ),
+          ],
         ),
-        SizedBox(height: mobile ? 12 : 16),
+        const SectionTitle(title: 'Hızlı erişim'),
         LayoutBuilder(
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 430;
@@ -95,6 +133,12 @@ class DriveHomeScreen extends StatelessWidget {
                 onTap: onOpenCollections,
                 color: AppColors.purple,
               ),
+              _QuickAction(
+                icon: Icons.search_rounded,
+                label: 'Arama',
+                onTap: onSearch,
+                color: AppColors.cyan,
+              ),
             ];
             if (!compact) {
               return Row(
@@ -118,44 +162,249 @@ class DriveHomeScreen extends StatelessWidget {
           },
         ),
         SectionTitle(
-          title: 'Derslerim',
-          actionLabel: hasCourses ? null : 'Ders Ekle',
-          onAction: hasCourses ? null : onCreateCourse,
+          title: 'Hazır kaynaklar',
+          actionLabel: latestFiles.isEmpty ? null : 'Tümünü Gör',
+          onAction: latestFiles.isEmpty ? null : onOpenUploadsPage,
         ),
-        GlassPanel(
-          padding: EdgeInsets.zero,
-          child: hasCourses
-              ? Column(
-                  children: [
-                    for (final course in data.courses)
-                      _CourseRow(
-                        course: course,
-                        onTap: () => onOpenCourse(course),
-                        onRename: () => onRenameCourse(course),
-                        onDelete: () => onDeleteCourse(course),
-                      ),
-                  ],
-                )
-              : _CourseEmptyPanel(onCreateCourse: onCreateCourse),
-        ),
+        if (latestFiles.isEmpty)
+          PremiumEmptyState(
+            icon: Icons.folder_open_outlined,
+            title: 'Henüz kaynak görünmüyor',
+            message:
+                'İlk dersini oluşturup PDF, PPTX veya DOCX dosyanı eklediğinde kaynakların burada düzenli biçimde görünür.',
+            badges: const ['PDF', 'PPTX', 'DOCX'],
+            actionLabel: 'Kaynak yükle',
+            onAction: onOpenUploads,
+            secondaryLabel: hasCourses ? 'Koleksiyonlar' : 'Ders oluştur',
+            onSecondaryAction: hasCourses ? onOpenCollections : onCreateCourse,
+          )
+        else
+          Column(
+            children: [
+              for (final file in latestFiles) ...[
+                SourcePreviewCard(
+                  file: file,
+                  ctaLabel: 'Bu dosyayla çalış',
+                  onTap: () => onOpenFile(file),
+                ),
+                if (file != latestFiles.last) const SizedBox(height: 12),
+              ],
+            ],
+          ),
         SectionTitle(
-          title: 'Son Yüklemeler',
-          actionLabel: 'Tümünü Gör',
-          onAction: onOpenUploadsPage,
+          title: 'Derslerim',
+          actionLabel: hasCourses ? 'Tümünü Gör' : 'Ders ekle',
+          onAction: hasCourses
+              ? () => onOpenCourse(data.courses.first)
+              : onCreateCourse,
         ),
-        _HomeStorageOverview(
-          recentFiles: data.recentFiles,
-          collections: data.collections,
-          onOpenFile: onOpenFile,
-          onOpenUploads: onOpenUploads,
-          onOpenCollections: onOpenCollections,
+        if (hasCourses)
+          SourceBaseCard(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _OverviewMetric(
+                        label: 'Ders',
+                        value: '${data.courses.length}',
+                        icon: Icons.menu_book_rounded,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _OverviewMetric(
+                        label: 'Bölüm',
+                        value:
+                            '${data.courses.fold<int>(0, (sum, course) => sum + course.sections.length)}',
+                        icon: Icons.account_tree_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _OverviewMetric(
+                        label: 'Dosya',
+                        value: '${files.length}',
+                        icon: Icons.description_outlined,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                for (final course in data.courses.take(3)) ...[
+                  _CourseRow(
+                    course: course,
+                    onTap: () => onOpenCourse(course),
+                    onRename: () => onRenameCourse(course),
+                    onDelete: () => onDeleteCourse(course),
+                  ),
+                  if (course != data.courses.take(3).last)
+                    const Divider(height: 1, color: AppColors.softLine),
+                ],
+              ],
+            ),
+          )
+        else
+          PremiumEmptyState(
+            icon: Icons.note_add_outlined,
+            title: 'Önce bir ders alanı oluştur',
+            message:
+                'Kaynaklarını konuya göre düzenlemek için ders ve bölüm yapısını başlat. Böylece üretim akışı daha düzenli ilerler.',
+            badges: const ['Ders', 'Bölüm', 'Kaynak'],
+            actionLabel: 'Ders oluştur',
+            onAction: onCreateCourse,
+          ),
+        SectionTitle(
+          title: 'Son koleksiyonlar',
+          actionLabel: data.collections.isEmpty ? null : 'Koleksiyonlar',
+          onAction: data.collections.isEmpty ? null : onOpenCollections,
         ),
-        SizedBox(height: mobile ? 12 : 22),
+        if (latestOutputs.isEmpty)
+          PremiumEmptyState(
+            icon: Icons.collections_bookmark_outlined,
+            title: 'Koleksiyonların burada birikir',
+            message:
+                'Kaynaklarından üretilen kart, soru ve özetler tamamlandığında bu alandan hızlıca tekrar açabilirsin.',
+            badges: const ['Flashcard', 'Soru', 'Özet'],
+            actionLabel: 'Koleksiyonlar',
+            onAction: onOpenCollections,
+          )
+        else
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 760;
+              if (compact) {
+                return Column(
+                  children: [
+                    for (final entry in latestOutputs) ...[
+                      ResultPreviewCard(
+                        icon: _collectionIcon(entry.$2.kind),
+                        title: entry.$2.title,
+                        source: entry.$1.file.title,
+                        createdAt: entry.$2.updatedLabel,
+                        preview: entry.$2.detail,
+                        statusLabel: 'Hazır',
+                        primaryActionLabel: 'Koleksiyonu aç',
+                        onPrimaryAction: onOpenCollections,
+                        secondaryActionLabel: 'Tekrar üret',
+                        onSecondaryAction: () => onOpenFile(entry.$1.file),
+                        tint: _collectionColor(entry.$2.kind),
+                      ),
+                      if (entry != latestOutputs.last)
+                        const SizedBox(height: 12),
+                    ],
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < latestOutputs.length; i++) ...[
+                    Expanded(
+                      child: ResultPreviewCard(
+                        icon: _collectionIcon(latestOutputs[i].$2.kind),
+                        title: latestOutputs[i].$2.title,
+                        source: latestOutputs[i].$1.file.title,
+                        createdAt: latestOutputs[i].$2.updatedLabel,
+                        preview: latestOutputs[i].$2.detail,
+                        statusLabel: 'Hazır',
+                        primaryActionLabel: 'Koleksiyonu aç',
+                        onPrimaryAction: onOpenCollections,
+                        secondaryActionLabel: 'Tekrar üret',
+                        onSecondaryAction: () =>
+                            onOpenFile(latestOutputs[i].$1.file),
+                        tint: _collectionColor(latestOutputs[i].$2.kind),
+                      ),
+                    ),
+                    if (i != latestOutputs.length - 1)
+                      const SizedBox(width: 12),
+                  ],
+                ],
+              );
+            },
+          ),
+        const SizedBox(height: 12),
         const TrustStrip(),
         const WorkspaceBottomNavGuard(),
       ],
     );
   }
+}
+
+class _OverviewMetric extends StatelessWidget {
+  const _OverviewMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.page,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.softLine),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: AppColors.blue, size: 18),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+IconData _collectionIcon(GeneratedKind kind) {
+  return switch (kind) {
+    GeneratedKind.flashcard => Icons.style_outlined,
+    GeneratedKind.question => Icons.quiz_outlined,
+    GeneratedKind.summary => Icons.summarize_outlined,
+    GeneratedKind.algorithm => Icons.account_tree_outlined,
+    GeneratedKind.comparison ||
+    GeneratedKind.table => Icons.table_chart_outlined,
+    GeneratedKind.podcast => Icons.podcasts_outlined,
+    GeneratedKind.infographic => Icons.insert_chart_outlined_rounded,
+    GeneratedKind.mindMap => Icons.hub_outlined,
+  };
+}
+
+Color _collectionColor(GeneratedKind kind) {
+  return switch (kind) {
+    GeneratedKind.flashcard => AppColors.blue,
+    GeneratedKind.question => AppColors.green,
+    GeneratedKind.summary => AppColors.purple,
+    GeneratedKind.algorithm => AppColors.orange,
+    GeneratedKind.comparison || GeneratedKind.table => AppColors.cyan,
+    GeneratedKind.podcast => const Color(0xFF8C5BFF),
+    GeneratedKind.infographic => AppColors.cyan,
+    GeneratedKind.mindMap => AppColors.blue,
+  };
 }
 
 class _HeroPanel extends StatelessWidget {
