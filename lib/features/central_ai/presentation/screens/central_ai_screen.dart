@@ -396,7 +396,30 @@ class _ContextPanel extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             if (loading)
-              const LinearProgressIndicator(minHeight: 3)
+              Row(
+                children: [
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.blue,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Drive kaynakların yükleniyor',
+                      style: TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                  ),
+                ],
+              )
             else if (error != null)
               _ContextNotice(
                 icon: Icons.error_outline_rounded,
