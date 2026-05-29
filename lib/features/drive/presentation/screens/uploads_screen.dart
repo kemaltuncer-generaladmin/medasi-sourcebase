@@ -1,5 +1,3 @@
-// ignore_for_file: unused_element, unused_element_parameter
-
 import 'package:flutter/material.dart';
 
 import '../../../../core/design_system/components/sourcebase_card.dart';
@@ -273,64 +271,6 @@ class _UploadGuidancePanel extends StatelessWidget {
   }
 }
 
-class _UploadHeroPainter extends CustomPainter {
-  const _UploadHeroPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final blue = Paint()
-      ..shader = AppColors.primaryGradient.createShader(Offset.zero & size);
-    final pale = Paint()..color = const Color(0xFFE3F0FF);
-    final white = Paint()..color = Colors.white;
-    final shadow = Paint()
-      ..color = AppColors.blue.withValues(alpha: .16)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(18, 26, 86, 64).shift(const Offset(0, 8)),
-        const Radius.circular(13),
-      ),
-      shadow,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(18, 26, 86, 64),
-        const Radius.circular(13),
-      ),
-      pale,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(26, 44, 70, 44),
-        const Radius.circular(10),
-      ),
-      blue,
-    );
-    canvas.drawCircle(Offset(size.width - 42, 74), 34, white);
-    canvas.drawCircle(
-      Offset(size.width - 42, 74),
-      34,
-      Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: .88),
-    );
-    final arrow = Paint()
-      ..color = AppColors.blue.withValues(alpha: .62)
-      ..strokeWidth = 5
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke;
-    final path = Path()
-      ..moveTo(size.width - 42, 88)
-      ..lineTo(size.width - 42, 58)
-      ..moveTo(size.width - 58, 72)
-      ..lineTo(size.width - 42, 56)
-      ..lineTo(size.width - 26, 72);
-    canvas.drawPath(path, arrow);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
 class _UploadFilter extends StatelessWidget {
   const _UploadFilter({
     required this.label,
@@ -526,23 +466,20 @@ class _UploadState extends StatelessWidget {
           ],
         );
       case DriveItemStatus.processing:
-        return ProcessingCard(
+        return _UploadProgressCard(
+          icon: Icons.sync_rounded,
           title: 'Kaynak işleniyor',
           message: 'Metin çıkarılıyor ve üretime hazırlanıyor.',
-          tags: [
-            file.sizeLabel,
-            file.pageLabel,
-            'İlerleme ${(upload.progress * 100).round()}%',
-          ],
+          progress: upload.progress,
+          tags: [file.sizeLabel, file.pageLabel],
         );
       case DriveItemStatus.uploading:
-        return ProcessingCard(
+        return _UploadProgressCard(
+          icon: Icons.cloud_upload_rounded,
           title: 'Dosya yükleniyor',
           message: 'Bu işlem dosya boyutuna göre kısa sürebilir.',
-          tags: [
-            file.sizeLabel,
-            'İlerleme ${(upload.progress * 100).round()}%',
-          ],
+          progress: upload.progress,
+          tags: [file.sizeLabel],
         );
       case DriveItemStatus.draft:
         return const StatusBadge(
@@ -590,73 +527,126 @@ class _UploadMetaPill extends StatelessWidget {
   }
 }
 
-class _ProgressStatus extends StatelessWidget {
-  const _ProgressStatus({
+class _UploadProgressCard extends StatelessWidget {
+  const _UploadProgressCard({
     required this.icon,
     required this.title,
-    required this.subtitle,
+    required this.message,
     required this.progress,
-    required this.color,
-    this.bigPercent = false,
+    this.tags = const [],
   });
 
   final IconData icon;
   final String title;
-  final String subtitle;
+  final String message;
   final double progress;
-  final Color color;
-  final bool bigPercent;
+  final List<String> tags;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                color: color,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
+    final clamped = progress.clamp(0.0, 1.0);
+    final hasProgress = progress > 0 && progress < 1.0;
+    final percent = (clamped * 100).round();
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+      decoration: BoxDecoration(
+        color: AppColors.selectedBlue,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.blue.withValues(alpha: .14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(11),
+                  border: Border.all(
+                    color: AppColors.blue.withValues(alpha: .18),
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Icon(icon, color: AppColors.blue, size: 18),
               ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              if (hasProgress)
+                Text(
+                  '%$percent',
+                  style: const TextStyle(
+                    color: AppColors.blue,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: hasProgress ? clamped : null,
+              minHeight: 6,
+              backgroundColor: AppColors.white,
+              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.blue),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            message,
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 13,
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (tags.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final tag in tags)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: AppColors.line),
+                    ),
+                    child: Text(
+                      tag,
+                      style: const TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
-        ),
-        const SizedBox(height: 5),
-        if (bigPercent)
-          Text(
-            '%${(progress * 100).round()}',
-            style: TextStyle(
-              color: color,
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-            ),
-          )
-        else
-          Text(
-            subtitle,
-            style: const TextStyle(color: AppColors.muted, fontSize: 15),
-          ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: LinearProgressIndicator(
-            value: progress,
-            minHeight: 8,
-            backgroundColor: AppColors.line,
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          bigPercent ? subtitle : '%${(progress * 100).round()} tamamlandı',
-          style: const TextStyle(color: AppColors.muted, fontSize: 14),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
