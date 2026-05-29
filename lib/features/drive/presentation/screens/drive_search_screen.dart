@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design_system/components/sourcebase_card.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/drive_models.dart';
 import '../widgets/drive_ui.dart';
+import '../widgets/premium_workspace_components.dart';
 
 enum _SearchSort { newest, name, course }
 
@@ -105,7 +107,17 @@ class _DriveSearchScreenState extends State<DriveSearchScreen> {
   Widget build(BuildContext context) {
     final showResults = _hasFilters;
     final results = showResults ? _results : const <DriveFile>[];
-    return WorkspaceScroll(
+    final readyCount = widget.files
+        .where((file) => file.status == DriveItemStatus.completed)
+        .length;
+    final processingCount = widget.files
+        .where(
+          (file) =>
+              file.status == DriveItemStatus.processing ||
+              file.status == DriveItemStatus.uploading,
+        )
+        .length;
+    return PremiumPageScaffold(
       children: [
         DriveTopBar(
           title: 'Dosya Arama',
@@ -113,6 +125,53 @@ class _DriveSearchScreenState extends State<DriveSearchScreen> {
           onBack: widget.onBack,
           showSearch: false,
         ),
+        PremiumHeroCard(
+          eyebrow: 'Arama',
+          title: 'Kaynaklarında ara',
+          description:
+              'Ders, bölüm, dosya türü veya hazır durumuna göre kaynaklarını hızlıca daralt.',
+          anchorIcon: Icons.search_rounded,
+          anchorLabel: '${widget.files.length} kaynak',
+          metrics: [
+            MetricPillData(
+              label: 'Hazır kaynak',
+              value: '$readyCount',
+              tint: AppColors.green,
+              icon: Icons.check_circle_outline_rounded,
+            ),
+            MetricPillData(
+              label: 'İşleniyor',
+              value: '$processingCount',
+              tint: AppColors.orange,
+              icon: Icons.sync_rounded,
+            ),
+            MetricPillData(
+              label: 'Sonuç',
+              value: showResults ? '${results.length}' : 'Bekleniyor',
+              tint: AppColors.blue,
+              icon: Icons.filter_alt_outlined,
+            ),
+          ],
+          actions: [
+            _SuggestedQueryChip(
+              label: 'Anatomi PDF’leri',
+              onTap: () => _applySuggestedQuery('Anatomi PDF’leri'),
+            ),
+            _SuggestedQueryChip(
+              label: 'Hazır kaynaklar',
+              onTap: () => _applySuggestedQuery('Hazır kaynaklar'),
+            ),
+            _SuggestedQueryChip(
+              label: 'Flashcard çıktıları',
+              onTap: () => _applySuggestedQuery('Flashcard çıktıları'),
+            ),
+            _SuggestedQueryChip(
+              label: 'PPTX sunumlar',
+              onTap: () => _applySuggestedQuery('PPTX sunumlar'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
         _SearchInput(
           controller: _queryController,
           onChanged: (value) => setState(() => _query = value),
@@ -245,22 +304,20 @@ class _DriveSearchScreenState extends State<DriveSearchScreen> {
         ),
         const SizedBox(height: 18),
         if (!showResults)
-          const GlassPanel(
-            padding: EdgeInsets.all(22),
-            child: EmptyState(
-              icon: Icons.search_rounded,
-              message: 'Drive içinde arama yapın.',
-              subMessage:
-                  'Dosya, ders veya bölüm adı yazarak sonuçları listeleyin.',
-            ),
+          const PremiumEmptyState(
+            icon: Icons.search_rounded,
+            title: 'Önerilen bir aramayla başla',
+            message: 'Dosya, ders veya bölüm adı yazarak sonuçları listeleyin.',
+            badges: ['Hazır kaynaklar', 'PPTX sunumlar', 'Flashcard çıktıları'],
           )
         else if (results.isEmpty)
-          const GlassPanel(
-            padding: EdgeInsets.all(22),
-            child: EmptyState(
-              message: 'Sonuç bulunamadı.',
-              subMessage: 'Arama metnini veya filtreleri değiştirin.',
-            ),
+          PremiumEmptyState(
+            icon: Icons.search_off_rounded,
+            title: 'Bu aramayla eşleşen kaynak bulunamadı',
+            message: 'Arama metnini veya filtreleri değiştirin.',
+            badges: const ['Filtreleri temizle', 'Hazır kaynakları göster'],
+            actionLabel: 'Filtreleri temizle',
+            onAction: _clearFilters,
           )
         else
           for (final file in results) ...[
@@ -270,6 +327,11 @@ class _DriveSearchScreenState extends State<DriveSearchScreen> {
         _ClearFiltersPanel(onClear: _clearFilters, enabled: _hasFilters),
       ],
     );
+  }
+
+  void _applySuggestedQuery(String value) {
+    _queryController.text = value;
+    setState(() => _query = value);
   }
 
   Future<void> _pickKind(BuildContext context) async {
@@ -356,6 +418,24 @@ class _SearchInput extends StatelessWidget {
           borderSide: const BorderSide(color: AppColors.blue, width: 2),
         ),
       ),
+    );
+  }
+}
+
+class _SuggestedQueryChip extends StatelessWidget {
+  const _SuggestedQueryChip({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SBSecondaryButton(
+      label: label,
+      icon: Icons.north_west_rounded,
+      onPressed: onTap,
+      size: SBButtonSize.small,
+      fullWidth: false,
     );
   }
 }
@@ -655,75 +735,16 @@ class _SearchResult extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final highlighted = file.featured;
-    return InkWell(
+    return SourcePreviewCard(
+      file: file,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: GlassPanel(
-        padding: const EdgeInsets.all(14),
-        borderColor: highlighted ? AppColors.blue : null,
-        child: Row(
-          children: [
-            FileKindBadge(kind: file.kind, plain: true, large: true),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    file.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.navy,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  if (highlighted) ...[
-                    const SizedBox(height: 6),
-                    const _RecentBadge(),
-                  ],
-                  const SizedBox(height: 6),
-                  Text(
-                    '${file.courseTitle}  >  ${file.sectionTitle}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${file.sizeLabel}  •  ${file.pageLabel}  •  ${file.updatedLabel}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 14,
-                    ),
-                  ),
-                  if (file.statusMessage != null &&
-                      file.status != DriveItemStatus.completed) ...[
-                    const SizedBox(height: 5),
-                    Text(
-                      file.statusMessage!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            StatusPill(status: file.status, compact: true),
-          ],
-        ),
-      ),
+      ctaLabel: 'Kaynağı aç',
+      trailing: file.featured
+          ? const Padding(
+              padding: EdgeInsets.only(left: 8),
+              child: _RecentBadge(),
+            )
+          : null,
     );
   }
 }
@@ -769,40 +790,60 @@ class _ChoiceSheet<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      color: AppColors.navy,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: SourceBaseCard(
+          radius: 22,
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: AppColors.navy,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Arama sonucunu daraltmak için bir seçenek seç.',
+                          style: TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(value),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              for (final option in options)
+                ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  onTap: () => Navigator.of(context).pop(option.value),
+                  title: Text(option.label),
+                  trailing: option.value == value
+                      ? const Icon(Icons.check_rounded, color: AppColors.blue)
+                      : null,
                 ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(value),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ],
-            ),
+            ],
           ),
-          for (final option in options)
-            ListTile(
-              onTap: () => Navigator.of(context).pop(option.value),
-              title: Text(option.label),
-              trailing: option.value == value
-                  ? const Icon(Icons.check_rounded, color: AppColors.blue)
-                  : null,
-            ),
-          const SizedBox(height: 10),
-        ],
+        ),
       ),
     );
   }

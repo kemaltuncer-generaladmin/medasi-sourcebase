@@ -1116,7 +1116,46 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text(title),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(22),
+              ),
+              titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
+              contentPadding: const EdgeInsets.fromLTRB(24, 18, 24, 8),
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              title: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppColors.selectedBlue,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.drive_file_rename_outline_rounded,
+                      color: AppColors.blue,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$label bilgisini güncelle.',
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
               content: SingleChildScrollView(
                 child: TextField(
                   controller: controller,
@@ -1134,13 +1173,15 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
                 ),
               ),
               actions: [
-                TextButton(
+                TextButton.icon(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Vazgeç'),
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  label: const Text('Vazgeç'),
                 ),
-                ElevatedButton(
+                FilledButton.icon(
                   onPressed: () => submit(setDialogState),
-                  child: const Text('Kaydet'),
+                  icon: const Icon(Icons.check_rounded, size: 18),
+                  label: const Text('Kaydet'),
                 ),
               ],
             );
@@ -1160,17 +1201,55 @@ class _DriveWorkspaceScreenState extends State<DriveWorkspaceScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
+        contentPadding: const EdgeInsets.fromLTRB(24, 18, 24, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        title: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.red.withValues(alpha: .10),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.warning_amber_rounded,
+                color: AppColors.red,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text(title)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message),
+            const SizedBox(height: 10),
+            const Text(
+              'Bu işlem geri alınamayabilir.',
+              style: TextStyle(
+                color: AppColors.red,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
         actions: [
-          TextButton(
+          TextButton.icon(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Vazgeç'),
+            icon: const Icon(Icons.close_rounded, size: 18),
+            label: const Text('Vazgeç'),
           ),
-          FilledButton(
+          FilledButton.icon(
             style: FilledButton.styleFrom(backgroundColor: AppColors.red),
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text(actionLabel),
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            label: Text(actionLabel),
           ),
         ],
       ),

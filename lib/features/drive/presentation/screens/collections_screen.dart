@@ -1,8 +1,12 @@
+// ignore_for_file: unused_element
+
 import 'package:flutter/material.dart';
 
+import '../../../../core/design_system/components/sourcebase_card.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/drive_models.dart';
 import '../widgets/drive_ui.dart';
+import '../widgets/premium_workspace_components.dart';
 
 enum _CollectionSort { newest, name, outputCount }
 
@@ -69,7 +73,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   @override
   Widget build(BuildContext context) {
     final visibleCollections = _visibleCollections;
-    return WorkspaceScroll(
+    return PremiumPageScaffold(
       children: [
         DriveTopBar(title: 'Koleksiyonlar', onSearch: widget.onSearch),
         Row(
@@ -109,39 +113,33 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           ],
         ),
         const SizedBox(height: 16),
-        GlassPanel(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-          child: Row(
-            children: [
-              _Metric(
-                icon: Icons.style_rounded,
-                color: AppColors.blue,
-                value: _count(GeneratedKind.flashcard).toString(),
-                label: 'Flashcard',
-              ),
-              const _MetricDivider(),
-              _Metric(
-                icon: Icons.help_rounded,
-                color: const Color(0xFF0BB0D4),
-                value: _count(GeneratedKind.question).toString(),
-                label: 'Soru',
-              ),
-              const _MetricDivider(),
-              _Metric(
-                icon: Icons.description_rounded,
-                color: AppColors.purple,
-                value: _count(GeneratedKind.summary).toString(),
-                label: 'Özet',
-              ),
-              const _MetricDivider(),
-              _Metric(
-                icon: Icons.account_tree_rounded,
-                color: AppColors.green,
-                value: _count(GeneratedKind.algorithm).toString(),
-                label: 'Algoritma',
-              ),
-            ],
-          ),
+        PremiumHeroCard(
+          eyebrow: 'Koleksiyonlar',
+          title: 'Çalışma Koleksiyonların',
+          description:
+              'Kaynaklarından üretilen kart, soru, özet ve tablolar burada düzenli biçimde toplanır.',
+          anchorIcon: Icons.collections_bookmark_rounded,
+          anchorLabel: '${widget.data.collections.length} kaynak',
+          metrics: [
+            MetricPillData(
+              label: 'Flashcard',
+              value: _count(GeneratedKind.flashcard).toString(),
+              tint: AppColors.blue,
+              icon: Icons.style_rounded,
+            ),
+            MetricPillData(
+              label: 'Soru',
+              value: _count(GeneratedKind.question).toString(),
+              tint: const Color(0xFF0BB0D4),
+              icon: Icons.help_rounded,
+            ),
+            MetricPillData(
+              label: 'Özet',
+              value: _count(GeneratedKind.summary).toString(),
+              tint: AppColors.purple,
+              icon: Icons.description_rounded,
+            ),
+          ],
         ),
         const SizedBox(height: 18),
         SingleChildScrollView(
@@ -236,18 +234,20 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           ],
         ),
         if (widget.data.collections.isEmpty)
-          const GlassPanel(
-            child: EmptyState(
-              message: 'Henüz bir koleksiyonunuz yok.',
-              subMessage: 'Dosyalarınızdan AI çıktıları üreterek başlayın.',
-            ),
+          const PremiumEmptyState(
+            icon: Icons.collections_bookmark_outlined,
+            title: 'Henüz koleksiyon yok',
+            message:
+                'Kaynağından kart, soru, özet veya tablo ürettiğinde burada görünür.',
+            badges: ['Flashcard', 'Soru', 'Özet'],
           )
         else if (visibleCollections.isEmpty)
-          const GlassPanel(
-            child: EmptyState(
-              message: 'Bu filtrede koleksiyon yok.',
-              subMessage: 'Başka bir çıktı türü seçin veya yeni çıktı üretin.',
-            ),
+          const PremiumEmptyState(
+            icon: Icons.filter_alt_off_outlined,
+            title: 'Bu filtrede koleksiyon yok',
+            message:
+                'Başka bir çıktı türü seçin veya yeni bir üretim başlatın.',
+            badges: ['Filtreleri değiştir', 'Yeni üretim'],
           )
         else
           for (final bundle in visibleCollections) ...[
@@ -462,79 +462,7 @@ class _CollectionCard extends StatelessWidget {
     final previewKind = outputs.isEmpty
         ? bundle.previewKind
         : outputs.first.kind;
-    final details = Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        FileKindBadge(kind: file.kind, large: true, plain: true),
-        const SizedBox(width: 18),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                file.title,
-                style: const TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 21,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 11),
-              Wrap(
-                spacing: 10,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  for (final output in outputs) _OutputLabel(output: output),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _MetaLine(icon: Icons.school_outlined, text: bundle.subject),
-              const SizedBox(height: 8),
-              _MetaLine(
-                icon: Icons.schedule_rounded,
-                text: 'Son güncelleme: ${file.updatedLabel}',
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-
-    final preview = Column(
-      children: [
-        OutlinedButton(
-          onPressed: () => onOpenFile(file),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.blue,
-            backgroundColor: AppColors.selectedBlue,
-            side: const BorderSide(color: AppColors.softLine),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-          ),
-          child: const Text('Görüntüle'),
-        ),
-        const SizedBox(height: 10),
-        _CollectionPreview(kind: previewKind),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(
-            outputs.length.clamp(1, 4).toInt(),
-            (index) => Container(
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                color: index == 0 ? AppColors.blue : AppColors.line,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
+    final previewOutput = outputs.isNotEmpty ? outputs.first : null;
 
     final menu = PopupMenuButton<_CollectionMenuAction>(
       tooltip: 'Diğer işlemler',
@@ -580,34 +508,73 @@ class _CollectionCard extends StatelessWidget {
       explicitChildNodes: true,
       label:
           '${file.title} koleksiyonu. ${outputs.length} çıktı. ${bundle.subject}. Son güncelleme: ${file.updatedLabel}.',
-      child: GlassPanel(
-        padding: const EdgeInsets.all(16),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth < 520) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  details,
-                  const SizedBox(height: 16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [preview, const Spacer(), menu],
-                  ),
-                ],
-              );
-            }
-            return Row(
+      child: SourceBaseCard(
+        radius: 20,
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: details),
-                const SizedBox(width: 12),
-                preview,
-                const SizedBox(width: 6),
+                Expanded(
+                  child: ResultPreviewCard(
+                    icon: _collectionKindIcon(previewKind),
+                    title: file.title,
+                    source: bundle.subject,
+                    createdAt: 'Son güncelleme: ${file.updatedLabel}',
+                    preview:
+                        previewOutput?.detail ??
+                        '${outputs.length} çıktı bu kaynak etrafında toplandı.',
+                    statusLabel: outputs.isEmpty ? null : 'Hazır',
+                    primaryActionLabel: 'Kaynağı aç',
+                    onPrimaryAction: () => onOpenFile(file),
+                    secondaryActionLabel: 'Tekrar üret',
+                    onSecondaryAction: () => onGenerate(file, previewKind),
+                    tint: _collectionKindColor(previewKind),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 menu,
               ],
-            );
-          },
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _CollectionInfoPill(
+                  icon: Icons.school_outlined,
+                  text: bundle.subject,
+                ),
+                _CollectionInfoPill(
+                  icon: Icons.layers_outlined,
+                  text: '${outputs.length} çıktı',
+                ),
+                _CollectionInfoPill(
+                  icon: Icons.description_outlined,
+                  text: FileKindBadge.kindLabel(file.kind),
+                ),
+              ],
+            ),
+            if (outputs.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final output in outputs.take(4))
+                    SizedBox(
+                      width: 236,
+                      child: _OutputCard(
+                        output: output,
+                        onGenerate: () => onGenerate(file, output.kind),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -669,6 +636,28 @@ class _OutputLabel extends StatelessWidget {
   }
 }
 
+class _OutputCard extends StatelessWidget {
+  const _OutputCard({required this.output, required this.onGenerate});
+
+  final GeneratedOutput output;
+  final VoidCallback onGenerate;
+
+  @override
+  Widget build(BuildContext context) {
+    return ResultPreviewCard(
+      icon: _collectionKindIcon(output.kind),
+      title: output.title,
+      source: 'Çıktı türü: ${output.kind.name}',
+      createdAt: output.updatedLabel,
+      preview: output.detail,
+      statusLabel: output.isReady ? 'Hazır' : null,
+      primaryActionLabel: 'Tekrar üret',
+      onPrimaryAction: onGenerate,
+      tint: _collectionKindColor(output.kind),
+    );
+  }
+}
+
 class _MetaLine extends StatelessWidget {
   const _MetaLine({required this.icon, required this.text});
 
@@ -697,6 +686,67 @@ class _MetaLine extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CollectionInfoPill extends StatelessWidget {
+  const _CollectionInfoPill({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F9FB),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.muted, size: 14),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+IconData _collectionKindIcon(GeneratedKind kind) {
+  return switch (kind) {
+    GeneratedKind.flashcard => Icons.style_rounded,
+    GeneratedKind.question => Icons.help_rounded,
+    GeneratedKind.summary => Icons.description_rounded,
+    GeneratedKind.algorithm => Icons.account_tree_rounded,
+    GeneratedKind.comparison ||
+    GeneratedKind.table => Icons.table_chart_rounded,
+    GeneratedKind.podcast => Icons.headphones_rounded,
+    GeneratedKind.infographic => Icons.insights_rounded,
+    GeneratedKind.mindMap => Icons.hub_rounded,
+  };
+}
+
+Color _collectionKindColor(GeneratedKind kind) {
+  return switch (kind) {
+    GeneratedKind.flashcard => AppColors.blue,
+    GeneratedKind.question => const Color(0xFF0BB0D4),
+    GeneratedKind.summary => AppColors.purple,
+    GeneratedKind.algorithm => AppColors.green,
+    GeneratedKind.comparison || GeneratedKind.table => AppColors.orange,
+    GeneratedKind.podcast => AppColors.red,
+    GeneratedKind.infographic => const Color(0xFF0F9A8A),
+    GeneratedKind.mindMap => AppColors.navy,
+  };
 }
 
 class _CollectionPreview extends StatelessWidget {

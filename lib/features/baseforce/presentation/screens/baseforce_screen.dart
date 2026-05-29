@@ -1,4 +1,4 @@
-// ignore_for_file: unused_element
+// ignore_for_file: unused_element, unused_element_parameter
 
 import 'dart:convert';
 import 'dart:math' as math;
@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/design_system/components/sourcebase_card.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sourcebase_brand.dart';
 import '../../../drive/data/drive_models.dart';
@@ -1288,6 +1289,21 @@ String _jobStatusLabel(_JobUiStatus status) {
   };
 }
 
+String _resultPreviewText(Object? content) {
+  if (content == null) return 'Önizleme henüz hazır değil.';
+  final raw = switch (content) {
+    final String text => text,
+    _ => content.toString(),
+  };
+  final cleaned = raw
+      .replaceAll(RegExp(r'[#>*`_-]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  if (cleaned.isEmpty) return 'Önizleme henüz hazır değil.';
+  if (cleaned.length <= 180) return cleaned;
+  return '${cleaned.substring(0, 177).trimRight()}...';
+}
+
 class _BaseForcePage extends StatelessWidget {
   const _BaseForcePage({
     required this.title,
@@ -2145,6 +2161,15 @@ class _SourcePickerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final readyCount = data.recentFiles.where(_isBaseForceReadySource).length;
+    final processingCount = data.recentFiles
+        .where(
+          (file) =>
+              file.status == DriveItemStatus.processing ||
+              file.status == DriveItemStatus.uploading,
+        )
+        .length;
+    final blockedCount = data.recentFiles.length - readyCount - processingCount;
     return _BaseForcePage(
       title: 'Kaynak Seç',
       subtitle: 'Hazır Drive kaynaklarını seç ve üretime devam et.',
@@ -2152,6 +2177,38 @@ class _SourcePickerScreen extends StatelessWidget {
       onBack: onBack,
       heroTight: true,
       children: [
+        PremiumHeroCard(
+          eyebrow: 'Üretim için kaynak seç',
+          title: 'Hangi dosyadan çalışalım?',
+          description:
+              'PDF, PPTX veya DOCX kaynaklarından sınav odaklı materyal oluşturabilirsin. Hazır olmayan dosyalar işlenene kadar seçilemez.',
+          tint: AppColors.blue,
+          anchorIcon: Icons.source_outlined,
+          anchorLabel: selectedSources.isEmpty
+              ? 'Kaynak seç'
+              : '${selectedSources.length} seçili',
+          metrics: [
+            MetricPillData(
+              label: 'Hazır kaynak',
+              value: '$readyCount',
+              tint: AppColors.green,
+              icon: Icons.check_circle_rounded,
+            ),
+            MetricPillData(
+              label: 'İşleniyor',
+              value: '$processingCount',
+              tint: AppColors.blue,
+              icon: Icons.hourglass_top_rounded,
+            ),
+            MetricPillData(
+              label: 'Uygun değil',
+              value: '$blockedCount',
+              tint: AppColors.red,
+              icon: Icons.block_rounded,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
         Row(
           children: [
             Expanded(
@@ -2175,11 +2232,14 @@ class _SourcePickerScreen extends StatelessWidget {
         _BasePanel(
           padding: EdgeInsets.zero,
           child: data.recentFiles.isEmpty
-              ? const _EmptyBaseForceState(
+              ? PremiumEmptyState(
                   icon: Icons.folder_off_outlined,
-                  title: 'Henüz hazır kaynak yok',
+                  title: 'Önce bir kaynak yükle',
                   message:
-                      'BaseForce çıktısı üretmek için önce Drive’a metin içeren PDF veya PPTX yükle.',
+                      'PDF, PPTX veya DOCX dosyanı Drive’a ekledikten sonra buradan üretim başlatabilirsin.',
+                  badges: const ['PDF', 'PPTX', 'DOCX'],
+                  actionLabel: 'Drive’a git',
+                  onAction: onBack,
                 )
               : Column(
                   children: [
@@ -2268,6 +2328,17 @@ class _FlashcardFactoryScreen extends StatelessWidget {
       onBack: onBack,
       art: _BaseForceArtKind.cardSet,
       children: [
+        _FactoryIdentityCard(
+          title: 'Flashcard Factory',
+          description:
+              'Seçili kaynaktan kısa, sınav odaklı tekrar kartları üret.',
+          tint: AppColors.blue,
+          outputType: 'Flashcard',
+          primaryValue: '$cardCount',
+          primaryLabel: 'Kart adedi',
+          sourceValue: readyFile?.title ?? 'Kaynak seç',
+        ),
+        const SizedBox(height: 14),
         _TwoPane(
           left: Column(
             children: [
@@ -2431,11 +2502,23 @@ class _FlashcardFactoryScreen extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         PrimaryGradientButton(
-          label: canGenerate ? 'Flashcard oluştur' : 'Kaynak seç',
+          label: canGenerate ? 'Flashcard üret' : 'Kaynak seç',
           icon: Icons.auto_awesome_rounded,
           height: 58,
           onTap: canGenerate ? onGenerate : null,
         ),
+        if (canGenerate)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text(
+              'Üretim tamamlandığında koleksiyonlarında görünecek.',
+              style: TextStyle(
+                color: AppColors.muted,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
         if (!canGenerate) ...[
           const SizedBox(height: 8),
           _SourceRequiredNotice(onPickSources: onPickSources),
@@ -2497,6 +2580,16 @@ class _QuestionFactoryScreen extends StatelessWidget {
       onSearch: onSearch,
       onBack: onBack,
       children: [
+        _FactoryIdentityCard(
+          title: 'Soru Fabrikası',
+          description: 'Kaynağından açıklamalı, sınav odaklı sorular üret.',
+          tint: AppColors.green,
+          outputType: questionType,
+          primaryValue: '$questionCount',
+          primaryLabel: 'Soru adedi',
+          sourceValue: readyFile?.title ?? 'Kaynak seç',
+        ),
+        const SizedBox(height: 14),
         _SelectedSourceChips(
           data: data,
           selectedSources: selectedSources,
@@ -2609,7 +2702,7 @@ class _QuestionFactoryScreen extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         PrimaryGradientButton(
-          label: canGenerate ? 'Soru oluştur' : 'Kaynak seç',
+          label: canGenerate ? 'Soru seti oluştur' : 'Kaynak seç',
           icon: Icons.auto_fix_high_rounded,
           height: 58,
           onTap: canGenerate ? onGenerate : null,
@@ -2682,6 +2775,17 @@ class _SummaryFactoryScreen extends StatelessWidget {
       onBack: onBack,
       art: _BaseForceArtKind.notebook,
       children: [
+        _FactoryIdentityCard(
+          title: 'Sınav Sabahı Özeti',
+          description:
+              'Kaynağından hızlı tekrar için yüksek verimli özet çıkar.',
+          tint: AppColors.purple,
+          outputType: 'Özet',
+          primaryValue: summaryLength,
+          primaryLabel: 'Özet uzunluğu',
+          sourceValue: readyFile?.title ?? 'Kaynak seç',
+        ),
+        const SizedBox(height: 14),
         _SelectedSourceChips(
           data: data,
           selectedSources: selectedSources,
@@ -2747,7 +2851,7 @@ class _SummaryFactoryScreen extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         PrimaryGradientButton(
-          label: canGenerate ? 'Özet oluştur' : 'Kaynak seç',
+          label: canGenerate ? 'Son tekrar özeti çıkar' : 'Kaynak seç',
           icon: Icons.auto_awesome_rounded,
           height: 58,
           onTap: canGenerate ? onGenerate : null,
@@ -2840,6 +2944,19 @@ class _AlgorithmFactoryScreen extends StatelessWidget {
           ),
       ],
       children: [
+        _FactoryIdentityCard(
+          title: 'Akış Şeması / Algoritma',
+          description:
+              'Kaynağındaki süreçleri adım adım çalışma algoritmasına dönüştür.',
+          tint: AppColors.orange,
+          outputType: algorithmLayout,
+          primaryValue: algorithmMode,
+          primaryLabel: 'Algoritma türü',
+          sourceValue: canGenerate
+              ? '$selectedCount kaynak seçili'
+              : 'Kaynak seç',
+        ),
+        const SizedBox(height: 14),
         _SelectedSourceChips(
           data: data,
           selectedSources: selectedSources,
@@ -3073,7 +3190,7 @@ class _AlgorithmFactoryScreen extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         PrimaryGradientButton(
-          label: canGenerate ? 'Akış oluştur' : 'Kaynak seç',
+          label: canGenerate ? 'Algoritma oluştur' : 'Kaynak seç',
           icon: Icons.auto_awesome_rounded,
           height: 58,
           onTap: canGenerate ? onGenerate : null,
@@ -3166,6 +3283,19 @@ class _ComparisonFactoryScreen extends StatelessWidget {
           ),
       ],
       children: [
+        _FactoryIdentityCard(
+          title: 'Karşılaştırma Tablosu',
+          description:
+              'Benzer kavramları farklarıyla birlikte düzenli tabloya dönüştür.',
+          tint: AppColors.cyan,
+          outputType: tableFormat,
+          primaryValue: comparisonType,
+          primaryLabel: 'Karşılaştırma konusu',
+          sourceValue: canGenerate
+              ? '${selectedFiles.length} kaynak seçili'
+              : 'Kaynak seç',
+        ),
+        const SizedBox(height: 14),
         _BasePanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3264,7 +3394,7 @@ class _ComparisonFactoryScreen extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         PrimaryGradientButton(
-          label: canGenerate ? 'Tablo oluştur' : 'Kaynak seç',
+          label: canGenerate ? 'Karşılaştırma tablosu oluştur' : 'Kaynak seç',
           icon: Icons.table_chart_outlined,
           height: 58,
           onTap: canGenerate ? onGenerate : null,
@@ -3396,6 +3526,36 @@ class _QueueScreen extends StatelessWidget {
       onBack: onBack,
       heroTight: true,
       children: [
+        PremiumHeroCard(
+          eyebrow: 'İşlem takibi',
+          title: 'Üretim Kuyruğu',
+          description:
+              'Bekleyen, işlenen, tamamlanan ve hata alan üretimleri tek yerden takip et.',
+          tint: AppColors.blue,
+          anchorIcon: Icons.schedule_rounded,
+          anchorLabel: jobs.isEmpty ? 'Kuyruk boş' : '${jobs.length} aktif iş',
+          metrics: [
+            MetricPillData(
+              label: 'Bekleyen',
+              value: '$runningCount',
+              tint: AppColors.blue,
+              icon: Icons.hourglass_top_rounded,
+            ),
+            MetricPillData(
+              label: 'Tamamlanan',
+              value: '$completedCount',
+              tint: AppColors.green,
+              icon: Icons.check_circle_rounded,
+            ),
+            MetricPillData(
+              label: 'Hatalı',
+              value: '$failedCount',
+              tint: AppColors.red,
+              icon: Icons.error_outline_rounded,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
         _ResponsiveGrid(
           minItemWidth: 230,
           children: [
@@ -3454,12 +3614,13 @@ class _QueueScreen extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         if (filteredRows.isEmpty)
-          const _BasePanel(
-            child: _EmptyBaseForceState(
+          _BasePanel(
+            child: PremiumEmptyState(
               icon: Icons.pending_actions_rounded,
               title: 'Kuyruk boş',
               message:
-                  'Üretim başlatıldığında pending, işleniyor, tamamlandı ve hata durumları burada görünür.',
+                  'Üretim başlatıldığında bekleyen, işleniyor, tamamlandı ve hatalı işler burada görünür.',
+              badges: const ['Bekleyen', 'İşleniyor', 'Tamamlandı', 'Hatalı'],
             ),
           )
         else
@@ -3502,6 +3663,21 @@ class _FlashcardResultsScreen extends StatelessWidget {
       onSearch: onSearch,
       onBack: onBack,
       children: [
+        if (current != null)
+          ResultPreviewCard(
+            icon: generatedIcon(current.kind),
+            title: _baseForceKindLabel(current.kind),
+            source: current.sourceTitle,
+            createdAt: current.createdAtLabel ?? 'Bugün',
+            preview: _resultPreviewText(current.content),
+            statusLabel: 'Hazır',
+            primaryActionLabel: 'Koleksiyona kaydet',
+            onPrimaryAction: onSave,
+            secondaryActionLabel: 'Tekrar üret',
+            onSecondaryAction: onRegenerate,
+            tint: generatedColor(current.kind),
+          ),
+        if (current != null) const SizedBox(height: 14),
         _BasePanel(
           padding: const EdgeInsets.all(22),
           child: current == null
@@ -3620,6 +3796,58 @@ class _GeneratedContentView extends StatelessWidget {
         title: result.title,
         content: content,
       ),
+    );
+  }
+}
+
+class _FactoryIdentityCard extends StatelessWidget {
+  const _FactoryIdentityCard({
+    required this.title,
+    required this.description,
+    required this.tint,
+    required this.outputType,
+    required this.primaryValue,
+    required this.primaryLabel,
+    required this.sourceValue,
+  });
+
+  final String title;
+  final String description;
+  final Color tint;
+  final String outputType;
+  final String primaryValue;
+  final String primaryLabel;
+  final String sourceValue;
+
+  @override
+  Widget build(BuildContext context) {
+    return PremiumHeroCard(
+      eyebrow: 'Üretim kimliği',
+      title: title,
+      description: description,
+      tint: tint,
+      anchorIcon: Icons.auto_awesome_rounded,
+      anchorLabel: outputType,
+      metrics: [
+        MetricPillData(
+          label: primaryLabel,
+          value: primaryValue,
+          tint: tint,
+          icon: Icons.tune_rounded,
+        ),
+        MetricPillData(
+          label: 'Çıktı tipi',
+          value: outputType,
+          tint: AppColors.purple,
+          icon: Icons.dataset_outlined,
+        ),
+        MetricPillData(
+          label: 'Seçili kaynak',
+          value: sourceValue,
+          tint: AppColors.green,
+          icon: Icons.source_outlined,
+        ),
+      ],
     );
   }
 }
@@ -5480,98 +5708,166 @@ class _SourceSelectRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = source.enabled;
-    return InkWell(
-      onTap: enabled ? onTap : null,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 520;
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Opacity(
-              opacity: enabled ? 1 : .58,
-              child: Column(
+    final status = _premiumStatusForDrive(source.status, enabled: enabled);
+    final statusLabel = selected && enabled
+        ? 'Seçili'
+        : source.suitabilityLabel;
+    return Opacity(
+      opacity: enabled ? 1 : .68,
+      child: SourceBaseCard(
+        radius: 18,
+        padding: const EdgeInsets.all(16),
+        onTap: enabled ? onTap : null,
+        borderColor: selected
+            ? AppColors.blue.withValues(alpha: .34)
+            : AppColors.line.withValues(alpha: .9),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 520;
+            final action = Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: selected
+                    ? AppColors.selectedBlue
+                    : enabled
+                    ? AppColors.blue.withValues(alpha: .08)
+                    : const Color(0xFFF4F6F8),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: selected
+                      ? AppColors.blue.withValues(alpha: .24)
+                      : enabled
+                      ? AppColors.blue.withValues(alpha: .18)
+                      : AppColors.line,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _CheckSquare(
-                        selected: selected && enabled,
-                        enabled: enabled,
-                      ),
-                      const SizedBox(width: 12),
-                      FileKindBadge(kind: source.kind, plain: false),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              source.name,
-                              maxLines: compact ? 2 : 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.navy,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${source.size}  •  ${source.pages}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.muted,
-                                fontSize: 14,
-                              ),
-                            ),
-                            if (source.blockedReason != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                source.blockedReason!,
-                                maxLines: compact ? 3 : 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: AppColors.red,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      if (!compact) ...[
-                        const SizedBox(width: 10),
-                        _SuitabilityPill(
-                          label: source.suitabilityLabel,
-                          status: source.status,
-                          warning: !enabled,
-                        ),
-                        const SizedBox(width: 10),
-                        const _MoreMenuButton(),
-                      ],
-                    ],
+                  Icon(
+                    selected
+                        ? Icons.check_circle_rounded
+                        : enabled
+                        ? Icons.add_circle_outline_rounded
+                        : Icons.lock_outline_rounded,
+                    size: 16,
+                    color: selected || enabled
+                        ? AppColors.blue
+                        : AppColors.muted,
                   ),
-                  if (compact) ...[
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        _SuitabilityPill(
-                          label: source.suitabilityLabel,
-                          status: source.status,
-                          warning: !enabled,
-                        ),
-                        const Spacer(),
-                        const _MoreMenuButton(),
-                      ],
+                  const SizedBox(width: 6),
+                  Text(
+                    selected
+                        ? 'Seçili'
+                        : enabled
+                        ? 'Kaynak seç'
+                        : 'Hazır değil',
+                    style: TextStyle(
+                      color: selected || enabled
+                          ? AppColors.blue
+                          : AppColors.muted,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w900,
                     ),
-                  ],
+                  ),
                 ],
               ),
-            ),
-          );
-        },
+            );
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _CheckSquare(
+                      selected: selected && enabled,
+                      enabled: enabled,
+                    ),
+                    const SizedBox(width: 12),
+                    FileKindBadge(kind: source.kind, plain: true),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            source.name,
+                            maxLines: compact ? 2 : 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.navy,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              height: 1.15,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              StatusBadge(
+                                label: statusLabel,
+                                status: status,
+                                compact: true,
+                              ),
+                              _BaseMiniTag(
+                                label: FileKindBadge.kindLabel(source.kind),
+                                tint: FileKindBadge.kindColor(source.kind),
+                              ),
+                              if (source.subject.trim().isNotEmpty)
+                                _BaseMiniTag(
+                                  label: source.subject,
+                                  tint: AppColors.purple,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!compact) ...[const SizedBox(width: 12), action],
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _InfoPill(
+                      icon: Icons.description_outlined,
+                      label: source.pages,
+                    ),
+                    _InfoPill(
+                      icon: Icons.data_object_rounded,
+                      label: source.size,
+                    ),
+                    _InfoPill(icon: Icons.schedule_rounded, label: source.time),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  source.blockedReason ??
+                      'Hazır kaynak. Bu dosyadan üretim başlatabilirsiniz.',
+                  maxLines: compact ? 3 : 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: source.blockedReason == null
+                        ? AppColors.muted
+                        : AppColors.red,
+                    fontSize: 13,
+                    height: 1.35,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (compact) ...[
+                  const SizedBox(height: 12),
+                  Align(alignment: Alignment.centerLeft, child: action),
+                ],
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -5681,37 +5977,73 @@ class _SelectedSourcesTray extends StatelessWidget {
         )
         .map((file) => _bfSourceFromFile(file))
         .toList();
-    return _BasePanel(
+    return SourceBaseCard(
+      radius: 20,
       padding: const EdgeInsets.all(18),
-      radius: 18,
+      borderColor: AppColors.blue.withValues(alpha: .16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 14,
-                backgroundColor: AppColors.blue,
-                child: Text(
-                  '${selected.length}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                  ),
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.selectedBlue,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.library_books_rounded,
+                  color: AppColors.blue,
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
-                'kaynak seçildi',
-                style: TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Seçili kaynaklar',
+                      style: TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$selected.length hazır kaynak üretim için seçildi.',
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              MetricPill(
+                label: 'Seçili kaynak',
+                value: '${selected.length}',
+                icon: Icons.check_circle_outline_rounded,
+              ),
+              const MetricPill(
+                label: 'Format',
+                value: 'PDF/PPTX/DOCX',
+                tint: AppColors.purple,
+                icon: Icons.auto_awesome_mosaic_rounded,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
           Wrap(
             spacing: 10,
             runSpacing: 10,
@@ -5726,24 +6058,12 @@ class _SelectedSourcesTray extends StatelessWidget {
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
-            height: 58,
-            child: ElevatedButton.icon(
+            child: SBPrimaryButton(
+              label: 'Bu kaynaklarla devam et',
+              icon: Icons.arrow_forward_rounded,
               onPressed: selected.isEmpty ? null : onContinue,
-              icon: const Icon(Icons.arrow_forward_rounded),
-              label: const Text('Devam Et'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.blue,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: AppColors.line,
-                padding: const EdgeInsets.symmetric(horizontal: 26),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                textStyle: const TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+              size: SBButtonSize.medium,
+              fullWidth: true,
             ),
           ),
         ],
@@ -5821,7 +6141,9 @@ class _SourcesPanel extends StatelessWidget {
               _isBaseForceReadySource(file),
         )
         .toList();
-    return _BasePanel(
+    return SourceBaseCard(
+      radius: 20,
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -5836,60 +6158,52 @@ class _SourcesPanel extends StatelessWidget {
             for (final file in files)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: _CompactSourceTile(
+                child: _SelectedSourceSummaryCard(
                   source: _bfSourceFromFile(file),
-                  selected: true,
                 ),
               ),
-          InkWell(
+          SourceBaseCard(
+            radius: 16,
+            padding: const EdgeInsets.all(16),
             onTap: onPickSources,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.blue.withValues(alpha: .28),
+            borderColor: AppColors.blue.withValues(alpha: .22),
+            child: const Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: AppColors.selectedBlue,
+                  child: Icon(
+                    Icons.add_rounded,
+                    color: AppColors.blue,
+                    size: 28,
+                  ),
                 ),
-              ),
-              child: Row(
-                children: const [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: AppColors.selectedBlue,
-                    child: Icon(
-                      Icons.add_rounded,
-                      color: AppColors.blue,
-                      size: 34,
-                    ),
-                  ),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Dosya Ekle',
-                          style: TextStyle(
-                            color: AppColors.blue,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                          ),
+                SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Hazır kaynak ekle',
+                        style: TextStyle(
+                          color: AppColors.blue,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
                         ),
-                        SizedBox(height: 4),
-                        Text(
-                          'PDF, PPTX, DOCX desteklenir',
-                          style: TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 14,
-                          ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'PDF, PPTX veya DOCX kaynaklarından seçim yap.',
+                        style: TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -5925,6 +6239,15 @@ class _SelectedSourceChips extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Seçili Kaynaklar', style: _titleStyle),
+        const SizedBox(height: 8),
+        const Text(
+          'Hazır olan kaynakları burada görür, gerektiğinde değiştirebilirsin.',
+          style: TextStyle(
+            color: AppColors.muted,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         const SizedBox(height: 12),
         if (sources.isEmpty)
           _SourceRequiredNotice(onPickSources: onPickSources)
@@ -5953,33 +6276,62 @@ class _SourceRequiredNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return SourceBaseCard(
+      radius: 18,
+      padding: const EdgeInsets.all(18),
+      borderColor: AppColors.blue.withValues(alpha: .2),
       onTap: onPickSources,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.selectedBlue,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.blue.withValues(alpha: .25)),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.source_outlined, color: AppColors.blue),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Üretim için önce Drive’dan bir kaynak seçin.',
-                style: TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: AppColors.selectedBlue,
+                child: Icon(Icons.source_outlined, color: AppColors.blue),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Önce bir kaynak seç',
+                  style: TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Hazır PDF, PPTX veya DOCX kaynakları seçerek üretime başlayabilirsin.',
+            style: TextStyle(
+              color: AppColors.muted,
+              fontSize: 14,
+              height: 1.4,
+              fontWeight: FontWeight.w700,
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: const [
+              _BaseMiniTag(label: 'Hazır kaynak', tint: AppColors.blue),
+              _BaseMiniTag(label: 'PDF / PPTX / DOCX', tint: AppColors.purple),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SBSecondaryButton(
+            label: 'Kaynak seç',
+            icon: Icons.folder_open_rounded,
+            onPressed: onPickSources,
+            size: SBButtonSize.small,
+            fullWidth: false,
+          ),
+        ],
       ),
     );
   }
@@ -6528,10 +6880,21 @@ class _ProductionSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _BasePanel(
-      child: _ResponsiveGrid(
-        minItemWidth: 165,
-        children: [for (final item in items) _SummaryStat(item: item)],
+    return SourceBaseCard(
+      radius: 20,
+      padding: const EdgeInsets.all(18),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          for (final item in items)
+            MetricPill(
+              label: item.label,
+              value: item.value,
+              tint: item.color,
+              icon: item.icon,
+            ),
+        ],
       ),
     );
   }
@@ -7433,203 +7796,309 @@ class _QueueRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusIcon = complete
-        ? Icons.check_circle_rounded
-        : failed
-        ? Icons.error_rounded
-        : Icons.schedule_rounded;
-    final statusColor = complete
-        ? AppColors.green
-        : failed
-        ? AppColors.red
-        : AppColors.navy;
+    final queueStatus = _queueStatus;
+    final statusTone = _premiumStatusForJob(queueStatus);
     final actionIcon = complete
         ? Icons.visibility_rounded
         : failed
         ? Icons.refresh_rounded
-        : Icons.stop_rounded;
+        : Icons.schedule_rounded;
     final actionLabel = complete
-        ? 'Gör'
+        ? 'Detayı aç'
         : failed
-        ? 'Tekrar Dene'
-        : 'Durdur';
-
-    final fileInfo = Row(
-      children: [
-        FileKindBadge(kind: source.kind, large: true),
-        const SizedBox(width: 18),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                source.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 7),
-              Text(
-                '${source.size}  •  ${source.pages}',
-                style: const TextStyle(color: AppColors.muted, fontSize: 14),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-
-    final productionInfo = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            _RoundGeneratedIcon(kind: kind, size: 50),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ],
-        ),
-        if (progress != null) ...[
-          const SizedBox(height: 13),
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 9,
-                    backgroundColor: AppColors.line,
-                    valueColor: const AlwaysStoppedAnimation(AppColors.blue),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                '%${(progress! * 100).round()}',
-                style: const TextStyle(
-                  color: AppColors.blue,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-        ] else
-          Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: StatusPill(
-              status: failed
-                  ? DriveItemStatus.failed
-                  : DriveItemStatus.completed,
-              compact: true,
-            ),
-          ),
-      ],
-    );
-
-    final statusInfo = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(statusIcon, color: statusColor, size: 22),
-        const SizedBox(width: 7),
-        Flexible(
-          child: Text(
-            time,
-            style: TextStyle(
-              color: statusColor,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-      ],
-    );
-
-    final actionButton = OutlinedButton.icon(
-      onPressed: onAction,
-      icon: Icon(actionIcon),
-      label: Text(actionLabel),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.blue,
-        side: const BorderSide(color: AppColors.blue),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
-      ),
-    );
+        ? 'Tekrar dene'
+        : 'Durumu aç';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
-      child: _BasePanel(
-        padding: const EdgeInsets.fromLTRB(18, 18, 14, 18),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth < 720) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  fileInfo,
-                  const SizedBox(height: 14),
-                  const Divider(color: AppColors.softLine),
-                  const SizedBox(height: 12),
-                  productionInfo,
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 10,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      statusInfo,
-                      actionButton,
-                      const _MoreMenuButton(),
-                    ],
-                  ),
-                ],
-              );
-            }
-            return Row(
+      child: SourceBaseCard(
+        radius: 20,
+        padding: const EdgeInsets.all(18),
+        borderColor: failed
+            ? AppColors.red.withValues(alpha: .16)
+            : AppColors.line.withValues(alpha: .9),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(flex: 2, child: fileInfo),
-                Container(width: 1, height: 62, color: AppColors.softLine),
-                const SizedBox(width: 18),
-                Expanded(flex: 2, child: productionInfo),
-                Container(
-                  width: 1,
-                  height: 62,
-                  margin: const EdgeInsets.symmetric(horizontal: 18),
-                  color: AppColors.softLine,
-                ),
+                _RoundGeneratedIcon(kind: kind, size: 48),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Center(child: statusInfo),
-                      const SizedBox(height: 12),
-                      actionButton,
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        source.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 4),
-                const _MoreMenuButton(),
+                const SizedBox(width: 12),
+                StatusBadge(
+                  label: _queueStatusLabel,
+                  status: statusTone,
+                  compact: true,
+                ),
               ],
-            );
-          },
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _BaseMiniTag(
+                  label: _baseForceKindLabel(kind),
+                  tint: generatedColor(kind),
+                ),
+                _BaseMiniTag(
+                  label: FileKindBadge.kindLabel(source.kind),
+                  tint: FileKindBadge.kindColor(source.kind),
+                ),
+                _BaseMiniTag(label: source.pages, tint: AppColors.blue),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _baseForceProgressLabel(kind, queueStatus, progress ?? 0),
+              style: TextStyle(
+                color: failed ? AppColors.red : AppColors.muted,
+                fontSize: 13.5,
+                height: 1.4,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (progress != null && !complete && !failed) ...[
+              const SizedBox(height: 12),
+              ProcessingCard(
+                title: 'İşlem sürüyor',
+                message: _baseForceProgressLabel(kind, queueStatus, progress!),
+                tags: [source.size, source.pages, time],
+              ),
+            ] else ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _InfoPill(
+                    icon: Icons.data_object_rounded,
+                    label: source.size,
+                  ),
+                  _InfoPill(icon: Icons.schedule_rounded, label: time),
+                ],
+              ),
+            ],
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    failed
+                        ? 'Kaynağı kontrol edip aynı modda yeniden deneyebilirsin.'
+                        : complete
+                        ? 'Hazır çıktı koleksiyonlardan da açılabilir.'
+                        : 'Hazır olduğunda sonuç ekranı otomatik güncellenir.',
+                    style: const TextStyle(
+                      color: AppColors.softText,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SBSecondaryButton(
+                  label: actionLabel,
+                  icon: actionIcon,
+                  onPressed: onAction,
+                  size: SBButtonSize.small,
+                  fullWidth: false,
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
+
+  _JobUiStatus get _queueStatus {
+    if (failed) return _JobUiStatus.failed;
+    if (complete) return _JobUiStatus.completed;
+    if (progress == null || progress == 0) return _JobUiStatus.pending;
+    return _JobUiStatus.running;
+  }
+
+  String get _queueStatusLabel {
+    return switch (_queueStatus) {
+      _JobUiStatus.pending => 'Beklemede',
+      _JobUiStatus.running => 'İşleniyor',
+      _JobUiStatus.completed => 'Tamamlandı',
+      _JobUiStatus.failed => 'Hatalı',
+    };
+  }
+}
+
+class _SelectedSourceSummaryCard extends StatelessWidget {
+  const _SelectedSourceSummaryCard({required this.source});
+
+  final _BFSource source;
+
+  @override
+  Widget build(BuildContext context) {
+    return SourceBaseCard(
+      radius: 16,
+      padding: const EdgeInsets.all(14),
+      borderColor: AppColors.line.withValues(alpha: .9),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              FileKindBadge(kind: source.kind, plain: true),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  source.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              StatusBadge(
+                label: source.suitabilityLabel,
+                status: _premiumStatusForDrive(
+                  source.status,
+                  enabled: source.enabled,
+                ),
+                compact: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _InfoPill(icon: Icons.menu_book_outlined, label: source.subject),
+              _InfoPill(icon: Icons.description_outlined, label: source.pages),
+              _InfoPill(icon: Icons.data_object_rounded, label: source.size),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoPill extends StatelessWidget {
+  const _InfoPill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F9FB),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppColors.muted),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BaseMiniTag extends StatelessWidget {
+  const _BaseMiniTag({required this.label, required this.tint});
+
+  final String label;
+  final Color tint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: tint.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: tint.withValues(alpha: .14)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: tint,
+          fontSize: 11.5,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+PremiumStatus _premiumStatusForDrive(
+  DriveItemStatus status, {
+  bool enabled = true,
+}) {
+  if (!enabled) {
+    return status == DriveItemStatus.failed
+        ? PremiumStatus.ineligible
+        : PremiumStatus.processing;
+  }
+  return switch (status) {
+    DriveItemStatus.completed => PremiumStatus.ready,
+    DriveItemStatus.processing => PremiumStatus.processing,
+    DriveItemStatus.uploading => PremiumStatus.processing,
+    DriveItemStatus.failed => PremiumStatus.failed,
+    DriveItemStatus.draft => PremiumStatus.draft,
+  };
+}
+
+PremiumStatus _premiumStatusForJob(_JobUiStatus status) {
+  return switch (status) {
+    _JobUiStatus.pending => PremiumStatus.processing,
+    _JobUiStatus.running => PremiumStatus.processing,
+    _JobUiStatus.completed => PremiumStatus.ready,
+    _JobUiStatus.failed => PremiumStatus.failed,
+  };
 }
 
 class _QuickResultAction extends StatelessWidget {

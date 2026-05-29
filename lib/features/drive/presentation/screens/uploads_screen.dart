@@ -1,8 +1,12 @@
+// ignore_for_file: unused_element, unused_element_parameter
+
 import 'package:flutter/material.dart';
 
+import '../../../../core/design_system/components/sourcebase_card.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/drive_models.dart';
 import '../widgets/drive_ui.dart';
+import '../widgets/premium_workspace_components.dart';
 
 class UploadsScreen extends StatefulWidget {
   const UploadsScreen({
@@ -54,7 +58,21 @@ class _UploadsScreenState extends State<UploadsScreen> {
   @override
   Widget build(BuildContext context) {
     final visibleUploads = _visibleUploads;
-    return WorkspaceScroll(
+    final totalCount = widget.uploads.length;
+    final readyCount = widget.uploads
+        .where((upload) => upload.status == DriveItemStatus.completed)
+        .length;
+    final activeCount = widget.uploads
+        .where(
+          (upload) =>
+              upload.status == DriveItemStatus.uploading ||
+              upload.status == DriveItemStatus.processing,
+        )
+        .length;
+    final failedCount = widget.uploads
+        .where((upload) => upload.status == DriveItemStatus.failed)
+        .length;
+    return PremiumPageScaffold(
       children: [
         DriveTopBar(
           title: 'Yüklemeler',
@@ -63,69 +81,54 @@ class _UploadsScreenState extends State<UploadsScreen> {
           showBrand: false,
         ),
         const SizedBox(height: 18),
-        _UploadGuidancePanel(onNewFile: widget.onNewFile),
-        const SizedBox(height: 14),
-        GlassPanel(
-          padding: const EdgeInsets.all(22),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 520;
-              final summary = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${widget.uploads.length} dosya',
-                    style: const TextStyle(
-                      color: AppColors.navy,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Yükleme, metin çıkarımı ve hazır olma durumlarını buradan takip edebilirsin.',
-                    style: TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 17,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
-              );
-              final action = SBSecondaryButton(
-                label: 'Yeni Dosya',
-                icon: Icons.add_rounded,
-                onPressed: widget.onNewFile,
-                size: SBButtonSize.small,
-                fullWidth: compact,
-              );
-              if (compact) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [summary, const SizedBox(height: 16), action],
-                );
-              }
-              return Row(
-                children: [
-                  Expanded(child: summary),
-                  const SizedBox(width: 18),
-                  Column(
-                    children: [
-                      action,
-                      const SizedBox(height: 18),
-                      const SizedBox(
-                        width: 150,
-                        height: 110,
-                        child: CustomPaint(painter: _UploadHeroPainter()),
-                      ),
-                    ],
-                  ),
-                ],
-              );
-            },
-          ),
+        PremiumHeroCard(
+          eyebrow: 'İşlem takibi',
+          title: 'Yükleme Merkezi',
+          description:
+              'Yükleme, metin çıkarımı ve hazır olma durumlarını buradan sakin biçimde takip edebilirsin.',
+          anchorIcon: Icons.cloud_upload_rounded,
+          anchorLabel: totalCount == 0
+              ? 'Henüz yükleme yok'
+              : '$totalCount kayıt',
+          metrics: [
+            MetricPillData(
+              label: 'Tümü',
+              value: '$totalCount',
+              tint: AppColors.blue,
+              icon: Icons.folder_copy_outlined,
+            ),
+            MetricPillData(
+              label: 'Hazır',
+              value: '$readyCount',
+              tint: AppColors.green,
+              icon: Icons.check_circle_outline_rounded,
+            ),
+            MetricPillData(
+              label: 'İşleniyor',
+              value: '$activeCount',
+              tint: AppColors.orange,
+              icon: Icons.sync_rounded,
+            ),
+            MetricPillData(
+              label: 'Hatalı',
+              value: '$failedCount',
+              tint: AppColors.red,
+              icon: Icons.error_outline_rounded,
+            ),
+          ],
+          actions: [
+            SBPrimaryButton(
+              label: 'Yeni dosya',
+              icon: Icons.add_rounded,
+              onPressed: widget.onNewFile,
+              size: SBButtonSize.small,
+              fullWidth: false,
+            ),
+          ],
         ),
         const SizedBox(height: 18),
+        _UploadGuidancePanel(onNewFile: widget.onNewFile),
+        const SizedBox(height: 14),
         Wrap(
           spacing: 10,
           runSpacing: 10,
@@ -160,20 +163,21 @@ class _UploadsScreenState extends State<UploadsScreen> {
         ),
         const SizedBox(height: 18),
         if (widget.uploads.isEmpty)
-          const GlassPanel(
-            child: EmptyState(
-              message: 'Aktif yükleme bulunmuyor.',
-              subMessage: 'Yeni dosyalar yükleyerek başlayabilirsiniz.',
-              icon: Icons.cloud_done_outlined,
-            ),
+          PremiumEmptyState(
+            icon: Icons.cloud_upload_outlined,
+            title: 'Henüz yükleme yok',
+            message:
+                'PDF, PPTX veya DOCX dosyanı ekledikten sonra durum takibi burada görünür.',
+            badges: const ['PDF', 'PPTX', 'DOCX'],
+            actionLabel: 'Yeni dosya',
+            onAction: widget.onNewFile,
           )
         else if (visibleUploads.isEmpty)
-          GlassPanel(
-            child: EmptyState(
-              message: _emptyTitle,
-              subMessage: _emptySubtitle,
-              icon: Icons.filter_alt_off_outlined,
-            ),
+          PremiumEmptyState(
+            icon: Icons.filter_alt_off_outlined,
+            title: _emptyTitle,
+            message: _emptySubtitle,
+            badges: const ['Filtreyi temizle', 'Durum takibi'],
           )
         else
           for (final upload in visibleUploads) ...[
@@ -386,7 +390,8 @@ class _UploadRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final file = upload.file;
-    return GlassPanel(
+    return SourceBaseCard(
+      radius: 18,
       padding: const EdgeInsets.all(16),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -412,24 +417,17 @@ class _UploadRow extends StatelessWidget {
                 style: const TextStyle(color: AppColors.muted, fontSize: 16),
               ),
               const SizedBox(height: 12),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  const Icon(
-                    Icons.folder_outlined,
-                    color: AppColors.muted,
-                    size: 20,
+                  _UploadMetaPill(
+                    icon: Icons.folder_outlined,
+                    text: '${file.courseTitle}  ›  ${file.sectionTitle}',
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${file.courseTitle}  ›  ${file.sectionTitle}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 15,
-                      ),
-                    ),
+                  _UploadMetaPill(
+                    icon: Icons.schedule_rounded,
+                    text: file.updatedLabel,
                   ),
                 ],
               ),
@@ -478,12 +476,17 @@ class _UploadState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final file = upload.file;
     switch (upload.status) {
       case DriveItemStatus.completed:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const StatusPill(status: DriveItemStatus.completed),
+            const StatusBadge(
+              label: 'Hazır',
+              status: PremiumStatus.ready,
+              compact: true,
+            ),
             const SizedBox(height: 12),
             const Text(
               'Kaynak hazır. BaseForce ve SourceLab içinde kullanılabilir.',
@@ -495,7 +498,11 @@ class _UploadState extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const StatusPill(status: DriveItemStatus.failed),
+            const StatusBadge(
+              label: 'Hatalı',
+              status: PremiumStatus.failed,
+              compact: true,
+            ),
             const SizedBox(height: 9),
             Text(
               driveFriendlyErrorMessage(
@@ -519,25 +526,67 @@ class _UploadState extends StatelessWidget {
           ],
         );
       case DriveItemStatus.processing:
-        return _ProgressStatus(
-          icon: Icons.auto_awesome_rounded,
+        return ProcessingCard(
           title: 'Kaynak işleniyor',
-          subtitle: 'Metin çıkarılıyor ve üretime hazırlanıyor.',
-          progress: upload.progress,
-          color: AppColors.purple,
+          message: 'Metin çıkarılıyor ve üretime hazırlanıyor.',
+          tags: [
+            file.sizeLabel,
+            file.pageLabel,
+            'İlerleme ${(upload.progress * 100).round()}%',
+          ],
         );
       case DriveItemStatus.uploading:
-        return _ProgressStatus(
-          icon: Icons.sync_rounded,
+        return ProcessingCard(
           title: 'Dosya yükleniyor',
-          subtitle: 'Bu işlem dosya boyutuna göre kısa sürebilir.',
-          progress: upload.progress,
-          color: AppColors.blue,
-          bigPercent: true,
+          message: 'Bu işlem dosya boyutuna göre kısa sürebilir.',
+          tags: [
+            file.sizeLabel,
+            'İlerleme ${(upload.progress * 100).round()}%',
+          ],
         );
       case DriveItemStatus.draft:
-        return const StatusPill(status: DriveItemStatus.draft);
+        return const StatusBadge(
+          label: 'Taslak',
+          status: PremiumStatus.draft,
+          compact: true,
+        );
     }
+  }
+}
+
+class _UploadMetaPill extends StatelessWidget {
+  const _UploadMetaPill({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F9FB),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.muted, size: 14),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

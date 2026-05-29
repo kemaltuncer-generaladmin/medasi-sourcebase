@@ -1376,6 +1376,36 @@ String _sourceLabToolTitle(_ToolKind tool) {
   };
 }
 
+IconData _sourceLabToolIcon(_ToolKind tool) {
+  return switch (tool) {
+    _ToolKind.examMorning => Icons.menu_book_rounded,
+    _ToolKind.clinical => Icons.health_and_safety_rounded,
+    _ToolKind.plan => Icons.calendar_view_week_rounded,
+    _ToolKind.podcast => Icons.headphones_rounded,
+    _ToolKind.infographic => Icons.insights_rounded,
+    _ToolKind.mindMap => Icons.account_tree_rounded,
+  };
+}
+
+Color _sourceLabToolTint(_ToolKind tool) {
+  return switch (tool) {
+    _ToolKind.examMorning => AppColors.blue,
+    _ToolKind.clinical => AppColors.green,
+    _ToolKind.plan => AppColors.purple,
+    _ToolKind.podcast => AppColors.orange,
+    _ToolKind.infographic => const Color(0xFF0BB0D4),
+    _ToolKind.mindMap => AppColors.red,
+  };
+}
+
+String _sourceLabPreviewText(Object? content) {
+  final text = _plainTextLabValue(
+    content,
+  ).replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (text.length <= 180) return text;
+  return '${text.substring(0, 177).trimRight()}...';
+}
+
 String _sourceLabLoadingSubtitle(_ToolKind tool) {
   return switch (tool) {
     _ToolKind.clinical =>
@@ -1513,38 +1543,11 @@ class _LabEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: AppColors.selectedBlue,
-            child: Icon(icon, color: AppColors.blue),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.navy,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.muted,
-              fontSize: 15,
-              height: 1.35,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
+    return PremiumEmptyState(
+      icon: icon,
+      title: title,
+      message: message,
+      badges: const ['Kaynak temelli', 'Hazır olduğunda görünür'],
     );
   }
 }
@@ -1566,21 +1569,13 @@ class _LabEmptyStateWithAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _LabEmptyState(icon: icon, title: title, message: message),
-        if (actionLabel != null && onAction != null) ...[
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _SecondaryLabButton(
-              label: actionLabel!,
-              icon: Icons.folder_open_rounded,
-              onTap: onAction,
-            ),
-          ),
-        ],
-      ],
+    return PremiumEmptyState(
+      icon: icon,
+      title: title,
+      message: message,
+      badges: const ['PDF', 'PPTX', 'DOCX'],
+      actionLabel: actionLabel,
+      onAction: onAction,
     );
   }
 }
@@ -5273,6 +5268,7 @@ class _SourceLabGeneratedResult extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tint = _sourceLabToolTint(tool);
     return _LabScroll(
       children: [
         _MinimalTopBar(
@@ -5303,6 +5299,20 @@ class _SourceLabGeneratedResult extends StatelessWidget {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    ResultPreviewCard(
+                      icon: _sourceLabToolIcon(tool),
+                      title: result!.title,
+                      source: result!.sourceTitle,
+                      createdAt: result!.createdAtLabel,
+                      preview: _sourceLabPreviewText(result!.content),
+                      statusLabel: 'Hazır',
+                      primaryActionLabel: saveLabel,
+                      onPrimaryAction: onSave,
+                      secondaryActionLabel: 'Tekrar üret',
+                      onSecondaryAction: onRegenerate,
+                      tint: tint,
+                    ),
+                    const SizedBox(height: 14),
                     if (audioNotice != null) ...[
                       _LabNotice(text: audioNotice!),
                       const SizedBox(height: 14),
@@ -5328,17 +5338,17 @@ class _SourceLabGeneratedResult extends StatelessWidget {
           _ResponsiveActions(
             children: [
               _SecondaryLabButton(
-                label: saveLabel,
-                icon: Icons.bookmark_border_rounded,
-                onTap: onSave,
-              ),
-              _SecondaryLabButton(
                 label: exportLabel,
                 icon: Icons.content_copy_rounded,
                 onTap: onExport,
               ),
               _SecondaryLabButton(
-                label: 'Yeniden Üret',
+                label: 'Koleksiyona kaydet',
+                icon: Icons.bookmark_border_rounded,
+                onTap: onSave,
+              ),
+              _SecondaryLabButton(
+                label: 'Tekrar üret',
                 icon: Icons.refresh_rounded,
                 onTap: onRegenerate,
               ),
@@ -5346,7 +5356,7 @@ class _SourceLabGeneratedResult extends StatelessWidget {
           )
         else if (!loading)
           _PrimaryLabButton(
-            label: 'Yeniden Üret',
+            label: 'Tekrar üret',
             icon: Icons.refresh_rounded,
             onTap: onRegenerate,
           ),
@@ -5362,51 +5372,11 @@ class _LabLoadingState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      child: Column(
-        children: [
-          const CircularProgressIndicator(color: AppColors.blue),
-          const SizedBox(height: 16),
-          const Text(
-            'Çıktı hazırlanıyor. İşlem tamamlanınca bu ekran otomatik güncellenecek.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.muted,
-              fontSize: 15,
-              height: 1.35,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (steps.isNotEmpty) ...[
-            const SizedBox(height: 18),
-            for (final step in steps)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.check_circle_outline_rounded,
-                      color: AppColors.blue,
-                      size: 19,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        step,
-                        style: const TextStyle(
-                          color: AppColors.navy,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ],
-      ),
+    return ProcessingCard(
+      title: 'Çıktı hazırlanıyor',
+      message:
+          'Kaynağın analiz ediliyor ve sonuç ekranı hazır olduğunda buraya düşecek.',
+      tags: steps.take(3).toList(),
     );
   }
 }
@@ -6719,70 +6689,112 @@ class _SourceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final disabled = !source.isSelectable;
-    return Container(
-      constraints: const BoxConstraints(minHeight: 104),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: disabled ? const Color(0xFFF4F7FB) : Colors.white,
-        border: Border.all(
-          color: disabled ? AppColors.softLine : AppColors.line,
-        ),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          FileKindBadge(kind: source.kind, compact: true),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  source.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 14.5,
-                    height: 1.08,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${source.size}  •  ${source.detail}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 12.5,
-                  ),
-                ),
-                if (disabled) ...[
-                  const SizedBox(height: 5),
+    return Opacity(
+      opacity: disabled ? .72 : 1,
+      child: SourceBaseCard(
+        radius: 16,
+        padding: const EdgeInsets.all(14),
+        borderColor: disabled
+            ? AppColors.softLine
+            : AppColors.line.withValues(alpha: .92),
+        child: Row(
+          children: [
+            FileKindBadge(kind: source.kind, plain: true),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
                   Text(
-                    source.disabledReason!,
+                    source.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: AppColors.red,
-                      fontSize: 12,
+                      color: AppColors.navy,
+                      fontSize: 14.5,
+                      height: 1.08,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${source.size}  •  ${source.detail}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      StatusBadge(
+                        label: disabled ? 'Hazır değil' : 'Hazır',
+                        status: disabled
+                            ? PremiumStatus.processing
+                            : PremiumStatus.ready,
+                        compact: true,
+                      ),
+                      if (source.tag.trim().isNotEmpty)
+                        _SourceBadge(label: source.tag),
+                    ],
+                  ),
+                  if (disabled) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      source.disabledReason!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.red,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          IconButton(
-            onPressed: allowRemove ? onRemove : onMenu,
-            icon: Icon(
-              allowRemove ? Icons.close_rounded : Icons.more_vert_rounded,
-              color: AppColors.navy,
+            IconButton(
+              onPressed: allowRemove ? onRemove : onMenu,
+              icon: Icon(
+                allowRemove ? Icons.close_rounded : Icons.more_vert_rounded,
+                color: AppColors.navy,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SourceBadge extends StatelessWidget {
+  const _SourceBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.purple.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.purple.withValues(alpha: .14)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.purple,
+          fontSize: 11.5,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
@@ -8319,22 +8331,24 @@ class _SummaryActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _LabPanel(
-      padding: const EdgeInsets.fromLTRB(22, 16, 22, 16),
+    return SourceBaseCard(
+      radius: 20,
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final leading = Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
                   color: AppColors.blue.withValues(alpha: .14),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(icon, color: AppColors.blue),
               ),
-              const SizedBox(width: 18),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -8355,7 +8369,28 @@ class _SummaryActionBar extends StatelessWidget {
                       style: const TextStyle(
                         color: AppColors.muted,
                         fontSize: 14,
+                        fontWeight: FontWeight.w600,
                       ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        MetricPill(
+                          label: 'Özet',
+                          value: title,
+                          tint: AppColors.blue,
+                          icon: icon,
+                        ),
+                        if (subtitle != null)
+                          MetricPill(
+                            label: 'Not',
+                            value: subtitle!,
+                            tint: AppColors.purple,
+                            icon: Icons.info_outline_rounded,
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -8406,88 +8441,36 @@ class _CompactToolHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _LabPanel(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-      radius: 18,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 620;
-          final copy = Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: AppColors.blue.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: AppColors.blue),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: AppColors.navy,
-                        fontSize: 30,
-                        height: 1.05,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 16,
-                        height: 1.35,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        _MiniHeroChip(
-                          icon: Icons.library_books_outlined,
-                          label: '$selectedCount kaynak seçili',
-                        ),
-                        const _MiniHeroChip(
-                          icon: Icons.verified_outlined,
-                          label: 'Kaynak temelli',
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-          final action = _SmallActionButton(
-            label: hasSources ? 'Kaynakları yönet' : 'Drive’dan kaynak seç',
-            icon: Icons.folder_open_rounded,
-            onTap: onPickSources,
-          );
-          if (compact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [copy, const SizedBox(height: 16), action],
-            );
-          }
-          return Row(
-            children: [
-              Expanded(child: copy),
-              const SizedBox(width: 18),
-              SizedBox(width: 230, child: action),
-            ],
-          );
-        },
-      ),
+    return PremiumHeroCard(
+      eyebrow: 'SourceLab',
+      title: title,
+      description: subtitle,
+      tint: AppColors.blue,
+      anchorIcon: icon,
+      anchorLabel: hasSources ? '$selectedCount kaynak seçili' : 'Kaynak seç',
+      metrics: [
+        MetricPillData(
+          label: 'Seçili kaynak',
+          value: '$selectedCount',
+          tint: AppColors.blue,
+          icon: Icons.library_books_outlined,
+        ),
+        const MetricPillData(
+          label: 'Yaklaşım',
+          value: 'Kaynak temelli',
+          tint: AppColors.purple,
+          icon: Icons.verified_outlined,
+        ),
+      ],
+      actions: [
+        SBSecondaryButton(
+          label: hasSources ? 'Kaynakları yönet' : 'Drive’dan kaynak seç',
+          icon: Icons.folder_open_rounded,
+          onPressed: onPickSources,
+          size: SBButtonSize.small,
+          fullWidth: false,
+        ),
+      ],
     );
   }
 }
