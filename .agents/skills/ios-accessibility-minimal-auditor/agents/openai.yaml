@@ -1,0 +1,4 @@
+interface:
+  display_name: "iOS Accessibility Minimal Auditor"
+  short_description: "Keep iOS accessibility useful and minimal"
+  default_prompt: "Use $ios-accessibility-minimal-auditor to improve accessibility without adding noisy hints."

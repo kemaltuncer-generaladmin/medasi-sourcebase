@@ -1,0 +1,4 @@
+interface:
+  display_name: "SwiftUI Declutter Auditor"
+  short_description: "Find and remove SwiftUI UI clutter"
+  default_prompt: "Use $swiftui-declutter-auditor to audit this SwiftUI screen for clutter and simplify it."

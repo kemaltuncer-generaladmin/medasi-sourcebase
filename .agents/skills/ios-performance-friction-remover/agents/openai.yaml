@@ -1,0 +1,4 @@
+interface:
+  display_name: "iOS Performance Friction Remover"
+  short_description: "Remove user-visible iOS performance friction"
+  default_prompt: "Use $ios-performance-friction-remover to find and remove performance friction users can feel."

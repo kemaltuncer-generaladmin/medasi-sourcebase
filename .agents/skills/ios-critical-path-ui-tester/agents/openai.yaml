@@ -1,0 +1,4 @@
+interface:
+  display_name: "iOS Critical Path UI Tester"
+  short_description: "Add focused tests for key iOS flows"
+  default_prompt: "Use $ios-critical-path-ui-tester to add only the UI tests that protect the most important user paths."

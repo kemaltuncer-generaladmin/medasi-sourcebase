@@ -1,0 +1,4 @@
+interface:
+  display_name: "iOS Flow Pruner"
+  short_description: "Prune unnecessary iOS navigation flows"
+  default_prompt: "Use $ios-flow-pruner to reduce this iOS app flow to the fewest useful steps."

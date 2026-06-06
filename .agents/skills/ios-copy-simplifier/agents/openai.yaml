@@ -1,0 +1,4 @@
+interface:
+  display_name: "iOS Copy Simplifier"
+  short_description: "Shorten and clarify iOS app copy"
+  default_prompt: "Use $ios-copy-simplifier to make this iOS app copy shorter, clearer, and more useful."

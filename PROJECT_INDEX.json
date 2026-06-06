@@ -1,0 +1,99 @@
+{
+  "project": "SourceBase",
+  "type": "ios-swiftui-app",
+  "vcs": "none",
+  "hotspotMethod": "file mtime and size heuristics because this checkout has no .git directory",
+  "toolchain": {
+    "swiftTools": "6.0",
+    "platforms": ["iOS 17", "macOS 14"]
+  },
+  "modules": [
+    {
+      "name": "App",
+      "path": "App/SourceBase",
+      "role": "xcode-app-shell",
+      "entry": "App/SourceBase/SourceBaseAppMain.swift",
+      "dependsOn": ["SourceBaseiOS"]
+    },
+    {
+      "name": "SourceBaseiOS",
+      "path": "SourceBaseiOS/Sources/SourceBaseiOS",
+      "role": "ui-app-layer",
+      "product": "library",
+      "groups": ["App", "Core", "DesignSystem", "Features"],
+      "features": ["Auth", "BaseForce", "CentralAI", "Drive", "Profile", "SourceLab", "Study"],
+      "dependsOn": ["SourceBaseBackend", "SwiftUI-Shimmer", "Pow", "lottie-spm"]
+    },
+    {
+      "name": "SourceBaseBackend",
+      "path": "SourceBaseBackend/Sources/SourceBaseBackend",
+      "role": "service-data-layer",
+      "product": "library",
+      "groups": ["Config", "Auth", "Drive", "Profile"],
+      "dependsOn": ["supabase-swift"]
+    }
+  ],
+  "entryPoints": {
+    "main": "App/SourceBase/SourceBaseAppMain.swift",
+    "rootView": "SourceBaseiOS/Sources/SourceBaseiOS/App/SourceBaseApp.swift",
+    "bootstrap": "SourceBaseiOS/Sources/SourceBaseiOS/Core/AppState.swift",
+    "deepLink": "sourcebase://auth/callback"
+  },
+  "serviceBoundaries": {
+    "authActor": "AuthBackend.shared",
+    "rpcChokepoint": "DriveAPI.invoke(action:payload:) -> Edge Function sourcebase",
+    "repositories": ["DriveRepository", "ProfileRepository", "StoreRepository"],
+    "stores": ["AppState", "SessionStore", "AppRouter", "SourceBaseWorkspaceStore"]
+  },
+  "dependencies": {
+    "internal": ["App->SourceBaseiOS", "SourceBaseiOS->SourceBaseBackend"],
+    "external": {
+      "supabase-swift": "2.46.0",
+      "SwiftUI-Shimmer": "1.5.1",
+      "Pow": "1.0.6",
+      "lottie-spm": "4.6.0"
+    },
+    "transitive": [
+      "swift-asn1 1.7.0",
+      "swift-clocks 1.0.6",
+      "swift-concurrency-extras 1.4.0",
+      "swift-crypto 4.5.0",
+      "swift-http-types 1.5.1",
+      "xctest-dynamic-overlay 1.9.0"
+    ]
+  },
+  "hotspots": {
+    "largest": [
+      "SourceBaseBackend/Sources/SourceBaseBackend/Drive/DriveRepository.swift",
+      "SourceBaseiOS/Sources/SourceBaseiOS/Features/Study/GeneratedOutputStudyView.swift",
+      "SourceBaseiOS/Sources/SourceBaseiOS/Core/SourceBaseWorkspaceStore.swift",
+      "SourceBaseiOS/Sources/SourceBaseiOS/Features/BaseForce/ResultView.swift",
+      "SourceBaseBackend/Sources/SourceBaseBackend/Drive/GeneratedContentModels.swift"
+    ],
+    "activeClusters": ["SourceLab", "BaseForce factory flows", "Study", "Drive details"]
+  },
+  "tests": {
+    "backend": [
+      "SourceBaseBackend/Tests/SourceBaseBackendTests/AuthTests.swift",
+      "SourceBaseBackend/Tests/SourceBaseBackendTests/DriveTests.swift"
+    ],
+    "ios": ["SourceBaseiOS/Tests/SourceBaseiOSTests/UploadAndOutputTests.swift"]
+  },
+  "appStore": {
+    "privacyManifest": "App/SourceBase/PrivacyInfo.xcprivacy",
+    "entitlements": "App/SourceBase/SourceBase.entitlements",
+    "infoPlist": "App/SourceBase/Info.plist",
+    "bundleIdentifier": "tr.com.medasi.sourcebase",
+    "inAppPurchaseCapability": "declared in App/SourceBase.xcodeproj/project.pbxproj target attributes"
+  },
+  "config": {
+    "runtime": "SourceBaseConfig.fromEnvironment()",
+    "envOverrides": [
+      "SOURCEBASE_SUPABASE_URL",
+      "SOURCEBASE_SUPABASE_ANON_KEY",
+      "SOURCEBASE_PUBLIC_URL",
+      "SOURCEBASE_MOBILE_REDIRECT_URL"
+    ],
+    "secretsRedacted": true
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "iOS State Simplifier"
+  short_description: "Simplify iOS loading and error states"
+  default_prompt: "Use $ios-state-simplifier to simplify this screen's loading, empty, error, and success states."

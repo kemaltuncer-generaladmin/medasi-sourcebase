@@ -1,0 +1,4 @@
+interface:
+  display_name: "iOS Real User Simplifier"
+  short_description: "Simplify iOS flows like a real user"
+  default_prompt: "Use $ios-real-user-simplifier to test this iOS app flow like a real user and simplify it."

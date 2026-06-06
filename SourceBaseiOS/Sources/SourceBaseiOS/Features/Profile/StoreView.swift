@@ -1,0 +1,585 @@
+import SwiftUI
+import StoreKit
+import SourceBaseBackend
+
+struct StoreView: View {
+    @Environment(AppState.self) private var appState
+    @State private var packages: [MedasiCoinPackage] = []
+    @State private var walletBalance: Double?
+    @State private var walletStatusMessage: String?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+#if DEBUG
+    @State private var storeKitStatusMessage: String?
+#endif
+
+    // Per-package purchase states
+    @State private var buyingPackageCode: String?
+    @State private var purchaseStatusPackageCode: String?
+    @State private var buyError: String?
+    @State private var buyInfo: String?
+
+    // Restore state
+    @State private var isRestoring = false
+
+    private var storeKit: SBStoreKitManager { SBStoreKitManager.shared }
+    private var router: AppRouter { appState.router }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SBSpacing.lg) {
+                premiumHeroCard
+#if DEBUG
+                storeKitDebugNotice
+#endif
+                walletSummarySection
+
+                if isLoading {
+                    SBLoadingState(
+                        icon: "storefront",
+                        title: "Paketler yükleniyor",
+                        message: "MC üretim kredisi paketleri hazırlanıyor..."
+                    )
+                } else if let error = errorMessage, !error.isEmpty && packages.isEmpty {
+                    SBErrorState(
+                        title: "Paketler yüklenemedi",
+                        message: error,
+                        actionLabel: "Tekrar Dene",
+                        onAction: { Task { await loadStoreData() } }
+                    )
+                } else {
+                    packagesSection
+                    restoreSection
+                }
+            }
+            .padding(SBSpacing.lg)
+            .sbFloatingTabContentPadding()
+            .sbReadableWidth(720)
+        }
+        .sbPageBackground()
+        .navigationTitle("MC Paketleri")
+        .sbInlineNavTitle()
+        .sbBackButton { router.pop() }
+        .refreshable { await loadStoreData() }
+        .task { await loadStoreData() }
+    }
+
+    // MARK: - Premium Hero Card
+
+    private var premiumHeroCard: some View {
+        SBCard(radius: 20, backgroundColor: SBColors.white, showShadow: true) {
+            VStack(alignment: .leading, spacing: SBSpacing.md) {
+                HStack {
+                    Text("MC Paketleri")
+                        .font(SBTypography.caption)
+                        .foregroundStyle(SBColors.blue)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(SBColors.selectedBlue)
+                        .clipShape(Capsule())
+
+                    Spacer()
+
+                    Image(systemName: "creditcard")
+                        .sbScaledFont(size: 24)
+                        .foregroundStyle(SBColors.blue)
+                        .accessibilityHidden(true)
+                }
+
+                Text("MC üretim kredisi")
+                    .font(SBTypography.heading2)
+                    .foregroundStyle(SBColors.navy)
+
+                Text("Kaynak tabanlı çıktılar MC ile hazırlanır. Paket satın alarak üretim bakiyeni artırabilirsin.")
+                    .font(SBTypography.bodyMedium)
+                    .foregroundStyle(SBColors.muted)
+                    .lineSpacing(2)
+
+                Divider().padding(.vertical, SBSpacing.xs)
+
+                HStack(spacing: SBSpacing.md) {
+                    metricInfo(icon: "applelogo", value: "App Store", label: "Ödeme")
+                    metricInfo(icon: "shield.checkered", value: "Güvenli", label: "İşlem")
+                    metricInfo(icon: "iphone", value: "iOS", label: "Platform")
+                }
+            }
+            .padding(SBSpacing.sm)
+        }
+    }
+
+    private func metricInfo(icon: String, value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .sbScaledFont(size: 12)
+                    .foregroundStyle(SBColors.blue)
+                    .accessibilityHidden(true)
+                Text(label)
+                    .font(SBTypography.caption)
+                    .foregroundStyle(SBColors.softText)
+            }
+            Text(value)
+                .font(SBTypography.labelSmall)
+                .foregroundStyle(SBColors.navy)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - Wallet Balance
+
+    private var walletSummarySection: some View {
+        SBCard(radius: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("MC bakiyesi")
+                        .font(SBTypography.caption)
+                        .foregroundStyle(SBColors.muted)
+
+                    if let balance = walletBalance {
+                        Text("\(balance.formatted(.number.precision(.fractionLength(0...2)))) MC")
+                            .font(SBTypography.heading2)
+                            .foregroundStyle(SBColors.navy)
+                    } else {
+                        Text(walletStatusMessage ?? "Yükleniyor...")
+                            .font(SBTypography.titleMedium)
+                            .foregroundStyle(SBColors.softText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
+                    }
+                }
+
+                Spacer()
+
+                Button {
+                    Task { await fetchWallet() }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.clockwise")
+                            .accessibilityHidden(true)
+                        Text("Yenile")
+                    }
+                    .font(SBTypography.labelSmall)
+                    .foregroundStyle(SBColors.blue)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(SBColors.selectedBlue)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .accessibilityLabel("Bakiyeyi yenile")
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    // MARK: - Packages Section
+
+    private var packagesSection: some View {
+        VStack(alignment: .leading, spacing: SBSpacing.md) {
+            Text("Paketler")
+                .font(SBTypography.titleMedium)
+                .foregroundStyle(SBColors.navy)
+
+            ForEach(packages) { package in
+                packageTile(package)
+            }
+        }
+    }
+
+    private func packageTile(_ package: MedasiCoinPackage) -> some View {
+        let isBuying = buyingPackageCode == package.code
+        let hasStatus = purchaseStatusPackageCode == package.code
+        let skProduct = storeKit.product(id: package.appStoreProductId)
+        let priceDisplay = skProduct?.displayPrice ?? package.priceLabel
+        let isBestValue = package.coin >= 200
+
+        return SBCard(radius: 16) {
+            VStack(alignment: .leading, spacing: SBSpacing.md) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: SBSpacing.xs) {
+                        if isBestValue {
+                            packageBadge("Sık kullanılan")
+                        }
+                        Text(package.title)
+                            .font(SBTypography.titleMedium)
+                            .foregroundStyle(SBColors.navy)
+                            .fontWeight(.bold)
+
+                        Text(package.description)
+                            .font(SBTypography.bodySmall)
+                            .foregroundStyle(SBColors.muted)
+                            .lineSpacing(1.5)
+                    }
+
+                    Spacer()
+
+                    ZStack {
+                        Circle()
+                            .fill(SBColors.selectedBlue)
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "plus")
+                            .sbScaledFont(size: 16, weight: .bold)
+                            .foregroundStyle(SBColors.blue)
+                    }
+                    .accessibilityHidden(true)
+                }
+
+                Text(priceDisplay)
+                    .font(SBTypography.heading2)
+                    .foregroundStyle(SBColors.navy)
+                    .fontWeight(.bold)
+
+                HStack(spacing: 8) {
+                    packageChip(icon: "toll", label: "\(package.coin) MC")
+                    if package.coin > 0 && package.priceCents > 0 {
+                        let priceUnit = Double(package.priceCents) / 100.0 / Double(package.coin)
+                        packageChip(icon: "tag", label: "\(String(format: "%.2f", priceUnit)) \(package.currencyDisplay)/MC")
+                    }
+                }
+
+                packageFeature("Ödeme App Store üzerinden işlenir")
+                packageFeature("Onaylandığında MC bakiyene eklenir")
+
+                // Per-package status notice
+                if hasStatus {
+                    if let info = buyInfo {
+                        paymentNotice(icon: "checkmark.circle", color: SBColors.green, message: info)
+                    } else if let error = buyError {
+                        paymentNotice(icon: "exclamationmark.triangle", color: SBColors.red, message: error)
+                    }
+                }
+
+                SBButton(
+                    isBuying ? "İşleniyor..." : "Satın Al",
+                    icon: "bag",
+                    variant: .primary,
+                    size: .medium,
+                    isLoading: isBuying || storeKit.isPurchasing,
+                    fullWidth: true,
+                    action: { Task { await startPurchase(package: package) } }
+                )
+                .disabled(storeKit.isPurchasing)
+                .padding(.top, 4)
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    // MARK: - Restore Section
+
+    private var restoreSection: some View {
+        Button {
+            Task { await restorePurchases() }
+        } label: {
+            HStack(spacing: SBSpacing.sm) {
+                if isRestoring {
+                    ProgressView().progressViewStyle(CircularProgressViewStyle(tint: SBColors.blue))
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "arrow.counterclockwise")
+                        .sbScaledFont(size: 14, weight: .semibold)
+                        .accessibilityHidden(true)
+                }
+                Text(isRestoring ? "Geri yükleniyor..." : "Satın Almalarımı Geri Yükle")
+                    .font(SBTypography.labelSmall)
+            }
+            .foregroundStyle(SBColors.blue)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, SBSpacing.md)
+        }
+        .disabled(isRestoring)
+        .accessibilityLabel("Satın almalarımı geri yükle")
+    }
+
+    // MARK: - Helper Views
+
+    private func packageBadge(_ label: String) -> some View {
+        Text(label)
+            .font(SBTypography.caption)
+            .foregroundStyle(SBColors.white)
+            .fontWeight(.bold)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(SBColors.blue)
+            .clipShape(Capsule())
+    }
+
+    private func packageChip(icon: String, label: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .sbScaledFont(size: 12, weight: .semibold)
+                .accessibilityHidden(true)
+            Text(label)
+                .font(SBTypography.labelSmall)
+        }
+        .foregroundStyle(SBColors.navy)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .background(SBColors.selectedBlue)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func packageFeature(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(SBColors.selectedBlue)
+                    .frame(width: 18, height: 18)
+                Image(systemName: "checkmark")
+                    .sbScaledFont(size: 10, weight: .bold)
+                    .foregroundStyle(SBColors.blue)
+            }
+            .accessibilityHidden(true)
+            Text(text)
+                .font(SBTypography.bodySmall)
+                .foregroundStyle(SBColors.navy)
+                .lineSpacing(1.3)
+        }
+    }
+
+    private func paymentNotice(icon: String, color: Color, message: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .sbScaledFont(size: 15, weight: .semibold)
+                .foregroundStyle(color)
+                .padding(.top, 1)
+                .accessibilityHidden(true)
+            Text(message)
+                .font(SBTypography.bodySmall)
+                .foregroundStyle(SBColors.navy)
+                .lineSpacing(1.2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(color.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(color.opacity(0.18), lineWidth: 1))
+    }
+
+#if DEBUG
+    @ViewBuilder
+    private var storeKitDebugNotice: some View {
+        if let storeKitStatusMessage {
+            paymentNotice(
+                icon: "shippingbox.and.arrow.backward",
+                color: SBColors.purple,
+                message: storeKitStatusMessage
+            )
+        }
+    }
+#endif
+
+    // MARK: - Data Loaders
+
+    private func loadStoreData() async {
+        isLoading = true
+        errorMessage = nil
+#if DEBUG
+        storeKitStatusMessage = nil
+#endif
+
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await fetchPackages() }
+            group.addTask { await fetchWallet() }
+        }
+
+        // Load StoreKit products for the fetched packages
+        if !packages.isEmpty {
+            let ids = Set(packages.map(\.appStoreProductId))
+            do {
+                try await storeKit.loadProducts(ids: ids)
+#if DEBUG
+                if storeKit.products.count < ids.count {
+                    storeKitStatusMessage = "\(storeKit.products.count)/\(ids.count) App Store ürünü hazır. Eksik paketler satın alma sırasında kullanılamaz."
+                }
+#endif
+            } catch {
+#if DEBUG
+                storeKitStatusMessage = "App Store ürünleri şu anda yüklenemedi."
+#endif
+            }
+        }
+
+        isLoading = false
+    }
+
+    private func fetchWallet() async {
+        walletBalance = nil
+        walletStatusMessage = "Yükleniyor..."
+        do {
+            guard let client = await AuthBackend.shared.getClient(),
+                  let userId = client.auth.currentUser?.id.uuidString else {
+                walletStatusMessage = "Oturum doğrulanamadı"
+                return
+            }
+            let snapshot = try await ProfileRepository(client: client).loadProfile(
+                userId: userId,
+                workspace: appState.workspace.workspace
+            )
+            walletBalance = snapshot.walletBalance
+            walletStatusMessage = snapshot.walletBalance == nil ? "Bakiye alınamadı" : nil
+        } catch {
+            walletBalance = nil
+            walletStatusMessage = "Bakiye alınamadı"
+        }
+    }
+
+    private func fetchPackages() async {
+        do {
+            guard let client = await AuthBackend.shared.getClient() else {
+                packages = []
+                errorMessage = "Mağaza için oturum doğrulanamadı."
+                return
+            }
+            let products = try await StoreRepository(client: client).loadProducts()
+            packages = products
+                .map { MedasiCoinPackage(snapshot: $0) }
+                .filter { $0.isConsumableCoinPack }
+            if packages.isEmpty {
+                errorMessage = "Mağaza paketleri şu anda listelenemiyor."
+            }
+        } catch {
+            packages = []
+            errorMessage = "Paketler şu anda alınamadı. Biraz sonra tekrar deneyebilirsin."
+        }
+    }
+
+    // MARK: - Purchase Flow
+
+    private func startPurchase(package: MedasiCoinPackage) async {
+        guard let skProduct = storeKit.product(id: package.appStoreProductId) else {
+            buyingPackageCode = nil
+            purchaseStatusPackageCode = package.code
+#if DEBUG
+            buyError = "Bu paket şu anda App Store'dan yüklenemedi. Tekrar deneyebilirsin."
+#else
+            buyError = "Bu paket şu anda App Store'dan yüklenemedi. Tekrar deneyebilirsin."
+#endif
+            return
+        }
+
+        buyingPackageCode = package.code
+        purchaseStatusPackageCode = nil
+        buyError = nil
+        buyInfo = nil
+
+        do {
+            try await storeKit.purchase(skProduct)
+            purchaseStatusPackageCode = package.code
+            buyInfo = "Satın alma tamamlandı! MC bakiyen güncellendi."
+            buyingPackageCode = nil
+            await fetchWallet()
+        } catch SBStoreError.cancelled {
+            // User cancelled — clear state silently
+            buyingPackageCode = nil
+            purchaseStatusPackageCode = nil
+        } catch SBStoreError.pending {
+            purchaseStatusPackageCode = package.code
+            buyInfo = (SBStoreError.pending.errorDescription ?? "")
+            buyingPackageCode = nil
+        } catch SBStoreError.alreadyProcessing {
+            purchaseStatusPackageCode = package.code
+            buyInfo = (SBStoreError.alreadyProcessing.errorDescription ?? "")
+            buyingPackageCode = nil
+        } catch {
+            purchaseStatusPackageCode = package.code
+            buyError = error.localizedDescription.isEmpty
+                ? "Satın alma tamamlanamadı. Tekrar deneyebilirsin."
+                : error.localizedDescription
+            buyingPackageCode = nil
+        }
+    }
+
+    private func restorePurchases() async {
+        isRestoring = true
+        defer { isRestoring = false }
+        do {
+            try await storeKit.restore()
+            await fetchWallet()
+        } catch {
+            // AppStore.sync() failing is non-fatal; user may not have previous purchases
+        }
+    }
+}
+
+// MARK: - MedasiCoinPackage
+
+struct MedasiCoinPackage: Identifiable, Sendable {
+    let id = UUID()
+    let code: String
+    let coin: Int
+    let priceCents: Int
+    let originalPriceCents: Int
+    let title: String
+    let description: String
+    let currency: String
+    let sortOrder: Int
+
+    init(
+        code: String,
+        coin: Int,
+        priceCents: Int,
+        originalPriceCents: Int? = nil,
+        title: String,
+        description: String,
+        currency: String,
+        sortOrder: Int
+    ) {
+        self.code = code
+        self.coin = coin
+        self.priceCents = priceCents
+        self.originalPriceCents = originalPriceCents ?? Int((Double(priceCents) / 0.9).rounded())
+        self.title = title
+        self.description = description
+        self.currency = currency
+        self.sortOrder = sortOrder
+    }
+
+    init(snapshot: StoreProductSnapshot) {
+        self.init(
+            code: snapshot.code,
+            coin: snapshot.coin,
+            priceCents: snapshot.priceCents,
+            title: snapshot.title,
+            description: snapshot.description,
+            currency: snapshot.currency,
+            sortOrder: snapshot.sortOrder
+        )
+    }
+
+    /// App Store consumable product ID, derived from the backend `store_products.code`
+    /// (e.g. "mc_10" → "tr.com.medasi.sourcebase.mc_10"). Using the code — not the coin
+    /// amount — keeps IDs unique across packages that happen to grant the same MC.
+    var appStoreProductId: String {
+        "tr.com.medasi.sourcebase.\(code)"
+    }
+
+    /// Only consumable MC packs are sold via StoreKit. Subscriptions (weekly/monthly)
+    /// remain on the web checkout flow and are filtered out of the in-app store.
+    var isConsumableCoinPack: Bool {
+        coin > 0 && !code.lowercased().contains("subscription")
+    }
+
+    var priceLabel: String {
+        Self.priceLabel(cents: priceCents, currency: currency)
+    }
+
+    var currencyDisplay: String {
+        currency == "TRY" ? "TL" : currency
+    }
+
+    private static func priceLabel(cents: Int, currency: String) -> String {
+        guard cents > 0 else { return "Ücretsiz" }
+        let amount = Double(cents) / 100.0
+        let formatted = amount.truncatingRemainder(dividingBy: 1) == 0
+            ? String(format: "%.0f", amount)
+            : String(format: "%.2f", amount)
+        return "\(formatted) \(currency == "TRY" ? "TL" : currency)"
+    }
+}
+
+#Preview {
+    NavigationStack {
+        StoreView()
+            .environment(AppState.shared)
+    }
+}
