@@ -7,7 +7,7 @@ require 'xcodeproj'
 APP_DIR   = File.expand_path(File.dirname(__FILE__))      # .../swiftsourcebase/App
 PROJ_PATH = File.join(APP_DIR, 'SourceBase.xcodeproj')
 TEAM_ID   = '489N9D2VTC'
-BUILD_NUM = '49'   # bump for each App Store Connect upload
+BUILD_NUM = '50'   # bump for each App Store Connect upload
 
 FileUtils.rm_rf(PROJ_PATH) if File.exist?(PROJ_PATH)
 project = Xcodeproj::Project.new(PROJ_PATH)

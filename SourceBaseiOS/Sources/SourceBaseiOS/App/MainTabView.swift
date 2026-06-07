@@ -10,8 +10,7 @@ struct MainTabView: View {
 
     private let tabs: [MainTabItem] = [
         MainTabItem(route: .drive, title: "Drive", icon: "folder", selectedIcon: "folder.fill"),
-        MainTabItem(route: .baseForce, title: "BaseForce", icon: "bolt", selectedIcon: "bolt.fill"),
-        MainTabItem(route: .sourceLab, title: "SourceLab", icon: "flask", selectedIcon: "flask.fill"),
+        MainTabItem(route: .baseForce, title: "Üret", icon: "bolt", selectedIcon: "bolt.fill"),
         MainTabItem(route: .centralAI, title: "MedasiChat", icon: "text.bubble", selectedIcon: "text.bubble.fill"),
         MainTabItem(route: .profile, title: "Profil", icon: "person", selectedIcon: "person.fill")
     ]
@@ -37,10 +36,8 @@ struct MainTabView: View {
         switch router.selectedTab {
         case .drive:
             DriveHomeView()
-        case .baseForce:
+        case .baseForce, .sourceLab:
             BaseForceHomeView()
-        case .sourceLab:
-            SourceLabHomeView()
         case .centralAI:
             CentralAIView()
         case .profile:

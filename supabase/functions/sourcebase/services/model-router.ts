@@ -219,7 +219,7 @@ export function resolveImageRoute(
   const defaultModel = normalizedQuality === "draft"
     ? imageModel("IMAGE_MODEL_DRAFT", "gpt-image-1-mini")
     : normalizedQuality === "premium"
-    ? imageModel("IMAGE_MODEL_PREMIUM", "gpt-image-2")
+    ? imageModel("IMAGE_MODEL_PREMIUM", "gpt-image-1.5")
     : imageModel("IMAGE_MODEL_STANDARD", "gpt-image-1.5");
   const selectedModel = requestedModel?.trim() || defaultModel;
   const defaultProvider = imageProviderEnv("IMAGE_PROVIDER_DEFAULT") ??

@@ -226,7 +226,10 @@ struct VerifyEmailView: View {
         localError = nil
         session.clearMessages()
         Task {
-            await session.verifyEmailOTP(email: email, token: code)
+            let didVerify = await session.verifyEmailOTP(email: email, token: code)
+            if didVerify {
+                navigateAfterVerification()
+            }
         }
     }
 

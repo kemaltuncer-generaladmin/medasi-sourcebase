@@ -128,7 +128,7 @@ public final class AppRouter {
         case .baseForceHome:
             switchTab(to: .baseForce)
         case .sourceLabHome:
-            switchTab(to: .sourceLab)
+            switchTab(to: .baseForce)
         case .route(let route):
             let tab = rootTab(for: route)
             selectedTab = tab
@@ -165,16 +165,16 @@ public final class AppRouter {
              .queue,
              .generationProcessing,
              .result,
-             .studyOutput:
-            return .baseForce
-        case .sourceLab,
+             .studyOutput,
+             // SourceLab tools now live inside the unified "Üret" (baseForce) tab.
+             .sourceLab,
              .examMorning,
              .clinical,
              .plan,
              .podcast,
              .infographic,
              .mindMap:
-            return .sourceLab
+            return .baseForce
         case .centralAI:
             return .centralAI
         case .profile,

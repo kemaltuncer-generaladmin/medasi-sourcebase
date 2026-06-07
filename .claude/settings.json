@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "xcodebuildmcp": {
+      "command": "/Users/kemaltuncer/.npm-global/bin/xcodebuildmcp",
+      "args": ["--config", ".xcodebuildmcp/config.yaml"]
+    }
+  }
+}

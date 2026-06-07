@@ -1,7 +1,8 @@
 import Foundation
+import Supabase
 
 public enum AuthResult: Sendable {
-    case success(String)
+    case success(String, user: User? = nil)
     case failure(String)
 
     public var ok: Bool {
@@ -10,12 +11,17 @@ public enum AuthResult: Sendable {
     }
 
     public var message: String? {
-        if case .success(let msg) = self { return msg }
+        if case .success(let msg, _) = self { return msg }
         return nil
     }
 
     public var error: String? {
         if case .failure(let err) = self { return err }
+        return nil
+    }
+
+    public var user: User? {
+        if case .success(_, let user) = self { return user }
         return nil
     }
 }

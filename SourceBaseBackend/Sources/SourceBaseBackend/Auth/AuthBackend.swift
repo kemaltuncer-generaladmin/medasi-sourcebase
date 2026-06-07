@@ -32,16 +32,25 @@ public actor AuthBackend {
         config?.appleOAuthEnabled ?? false
     }
 
-    public func currentUser() -> User? {
-        supabase?.auth.currentUser
+    public func currentUser() async -> User? {
+        guard let supabase else { return nil }
+        // The synchronous `currentUser` can be stale (nil) immediately after a
+        // fresh signIn in supabase-swift v2 — the session is persisted through an
+        // isolated store that the sync accessor doesn't see yet. Fall back to the
+        // async `session` (loads/validates the stored session) so login reliably
+        // resolves the user and the app navigates past the auth screen.
+        if let user = supabase.auth.currentUser {
+            return user
+        }
+        return try? await supabase.auth.session.user
     }
 
-    public func currentUserNeedsProfile() -> Bool {
-        userNeedsProfile(currentUser())
+    public func currentUserNeedsProfile() async -> Bool {
+        userNeedsProfile(await currentUser())
     }
 
-    public func currentUserHasVerifiedEmail() -> Bool {
-        currentUser()?.emailConfirmedAt != nil
+    public func currentUserHasVerifiedEmail() async -> Bool {
+        (await currentUser())?.emailConfirmedAt != nil
     }
 
     public func getClient() -> SupabaseClient? {
@@ -89,8 +98,8 @@ public actor AuthBackend {
     public func signIn(email: String, password: String) async throws -> AuthResult {
         let auth = try authOrThrow()
         do {
-            _ = try await auth.signIn(email: email.trimmingCharacters(in: .whitespaces), password: password)
-            return .success("Giriş başarılı.")
+            let session = try await auth.signIn(email: email.trimmingCharacters(in: .whitespaces), password: password)
+            return .success("Giriş başarılı.", user: session.user)
         } catch {
             SBLog.auth.error("sign_in failed error=\(String(describing: error), privacy: .private)")
             throw error
@@ -230,12 +239,12 @@ public actor AuthBackend {
 
     public func verifyEmailOTP(email: String, token: String) async throws -> AuthResult {
         let auth = try authOrThrow()
-        try await auth.verifyOTP(
+        let response = try await auth.verifyOTP(
             email: email.trimmingCharacters(in: .whitespaces),
             token: token.trimmingCharacters(in: .whitespaces),
             type: .signup
         )
-        return .success("E-posta doğrulaması tamamlandı.")
+        return .success("E-posta doğrulaması tamamlandı.", user: response.user)
     }
 
     public func handleCallback(_ url: URL) async throws -> AuthCallbackResult {

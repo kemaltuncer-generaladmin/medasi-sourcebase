@@ -72,23 +72,36 @@ public final class SessionStore {
 
     // MARK: - Sign In
 
-    public func signIn(email: String, password: String) async {
+    @discardableResult
+    public func signIn(email: String, password: String) async -> Bool {
         isLoading = true
         errorMessage = nil
+        defer { isLoading = false }
 
         do {
             let result = try await withAuthTimeout {
                 try await AuthBackend.shared.signIn(email: email, password: password)
             }
-            if case .success = result {
-                currentUser = await AuthBackend.shared.currentUser()
-                successMessage = "Giriş başarılı."
+            if case .success(let message, let user) = result {
+                let resolvedUser: User?
+                if let user {
+                    resolvedUser = user
+                } else {
+                    resolvedUser = await AuthBackend.shared.currentUser()
+                }
+                guard let resolvedUser else {
+                    errorMessage = "Oturum açıldı ama kullanıcı bilgisi alınamadı. Lütfen tekrar dene."
+                    return false
+                }
+                currentUser = resolvedUser
+                successMessage = message
+                return true
             }
         } catch {
             errorMessage = friendlyAuthError(error)
         }
 
-        isLoading = false
+        return false
     }
 
     // MARK: - Sign Up
@@ -104,7 +117,7 @@ public final class SessionStore {
                 password: password,
                 profile: nil
             )
-            if case .success(let message) = result {
+            if case .success(let message, _) = result {
                 successMessage = message
             }
         } catch {
@@ -116,21 +129,34 @@ public final class SessionStore {
 
     // MARK: - Verify Email OTP
 
-    public func verifyEmailOTP(email: String, token: String) async {
+    @discardableResult
+    public func verifyEmailOTP(email: String, token: String) async -> Bool {
         isLoading = true
         errorMessage = nil
+        defer { isLoading = false }
 
         do {
             let result = try await AuthBackend.shared.verifyEmailOTP(email: email, token: token)
-            if case .success = result {
-                currentUser = await AuthBackend.shared.currentUser()
-                successMessage = "E-posta doğrulaması tamamlandı."
+            if case .success(let message, let user) = result {
+                let resolvedUser: User?
+                if let user {
+                    resolvedUser = user
+                } else {
+                    resolvedUser = await AuthBackend.shared.currentUser()
+                }
+                guard let resolvedUser else {
+                    errorMessage = "E-posta doğrulandı ama oturum bilgisi alınamadı. Lütfen tekrar giriş yap."
+                    return false
+                }
+                currentUser = resolvedUser
+                successMessage = message
+                return true
             }
         } catch {
             errorMessage = friendlyAuthError(error)
         }
 
-        isLoading = false
+        return false
     }
 
     // MARK: - Resend Verification Email
@@ -141,7 +167,7 @@ public final class SessionStore {
 
         do {
             let result = try await AuthBackend.shared.resendSignupEmail(email)
-            if case .success(let message) = result {
+            if case .success(let message, _) = result {
                 successMessage = message
             }
         } catch {
@@ -179,7 +205,7 @@ public final class SessionStore {
 
         do {
             let result = try await AuthBackend.shared.sendPasswordReset(email)
-            if case .success(let message) = result {
+            if case .success(let message, _) = result {
                 successMessage = message
             }
         } catch {
@@ -195,7 +221,7 @@ public final class SessionStore {
 
         do {
             let result = try await AuthBackend.shared.updatePassword(password)
-            if case .success(let message) = result {
+            if case .success(let message, _) = result {
                 currentUser = await AuthBackend.shared.currentUser()
                 successMessage = message
                 isLoading = false

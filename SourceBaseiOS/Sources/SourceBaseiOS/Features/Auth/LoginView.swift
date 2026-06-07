@@ -242,13 +242,16 @@ struct LoginView: View {
         session.clearMessages()
         let cleanEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         Task {
-            await session.signIn(email: cleanEmail, password: password)
+            let didSignIn = await session.signIn(email: cleanEmail, password: password)
+            if didSignIn {
+                navigateAfterLogin(email: cleanEmail)
+            }
         }
     }
 
-    private func navigateAfterLogin() {
+    private func navigateAfterLogin(email fallbackEmail: String? = nil) {
         if session.needsEmailVerification {
-            router.replace(with: .verifyEmail(email: email))
+            router.replace(with: .verifyEmail(email: session.email.isEmpty ? fallbackEmail ?? email : session.email))
         } else if session.needsProfileSetup {
             router.replace(with: .profileSetup)
         } else {

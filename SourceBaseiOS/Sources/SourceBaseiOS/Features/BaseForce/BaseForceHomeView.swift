@@ -19,7 +19,7 @@ struct BaseForceHomeView: View {
 
     private var activeBaseForceJobs: Int {
         workspaceStore.generationJobs.filter { job in
-            SourceBaseQueueSurface.baseForce.includes(job.kind) && job.isActive
+            SourceBaseQueueSurface.all.includes(job.kind) && job.isActive
         }.count
     }
 
@@ -47,7 +47,8 @@ struct BaseForceHomeView: View {
                     momentumSection.sbEntrance(2)
                     primaryFactoriesSection.sbEntrance(3)
                     secondaryFactoriesSection.sbEntrance(4)
-                    recentGenerationsSection.sbEntrance(5)
+                    deepToolsSection.sbEntrance(5)
+                    recentGenerationsSection.sbEntrance(6)
                 }
             }
             .padding(SBSpacing.lg)
@@ -55,7 +56,7 @@ struct BaseForceHomeView: View {
             .sbReadableWidth(1180)
         }
         .sbPageBackground(tone: .cool)
-        .navigationTitle("BaseForce")
+        .navigationTitle("Üret")
         .sbOpaqueNavBar()
         .task {
             await loadWorkspace()
@@ -97,7 +98,7 @@ struct BaseForceHomeView: View {
                     icon: "clock",
                     variant: .secondary,
                     size: .medium,
-                    action: { router.navigate(to: .queue(surface: .baseForce)) }
+                    action: { router.navigate(to: .queue(surface: .all)) }
                 )
             }
         } footer: {
@@ -212,7 +213,71 @@ struct BaseForceHomeView: View {
                     subtitle: activeBaseForceJobs == 0 ? "Hazırlananları takip et" : "\(activeBaseForceJobs) çıktı hazırlanıyor",
                     color: SBColors.blue
                 ) {
-                    router.navigate(to: .queue(surface: .baseForce))
+                    router.navigate(to: .queue(surface: .all))
+                }
+            }
+        }
+    }
+
+    // MARK: - Deep / clinical tools (merged from the old SourceLab tab)
+
+    private var deepToolsSection: some View {
+        VStack(alignment: .leading, spacing: SBSpacing.md) {
+            SBSectionHeader(title: "Klinik & derin tekrar")
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 154), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
+                factoryTile(
+                    icon: "cross.case",
+                    title: "Klinik Senaryo",
+                    subtitle: "Ayırıcı tanı ve karar pratiği",
+                    color: SBColors.purple
+                ) {
+                    openDeepTool(.clinical)
+                }
+
+                factoryTile(
+                    icon: "bolt",
+                    title: "Sınav Sabahı",
+                    subtitle: "7 dakikalık kritik tarama",
+                    color: SBColors.orange
+                ) {
+                    openDeepTool(.examMorning)
+                }
+
+                factoryTile(
+                    icon: "checklist",
+                    title: "Öğrenme Planı",
+                    subtitle: "Bugün, 72 saat ve 7 gün",
+                    color: SBColors.green
+                ) {
+                    openDeepTool(.plan)
+                }
+
+                factoryTile(
+                    icon: "mic",
+                    title: "Podcast",
+                    subtitle: "Yolda dinlenecek tekrar",
+                    color: SBColors.red
+                ) {
+                    openDeepTool(.podcast)
+                }
+
+                factoryTile(
+                    icon: "chart.bar.doc.horizontal",
+                    title: "İnfografik",
+                    subtitle: "Tek bakışlık görsel hafıza",
+                    color: SBColors.cyan
+                ) {
+                    openDeepTool(.infographic)
+                }
+
+                factoryTile(
+                    icon: "point.3.connected.trianglepath.dotted",
+                    title: "Zihin Haritası",
+                    subtitle: "Kavram ilişkilerini ayır",
+                    color: SBColors.blue
+                ) {
+                    openDeepTool(.mindMap)
                 }
             }
         }
@@ -260,7 +325,7 @@ struct BaseForceHomeView: View {
     private var recentGenerationsSection: some View {
         VStack(alignment: .leading, spacing: SBSpacing.md) {
             SBSectionHeader(title: "Son üretimler", action: "Tümünü gör") {
-                router.navigate(to: .queue(surface: .baseForce))
+                router.navigate(to: .queue(surface: .all))
             }
 
             if latestGenerations.isEmpty {
@@ -342,7 +407,7 @@ struct BaseForceHomeView: View {
                         action: {
                             Task {
                                 _ = await workspaceStore.enqueueDriveGeneration(file: file, kind: output.kind)
-                                router.navigate(to: .queue(surface: .baseForce))
+                                router.navigate(to: .queue(surface: .all))
                             }
                         }
                     )
@@ -414,6 +479,12 @@ struct BaseForceHomeView: View {
         } else {
             router.navigate(to: route)
         }
+    }
+
+    // Deep/clinical tools manage their own source selection inside the tool
+    // view (as the old SourceLab tab did), so navigate straight there.
+    private func openDeepTool(_ route: AppRoute) {
+        router.navigate(to: route)
     }
 
     // MARK: - Actions

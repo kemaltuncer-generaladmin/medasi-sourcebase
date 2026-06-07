@@ -31,6 +31,10 @@ import {
   getObjectMetadata,
   ObjectMetadata,
 } from "./services/object-storage.ts";
+import {
+  appleRootCertificates,
+  verifyAndDecodeAppleJws,
+} from "../_shared/appstore_jws.ts";
 
 type JsonMap = Record<string, unknown>;
 type StorageObjectMetadata = ObjectMetadata;
@@ -125,6 +129,8 @@ Deno.serve(async (request) => {
         return success(await renameFile(user.id, payload));
       case "move_files":
         return success(await moveFiles(user.id, payload));
+      case "move_generated_output":
+        return success(await moveGeneratedOutput(user.id, payload));
       case "delete_files":
         return success(await deleteFiles(user.id, payload));
       case "retry_file_processing":
@@ -133,6 +139,8 @@ Deno.serve(async (request) => {
         return success(await addToCollection(user.id, payload));
       case "purchase_medasicoin":
         return success(await purchaseMedasiCoin(user.id, payload));
+      case "redeem_appstore_purchase":
+        return success(await redeemAppStorePurchase(user, payload));
       case "sourcebase_question_session":
         return success(await sourcebaseQuestionSession(user.id, payload));
       case "submit_sourcebase_question_answer":
@@ -147,6 +155,8 @@ Deno.serve(async (request) => {
         return success(await completeProfileAvatarUpload(user.id, payload));
       case "submit_support_form":
         return success(await submitSupportForm(user.id, payload));
+      case "request_account_deletion":
+        return success(await requestAccountDeletion(user, payload));
 
       // AI Generation actions
       case "process_file_extraction":
@@ -1400,6 +1410,334 @@ async function supabaseRest(path: string, init: RequestInit) {
     throw new SafeError("DATABASE_ERROR", "SourceBase verisi işlenemedi.", 500);
   }
   return response;
+}
+
+// ===========================================================================
+// Restored after the 2026-06 backend migration (these handlers were dropped
+// when the live function was re-synced from an incomplete local snapshot, yet
+// the iOS client still calls all three). Storage-agnostic: pure DB + shared
+// MedasiCoin wallet RPCs, so safe alongside the S3 migration. See git history.
+// ===========================================================================
+
+// Save an AI output into a course/section (the "Bölüme kaydet" action).
+async function moveGeneratedOutput(userId: string, payload: JsonMap) {
+  const outputId = requireUuid(payload.outputId, "outputId");
+  const courseId = requireUuid(payload.courseId, "courseId");
+  const sectionId = requireUuid(payload.sectionId, "sectionId");
+  await assertOwned(userId, "courses", courseId);
+  await assertOwned(userId, "sections", sectionId);
+  await assertSectionInCourse(userId, sectionId, courseId);
+  await assertOwned(userId, "generated_outputs", outputId);
+  const rows = await dbPatchReturning(
+    "generated_outputs",
+    `id=eq.${outputId}&owner_user_id=eq.${userId}`,
+    {
+      course_id: courseId,
+      section_id: sectionId,
+      updated_at: new Date().toISOString(),
+    },
+  );
+  await audit(userId, "move_generated_output", "generated_output", outputId, {
+    courseId,
+    sectionId,
+  });
+  return { rows };
+}
+
+// File a deletion request as a support ticket (App Store account-deletion path).
+async function requestAccountDeletion(
+  user: { id: string; email?: string },
+  payload: JsonMap,
+) {
+  const email = normalizeEmail(
+    optionalString(payload.email) ?? user.email ?? "destek@sourcebase.local",
+  );
+  let ticketId: string | null = null;
+  try {
+    const [ticket] = await dbInsert("support_tickets", [{
+      owner_user_id: user.id,
+      topic: "Hesap silme talebi",
+      email,
+      message:
+        "Kullanıcı SourceBase iOS içinden hesap silme talebi gönderdi. Kimlik ve veri silme süreci kayıtlı e-posta üzerinden takip edilmeli.",
+      status: "open",
+      metadata: {
+        source: "account_deletion",
+        submittedAt: new Date().toISOString(),
+      },
+    }]);
+    ticketId = optionalString(ticket?.id) ?? null;
+  } catch (_error) {
+    // Best-effort: never block the user's deletion flow on a ticket write.
+    ticketId = null;
+  }
+  await audit(
+    user.id,
+    "request_account_deletion",
+    "support_ticket",
+    ticketId,
+    { email, stored: Boolean(ticketId) },
+  );
+  return { status: "received", ticketId };
+}
+
+// Redeem a verified StoreKit 2 transaction and credit MedasiCoin.
+// All credited values come from the Apple-signed JWS payload — the
+// client-sent productId/transactionId are treated as untrusted hints.
+async function redeemAppStorePurchase(
+  user: { id: string; email?: string },
+  payload: JsonMap,
+) {
+  const jws = requireString(payload.jws, "jws");
+  const expectedBundleId =
+    optionalString(Deno.env.get("SOURCEBASE_APP_STORE_BUNDLE_ID")) ??
+      "tr.com.medasi.sourcebase";
+
+  let transaction: JsonMap;
+  try {
+    transaction = await verifyAndDecodeAppleJws(jws, appleRootCertificates());
+  } catch (_error) {
+    throw new SafeError(
+      "APPSTORE_VERIFY_FAILED",
+      "App Store satın alması doğrulanamadı.",
+      400,
+    );
+  }
+
+  if (optionalString(transaction.bundleId) !== expectedBundleId) {
+    throw new SafeError(
+      "APPSTORE_BUNDLE_MISMATCH",
+      "Satın alma bu uygulamaya ait değil.",
+      400,
+    );
+  }
+
+  const transactionId = requireString(
+    transaction.transactionId ?? transaction.originalTransactionId,
+    "transactionId",
+  );
+  const appleProductId = requireString(transaction.productId, "productId");
+
+  const prefix = `${expectedBundleId}.`;
+  const productCode = appleProductId.startsWith(prefix)
+    ? appleProductId.slice(prefix.length)
+    : appleProductId;
+
+  const product = await loadMedasiCoinProduct(productCode);
+  const sharedProduct = await loadSharedMedasiCoinProduct(productCode);
+  const coinUnits = productCoinUnits(sharedProduct);
+  if (coinUnits <= 0 || productCode.toLowerCase().includes("subscription")) {
+    throw new SafeError(
+      "PRODUCT_NOT_PURCHASABLE",
+      "Bu ürün App Store üzerinden coin paketi olarak satılamaz.",
+      400,
+    );
+  }
+
+  const providerPaymentId = `appstore:${transactionId}`;
+  const existing = await dbSelect(
+    `purchases?provider=eq.appstore&provider_payment_id=eq.${
+      encodeURIComponent(providerPaymentId)
+    }&select=id,status&limit=1`,
+  );
+  const beforeUnits = await sharedWalletBalanceUnits(user.id);
+  await sharedRpc("grant_store_product", {
+    p_user_id: user.id,
+    p_product_id: requireUuid(sharedProduct.id, "shared_product_id"),
+    p_provider: "appstore",
+    p_provider_transaction_id: providerPaymentId,
+    p_status: "active",
+    p_raw_receipt: {
+      app_key: "sourcebase",
+      provider: "appstore",
+      transactionId,
+      productId: appleProductId,
+      environment: optionalString(transaction.environment),
+      transaction,
+    },
+  });
+  const afterUnits = await sharedWalletBalanceUnits(user.id);
+
+  if (existing.some((row) => row.status === "completed")) {
+    return {
+      status: "ok",
+      alreadyProcessed: true,
+      transactionId,
+      productCode,
+      wallet_balance: afterUnits / 100,
+    };
+  }
+
+  const productId = requireUuid(product.id, "product_id");
+  const priceCents = numericValue(product.price_cents) ?? 0;
+  const currency = optionalString(product.currency) ?? "TRY";
+  if (existing.length > 0) {
+    await dbPatch(
+      "purchases",
+      `id=eq.${existing[0].id}`,
+      { status: "completed", updated_at: new Date().toISOString() },
+    );
+  } else {
+    await dbInsert("purchases", [{
+      user_id: user.id,
+      product_id: productId,
+      provider: "appstore",
+      provider_payment_id: providerPaymentId,
+      amount_cents: priceCents,
+      currency,
+      status: "completed",
+    }]);
+  }
+
+  await dbInsert("wallet_transactions", [{
+    user_id: user.id,
+    job_id: null,
+    amount_mc: coinUnits / 100,
+    amount_units: coinUnits,
+    type: "purchase",
+    reason: `appstore_purchase:${productCode}`,
+    balance_before: beforeUnits / 100,
+    balance_after: afterUnits / 100,
+    metadata: {
+      provider: "appstore",
+      transactionId,
+      productId: appleProductId,
+      environment: optionalString(transaction.environment),
+      product: medasiCoinProductSnapshot(sharedProduct, coinUnits),
+    },
+  }]);
+
+  return {
+    status: "ok",
+    transactionId,
+    productCode,
+    added_mc: coinUnits / 100,
+    wallet_balance: afterUnits / 100,
+  };
+}
+
+// --- sourcebase-local coin product (FK target for purchases) ---
+async function loadMedasiCoinProduct(productCode: string) {
+  const rows = await dbSelect(
+    `products?slug=eq.${
+      encodeURIComponent(productCode)
+    }&status=eq.published&select=*&limit=1`,
+  );
+  const product = rows[0];
+  if (!product) {
+    throw new SafeError("PRODUCT_NOT_FOUND", "Seçilen MC paketi bulunamadı.", 404);
+  }
+  return product;
+}
+
+// --- shared ecosystem coin product (public.store_products) ---
+async function loadSharedMedasiCoinProduct(productCode: string) {
+  const rows = await sharedDbSelect(
+    `store_products?code=eq.${
+      encodeURIComponent(productCode)
+    }&is_active=eq.true&select=*&limit=1`,
+  );
+  const product = rows[0];
+  if (!product || productCoinUnits(product) <= 0) {
+    throw new SafeError(
+      "SHARED_PRODUCT_NOT_FOUND",
+      "Seçilen MC paketi ortak mağazada bulunamadı.",
+      404,
+    );
+  }
+  return product;
+}
+
+function medasiCoinProductSnapshot(product: JsonMap, coinUnits: number) {
+  const metadata = isRecord(product.metadata) ? product.metadata : {};
+  return {
+    id: optionalString(product.id),
+    code: optionalString(product.code) ??
+      optionalString(product.slug) ??
+      optionalString(metadata.code) ?? "",
+    title: optionalString(product.title) ??
+      optionalString(metadata.title) ??
+      `${coinUnits / 100} MC Paketi`,
+    price_cents: numericValue(product.price_cents) ??
+      numericValue(metadata.price_cents) ?? 0,
+    currency: (optionalString(product.currency) ??
+      optionalString(metadata.currency) ?? "TRY").toUpperCase(),
+    coin_amount: coinUnits / 100,
+    amount_units: coinUnits,
+  };
+}
+
+function productCoinUnits(product: JsonMap) {
+  const metadata = isRecord(product.metadata) ? product.metadata : {};
+  const coinAmount = numericValue(product.coin_amount) ??
+    numericValue(product.coins) ??
+    numericValue(product.medasicoin_amount) ??
+    numericValue(metadata.coin_amount) ??
+    numericValue(metadata.coins) ??
+    numericValue(metadata.medasicoin_amount) ?? 0;
+  return Math.max(0, Math.round(coinAmount * 100));
+}
+
+// --- shared MedasiCoin wallet (public schema, service-role) ---
+async function sharedWalletBalanceUnits(userId: string) {
+  const profile = await sharedRpc("sync_wallet_profile", { p_user_id: userId });
+  return Math.round((numericValue(profile.wallet_balance) ?? 0) * 100);
+}
+
+async function sharedRpc(name: string, body: JsonMap): Promise<JsonMap> {
+  const response = await sharedSupabaseRest(`rpc/${name}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  const data: unknown = await response.json();
+  if (typeof data === "number" || typeof data === "string") {
+    return { wallet_balance: Number(data) };
+  }
+  return isRecord(data) ? data : {};
+}
+
+async function sharedDbSelect(path: string): Promise<JsonMap[]> {
+  const response = await sharedSupabaseRest(path, { method: "GET" });
+  const data = await response.json();
+  return Array.isArray(data) ? data.filter(isRecord) : [];
+}
+
+// Shared (public-schema) REST — for store_products + wallet RPCs used across
+// the whole MedAsi ecosystem. Distinct from supabaseRest (sourcebase schema).
+async function sharedSupabaseRest(path: string, init: RequestInit) {
+  const supabaseUrl = getSupabaseUrl();
+  const serviceKey = getSupabaseServiceRoleKey();
+  if (!supabaseUrl || !serviceKey) {
+    throw new SafeError(
+      "DATABASE_NOT_CONFIGURED",
+      "Ortak MedasiCoin veritabanı yapılandırılmamış.",
+      500,
+    );
+  }
+  const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
+    ...init,
+    headers: {
+      apikey: serviceKey,
+      authorization: `Bearer ${serviceKey}`,
+      "content-type": "application/json",
+      "accept-profile": "public",
+      "content-profile": "public",
+      ...(init.headers ?? {}),
+    },
+  });
+  if (!response.ok) {
+    throw new SafeError(
+      "DATABASE_ERROR",
+      "Ortak MedasiCoin verisi işlenemedi.",
+      500,
+    );
+  }
+  return response;
+}
+
+function numericValue(value: unknown) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
 }
 
 function success(data: unknown) {
