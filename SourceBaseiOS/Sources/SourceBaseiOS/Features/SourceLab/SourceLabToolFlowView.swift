@@ -121,7 +121,7 @@ struct SourceLabToolFlowView: View {
                         .foregroundStyle(SBColors.navy)
                     Spacer()
                     Button("Değiştir") {
-                        router.navigate(to: .sourcePicker)
+                        router.beginSourceSelection(from: .baseForce, destination: .route(factoryRoute))
                     }
                     .font(SBTypography.labelSmall)
                     .foregroundStyle(SBColors.blue)
@@ -155,7 +155,7 @@ struct SourceLabToolFlowView: View {
                         title: "Hazır kaynak seç",
                         message: "Üretime başlamadan önce kullanacağın hazır kaynağı seç.",
                         actionLabel: "Kaynak seç",
-                        onAction: { router.navigate(to: .sourcePicker) }
+                        onAction: { router.beginSourceSelection(from: .baseForce, destination: .route(factoryRoute)) }
                     )
                 }
             }
@@ -227,7 +227,7 @@ struct SourceLabToolFlowView: View {
                         .background(SBColors.field)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("\(index + 1). çıktı bölümü")
+                        .accessibilityLabel("\(index + 1). çalışma bölümü")
                         .accessibilityValue(section)
                     }
                 }
@@ -305,7 +305,7 @@ struct SourceLabToolFlowView: View {
             if canGenerate {
                 generate()
             } else {
-                router.navigate(to: .sourcePicker)
+                router.beginSourceSelection(from: .baseForce, destination: .route(factoryRoute))
             }
         }
         .disabled(isGenerating)
@@ -315,7 +315,7 @@ struct SourceLabToolFlowView: View {
 
     private func generate() {
         guard let readyFile else {
-            workspaceStore.toast("Üretim için önce hazır bir kaynak seç.")
+            workspaceStore.toast("Önce hazır bir kaynak seç.")
             return
         }
         let controlKey: String
@@ -384,6 +384,16 @@ struct SourceLabToolFlowView: View {
         await workspaceStore.loadWorkspace()
             errorMessage = workspaceStore.errorMessage
         isLoading = false
+    }
+
+    private var factoryRoute: AppRoute {
+        switch kind {
+        case .podcast: return .podcast
+        case .infographic: return .infographic
+        case .mindMap: return .mindMap
+        case .learningPlan: return .plan
+        default: return .baseForce
+        }
     }
 
     private func infographicLearningFocus(for control: String) -> String {

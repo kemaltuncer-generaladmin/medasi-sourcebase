@@ -137,7 +137,7 @@ struct SettingsView: View {
 
             SBNotice(
                 icon: "internaldrive",
-                message: "Drive alanındaki kaynak, çıktı ve koleksiyon özetin burada gösterilir.",
+                message: "Drive kaynakların, çalışmaların ve koleksiyonların burada özetlenir.",
                 tint: SBColors.cyan
             )
         }

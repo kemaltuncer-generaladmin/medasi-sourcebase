@@ -141,7 +141,7 @@ struct ClinicalView: View {
                     Spacer()
 
                     Button {
-                        router.navigate(to: .sourcePicker)
+                        router.beginSourceSelection(from: .baseForce, destination: .route(.clinical))
                     } label: {
                         HStack(spacing: SBSpacing.xs) {
                             Image(systemName: "folder")
@@ -342,7 +342,7 @@ struct ClinicalView: View {
                 if canGenerate {
                     generate()
                 } else if !hasSources {
-                    router.navigate(to: .sourcePicker)
+                    router.beginSourceSelection(from: .baseForce, destination: .route(.clinical))
                 } else {
                     workspaceStore.toast("Seçili kaynak hazır değil.")
                 }
@@ -403,7 +403,7 @@ struct ClinicalView: View {
         guard let file = selectedSources
             .compactMap({ workspaceStore.file(id: $0) })
             .first(where: { workspaceStore.isReadyForGeneration($0) }) else {
-            workspaceStore.toast("Üretim için önce hazır bir kaynak seç.")
+            workspaceStore.toast("Önce hazır bir kaynak seç.")
             return
         }
         isGenerating = true

@@ -3,7 +3,7 @@ import SwiftUI
 struct CentralAIView: View {
     var body: some View {
         ScrollView {
-            Text("Şu an geliştirilme aşamasında.")
+            Text("Yakında burada olacak.")
                 .font(SBTypography.bodyMedium)
                 .foregroundStyle(SBColors.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)

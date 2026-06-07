@@ -152,7 +152,7 @@ struct ProfileMenuDetailView: View {
             }
             Button("Vazgeç", role: .cancel) {}
         } message: {
-            Text("Bu işlem silme talebini backend'e iletir. Profil, Drive ve üretim kredisi verilerinin silme süreci başlatılır ve oturumun kapatılır.")
+            Text("Hesabın ve çalışma alanın silme sürecine alınır. Oturumun kapatılır.")
         }
     }
 
@@ -307,14 +307,14 @@ struct ProfileMenuDetailView: View {
 
                 faqRow(
                     question: "PDF yükledim, neden işleniyor görünüyor?",
-                    answer: "Metin çıkarımı tamamlanmadan kaynak üretime açılmaz. Taranmış/görsel PDF'lerde OCR gerektiği için açık hata gösterilir."
+                    answer: "Metin çıkarımı bitince kaynak hazır olur. Taranmış PDF'lerde daha net dosya gerekebilir."
                 )
                 faqRow(
                     question: "Üretilen sorular nerede çözülür?",
-                    answer: "Soru üretimi tamamlanınca doğrudan Qlinik tarzı çözüm ekranı açılır. Koleksiyonlardan aynı ekrana dönebilirsin."
+                    answer: "Soru hazır olunca Koleksiyonlar veya Kuyruk ekranından çözüm ekranına geçebilirsin."
                 )
                 faqRow(
-                    question: "PDF çıktıyı nereden alırım?",
+                    question: "PDF dosyasını nereden alırım?",
                     answer: "Sınav özeti, algoritma, karşılaştırma ve zihin haritası çalışma ekranlarında PDF dışa aktarımı bulunur."
                 )
                 faqRow(
@@ -331,7 +331,7 @@ struct ProfileMenuDetailView: View {
                 Picker("Konu", selection: $supportTopic) {
                     ForEach([
                         "Yükleme ve dosya işleme",
-                        "Üretim çıktıları",
+                        "Üretim çalışmaları",
                         "Ödeme ve paketler",
                         "Profil ve hesap",
                         "Diğer"
@@ -394,7 +394,7 @@ struct ProfileMenuDetailView: View {
 
             SBNotice(
                 icon: "info.circle",
-                message: "SourceBase, Medasi içinde kişisel kaynaklarını canlı çalışma materyaline dönüştüren premium öğrenme alanıdır. Drive kaynakları ve Üret çıktıları aynı çalışma alanında tutulur.",
+                message: "SourceBase, kaynaklarını çalışma materyaline dönüştürür. Drive, Kuyruk ve Koleksiyonlar aynı çalışma alanında çalışır.",
                 tint: SBColors.blue
             )
 
@@ -403,9 +403,8 @@ struct ProfileMenuDetailView: View {
                     .font(SBTypography.titleMedium)
                     .foregroundStyle(SBColors.navy)
                 aboutBullet("PDF, PPTX, DOCX, PPT ve DOC kaynaklarını ders-bölüm düzeninde saklar.")
-                aboutBullet("Flashcard, Qlinik formatlı soru, sınav sabahı özeti, algoritma, karşılaştırma ve zihin haritası üretir.")
-                aboutBullet("Özel çalışma ekranları ve Medasi PDF şablonlarıyla çıktıyı okunabilir çalışma materyaline taşır.")
-                aboutBullet("MedasiChat, Recall ekosistem bağlantısı tamamlanana kadar geliştirme aşamasında kalır.")
+                aboutBullet("Flashcard, soru, sınav sabahı özeti, akış, tablo ve zihin haritası üretir.")
+                aboutBullet("Hazır çalışmalar Koleksiyonlar ve çalışma ekranlarında açılır.")
             }
         }
     }

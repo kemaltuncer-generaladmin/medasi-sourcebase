@@ -24,7 +24,7 @@ public enum SBEmptyStateContext {
     var motivationLine: String? {
         switch self {
         case .drive: return "Her yüklenen kaynak seni bir adım öne taşır."
-        case .baseForce: return "Doğru kaynak, doğru çıktıya giden ilk adım."
+        case .baseForce: return "Doğru kaynak, güçlü çalışmanın ilk adımı."
         case .generationWaiting: return "Biraz sabır, kaliteli sonuç geliyor."
         case .completedSuccess: return "Harika iş. Şimdi çalışmaya geçebilirsin."
         case .sourceMissing: return "Uygun bir kaynak seçince devam edebilirsin."

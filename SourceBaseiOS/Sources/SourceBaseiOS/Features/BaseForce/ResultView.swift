@@ -77,7 +77,7 @@ struct ResultView: View {
             .sbFloatingTabContentPadding()
         }
         .sbPageBackground(tone: .cool)
-        .navigationTitle(result?.title ?? "Üretim Sonucu")
+        .navigationTitle(result?.title ?? "Çalışma")
         .sbInlineNavTitle()
         .task {
             await monitorResult()
@@ -91,7 +91,7 @@ struct ResultView: View {
             if let result {
                 Text(result.sourceTitle)
             } else {
-                Text("Sonuç burada görünür.")
+                Text("Çalışma hazır olunca burada görünür.")
             }
         }
         .font(SBTypography.bodyMedium)
@@ -101,16 +101,16 @@ struct ResultView: View {
     private func headerHero(_ result: GenerationResult) -> some View {
         SBSignatureHero(
             eyebrow: "Sonuç",
-            title: "\(outputKindLabel(result.kind)) hazır",
+            title: "\(SBOutputStyle.outputKindLabel(result.kind)) hazır",
             message: "\(result.sourceTitle) kaynağından üretildi. Şimdi oku, kopyala ya da koleksiyonda aç.",
-            icon: outputIcon(result.kind),
-            tint: outputColor(result.kind)
+            icon: SBOutputStyle.outputIcon(result.kind),
+            tint: SBOutputStyle.outputColor(result.kind)
         ) {
             EmptyView()
         } footer: {
             SBMetricRibbon(items: [
                 .init(icon: "checkmark.seal.fill", value: "Hazır", label: "durum", tint: SBColors.green),
-                .init(icon: "doc.text", value: outputKindLabel(result.kind), label: "tür", tint: outputColor(result.kind)),
+                .init(icon: "doc.text", value: SBOutputStyle.outputKindLabel(result.kind), label: "tür", tint: SBOutputStyle.outputColor(result.kind)),
                 .init(icon: "creditcard", value: result.mcCostLabel ?? "Güvenli", label: "MC", tint: SBColors.orange)
             ])
         }
@@ -119,13 +119,13 @@ struct ResultView: View {
     // MARK: - Result Preview Card
 
     private func resultPreviewCard(_ result: GenerationResult) -> some View {
-        SBCard(radius: 18, borderColor: outputColor(result.kind).opacity(0.18)) {
+        SBCard(radius: 18, borderColor: SBOutputStyle.outputColor(result.kind).opacity(0.18)) {
             VStack(alignment: .leading, spacing: SBSpacing.md) {
                 HStack(spacing: SBSpacing.md) {
-                    SBIconTile(icon: outputIcon(result.kind), tint: outputColor(result.kind), size: 46, radius: 13)
+                    SBIconTile(icon: SBOutputStyle.outputIcon(result.kind), tint: SBOutputStyle.outputColor(result.kind), size: 46, radius: 13)
 
                     VStack(alignment: .leading, spacing: SBSpacing.xs) {
-                        Text(outputKindLabel(result.kind))
+                        Text(SBOutputStyle.outputKindLabel(result.kind))
                             .font(SBTypography.titleSmall)
                             .foregroundStyle(SBColors.navy)
 
@@ -154,10 +154,10 @@ struct ResultView: View {
 
                     Text(result.mcCostLabel ?? "Kaydedildi")
                         .font(SBTypography.labelSmall)
-                        .foregroundStyle(outputColor(result.kind))
+                        .foregroundStyle(SBOutputStyle.outputColor(result.kind))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(outputColor(result.kind).opacity(0.08))
+                        .background(SBOutputStyle.outputColor(result.kind).opacity(0.08))
                         .clipShape(Capsule())
                 }
             }
@@ -173,11 +173,11 @@ struct ResultView: View {
                     .sbScaledFont(size: 32, weight: .semibold)
                     .foregroundStyle(SBColors.orange)
 
-                Text("Boş içerik döndü")
+                Text("İçerik hazırlanamadı")
                     .font(SBTypography.titleSmall)
                     .foregroundStyle(SBColors.navy)
 
-                Text("Yeniden üretmeyi deneyebilirsin.")
+                Text("Kuyruktan tekrar deneyebilirsin.")
                     .font(SBTypography.bodySmall)
                     .foregroundStyle(SBColors.muted)
                     .multilineTextAlignment(.center)
@@ -197,11 +197,11 @@ struct ResultView: View {
                     .sbScaledFont(size: 28, weight: .semibold)
                     .foregroundStyle(SBColors.orange)
 
-                Text("Sonuç görüntülendi")
+                Text("Çalışma açıldı")
                     .font(SBTypography.titleSmall)
                     .foregroundStyle(SBColors.navy)
 
-                Text("Koleksiyon bağlantısı yenilenemedi. Koleksiyonları açıp listeyi yenileyebilirsin.\n\(error)")
+                Text("Koleksiyon yenilenemedi. Listeyi tekrar açıp deneyebilirsin.")
                     .font(SBTypography.bodySmall)
                     .foregroundStyle(SBColors.muted)
                     .multilineTextAlignment(.center)
@@ -270,7 +270,7 @@ struct ResultView: View {
                     .font(SBTypography.titleSmall)
                     .foregroundStyle(SBColors.navy)
 
-                Text("Kaynağından bir çalışma çıktısı üretip burada görüntüleyebilirsin.")
+                Text("Kaynağından bir çalışma başlatıp burada açabilirsin.")
                     .font(SBTypography.bodySmall)
                     .foregroundStyle(SBColors.muted)
                     .multilineTextAlignment(.center)
@@ -283,7 +283,7 @@ struct ResultView: View {
 
     private var nextStepButton: some View {
         SBButton(
-            "Yeni üretim başlat",
+            "Yeni çalışma başlat",
             icon: "bolt.fill",
             variant: .secondary,
             size: .large,
@@ -293,54 +293,6 @@ struct ResultView: View {
     }
 
     // MARK: - Helpers
-
-    private func outputIcon(_ kind: GeneratedKind) -> String {
-        switch kind {
-        case .flashcard: return "rectangle.on.rectangle"
-        case .question: return "questionmark.circle"
-        case .summary: return "doc.text"
-        case .examMorningSummary: return "alarm"
-        case .algorithm: return "arrow.triangle.branch"
-        case .comparison, .table: return "tablecells"
-        case .clinicalScenario: return "cross.case"
-        case .learningPlan: return "calendar.badge.clock"
-        case .podcast: return "headphones"
-        case .infographic: return "chart.bar"
-        case .mindMap: return "point.3.connected.trianglepath.dotted"
-        }
-    }
-
-    private func outputColor(_ kind: GeneratedKind) -> Color {
-        switch kind {
-        case .flashcard: return SBColors.blue
-        case .question: return SBColors.questionTint
-        case .summary: return SBColors.purple
-        case .examMorningSummary: return SBColors.purple
-        case .algorithm: return SBColors.orange
-        case .comparison, .table: return SBColors.blue
-        case .clinicalScenario: return SBColors.orange
-        case .learningPlan: return SBColors.green
-        case .podcast: return SBColors.red
-        case .infographic: return SBColors.cyan
-        case .mindMap: return SBColors.purple
-        }
-    }
-
-    private func outputKindLabel(_ kind: GeneratedKind) -> String {
-        switch kind {
-        case .flashcard: return "Flashcard"
-        case .question: return "Soru"
-        case .summary: return "Özet"
-        case .examMorningSummary: return "Sınav Sabahı"
-        case .algorithm: return "Algoritma"
-        case .comparison, .table: return "Tablo"
-        case .clinicalScenario: return "Klinik Senaryo"
-        case .learningPlan: return "Öğrenme Planı"
-        case .podcast: return "Podcast"
-        case .infographic: return "İnfografik"
-        case .mindMap: return "Zihin Haritası"
-        }
-    }
 
     private func previewText(_ content: String) -> String {
         let cleaned = content
@@ -356,7 +308,7 @@ struct ResultView: View {
 
     private func openStudyOutput() {
         guard let output = findOutput() else {
-            workspaceStore.toast("Hazır çalışma çıktısı bulunamadı.")
+            workspaceStore.toast("Hazır çalışma bulunamadı.")
             return
         }
         saveError = nil
@@ -419,7 +371,7 @@ struct ResultView: View {
             errorMessage = nil
         }
 
-        for attempt in 0..<120 {
+        for attempt in 0..<60 {
             if await loadResult() || didForwardToStudy {
                 return
             }
@@ -433,7 +385,7 @@ struct ResultView: View {
 
         if !didForwardToStudy {
             isLoading = false
-            errorMessage = "Üretim beklenenden uzun sürdü. Kuyruk ekranından takip edip hazır olduğunda sonucu açabilirsin."
+            errorMessage = "Üretim beklenenden uzun sürdü. Kuyruktan takip edebilirsin."
         }
     }
 
@@ -513,11 +465,11 @@ struct ResultView: View {
     private func progressText(for job: SBGenerationJob) -> String {
         switch job.status {
         case .queued:
-            return "Çalışma çıktısı kuyruğa alındı. Hazır olduğunda sonuç ekranına geçeceksin."
+            return "Çalışma kuyruğa eklendi."
         case .running:
-            return "Üretim devam ediyor • \(Int(job.progress * 100))%"
+            return "Hazırlanıyor • \(Int(job.progress * 100))%"
         case .completed:
-            return "Üretim tamamlandı. Çalışma çıktısı kaydediliyor."
+            return "Çalışma hazır. Kaydediliyor."
         case .failed(let message):
             return message
         }

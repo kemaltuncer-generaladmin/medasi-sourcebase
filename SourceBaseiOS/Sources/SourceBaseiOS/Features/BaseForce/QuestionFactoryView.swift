@@ -21,7 +21,7 @@ struct QuestionFactoryView: View {
     enum QuestionType: String, CaseIterable {
         case multipleChoice = "Test"
         case clinicalCase = "Klinik Vaka"
-        case qlinik = "Qlinik"
+        case qlinik = "Klinik"
     }
 
     enum Difficulty: String, CaseIterable {
@@ -47,7 +47,7 @@ struct QuestionFactoryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SBSpacing.lg) {
+            VStack(alignment: .leading, spacing: BaseForceFactoryStyle.screenSpacing) {
                 if isLoading {
                     SBLoadingState(
                         icon: "questionmark.circle",
@@ -71,7 +71,7 @@ struct QuestionFactoryView: View {
                     }
                 }
             }
-            .padding(SBSpacing.lg)
+            .padding(BaseForceFactoryStyle.pagePadding)
             .sbFloatingTabContentPadding()
             .sbReadableWidth(760)
         }
@@ -386,7 +386,7 @@ struct QuestionFactoryView: View {
 
     private func generate() {
         guard let readyFile else {
-            workspaceStore.toast("Üretim için önce hazır bir kaynak seç.")
+            workspaceStore.toast("Önce hazır bir kaynak seç.")
             return
         }
         isGenerating = true
@@ -396,7 +396,7 @@ struct QuestionFactoryView: View {
             "\(questionCount) soru",
             "5 şıklı",
             addExplanation ? "açıklamalı" : "kısa geri bildirimli",
-            "Qlinik uyumlu",
+            "5 şık",
             quality.rawValue
         ].joined(separator: " • ")
         Task {

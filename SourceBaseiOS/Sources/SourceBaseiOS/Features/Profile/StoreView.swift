@@ -121,7 +121,7 @@ struct StoreView: View {
                     .font(SBTypography.heading2)
                     .foregroundStyle(SBColors.navy)
 
-                Text("Kaynak tabanlı çıktılar MC ile hazırlanır. Paket satın alarak üretim bakiyeni artırabilirsin.")
+                Text("Çalışmalar MC ile hazırlanır. Paket satın alarak üretim bakiyeni artırabilirsin.")
                     .font(SBTypography.bodyMedium)
                     .foregroundStyle(SBColors.muted)
                     .lineSpacing(2)
@@ -130,7 +130,7 @@ struct StoreView: View {
 
                 HStack(spacing: SBSpacing.md) {
                     metricInfo(icon: "applelogo", value: "App Store", label: "Ödeme")
-                    metricInfo(icon: "shield.checkered", value: "Güvenli", label: "İşlem")
+                    metricInfo(icon: "shield.checkered", value: "Güvenli", label: "Ödeme")
                     metricInfo(icon: "iphone", value: "iOS", label: "Platform")
                 }
             }
@@ -281,7 +281,7 @@ struct StoreView: View {
                 }
 
                 SBButton(
-                    isBuying ? "İşleniyor..." : purchaseLabel,
+                    isBuying ? "Onay bekleniyor..." : purchaseLabel,
                     icon: "bag",
                     variant: .primary,
                     size: .medium,

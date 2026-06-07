@@ -15,7 +15,7 @@ struct CollectionsView: View {
     enum CollectionSort: String, CaseIterable {
         case newest = "Yeni"
         case name = "A-Z"
-        case outputCount = "Çok çıktı"
+        case outputCount = "Çok çalışma"
     }
 
     private var filteredCollections: [CollectionBundle] {
@@ -45,7 +45,7 @@ struct CollectionsView: View {
                     SBLoadingState(
                         icon: "rectangle.stack",
                         title: "Hazırlanıyor",
-                        message: "Çalışma çıktıları yükleniyor."
+                        message: "Çalışmalar yükleniyor."
                     )
                 } else if let error = errorMessage {
                     SBErrorState(
@@ -223,7 +223,7 @@ struct CollectionsView: View {
             SBEmptyState(
                 icon: "line.3.horizontal.decrease.circle",
                 title: "Bu filtrede koleksiyon yok",
-                message: "Başka bir filtre seç veya yeni çıktı üret.",
+                message: "Başka bir filtre seç veya yeni çalışma başlat.",
                 badges: ["Yeni üretim"],
                 actionLabel: "Filtreyi temizle",
                 onAction: { selectedKind = nil }
@@ -309,7 +309,7 @@ struct CollectionsView: View {
                 // Info pills
                 FlowLayout(spacing: SBSpacing.xs) {
                     infoPill(icon: "graduationcap", text: bundle.subject)
-                    infoPill(icon: "square.stack.3d.up", text: "\(bundle.outputs.count) çıktı")
+                    infoPill(icon: "square.stack.3d.up", text: "\(bundle.outputs.count) çalışma")
                     infoPill(icon: "doc", text: SBFileKind.from(bundle.file.kind).label)
                     infoPill(icon: "clock", text: bundle.file.updatedLabel)
                 }
@@ -354,7 +354,7 @@ struct CollectionsView: View {
                         HStack(spacing: SBSpacing.xs) {
                             Image(systemName: "bolt.fill")
                                 .sbScaledFont(size: 14)
-                            Text("Benzer çıktı üret")
+                            Text("Benzer çalışma üret")
                                 .font(SBTypography.labelSmall)
                         }
                         .foregroundStyle(outputColor(bundle.previewKind))

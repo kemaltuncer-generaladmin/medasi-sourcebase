@@ -643,7 +643,7 @@ import SourceBaseBackend
     )
 
     let message = SourceBaseWorkspaceStore.shared.friendlyError(error)
-    #expect(message == "İşlem şu anda hazırlanamadı. Biraz sonra tekrar deneyebilirsin.")
+    #expect(message == "Şu anda hazırlanamadı. Biraz sonra tekrar deneyebilirsin.")
 }
 
 @MainActor

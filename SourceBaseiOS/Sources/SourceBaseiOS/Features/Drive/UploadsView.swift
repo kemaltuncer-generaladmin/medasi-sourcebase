@@ -12,7 +12,7 @@ struct UploadsView: View {
         case all = "Tümü"
         case active = "İşleniyor"
         case completed = "Hazır"
-        case failed = "Hatalı"
+        case failed = "Tekrar dene"
 
         var icon: String {
             switch self {
@@ -47,7 +47,7 @@ struct UploadsView: View {
         case .all: return "Henüz yükleme yok"
         case .active: return "Devam eden yükleme yok"
         case .completed: return "Hazır dosya yok"
-        case .failed: return "Hatalı yükleme yok"
+        case .failed: return "Tekrar denenecek kaynak yok"
         }
     }
 
@@ -56,7 +56,7 @@ struct UploadsView: View {
         case .all: return "\(DriveUploadService.supportedExtensionsDisplay) dosyanı ekledikten sonra durum takibi burada görünür."
         case .active: return "Yeni dosya seçtiğinde yükleme ilerlemesi burada görünür."
         case .completed: return "Metni çıkarılıp üretime hazır olan dosyalar burada görünür."
-        case .failed: return "Yükleme hatası olursa dosyayı tekrar seçerek deneyebilirsin."
+        case .failed: return "Tamamlanmayan yüklemeleri buradan yeniden başlatabilirsin."
         }
     }
 
@@ -247,7 +247,7 @@ struct UploadsView: View {
             VStack(alignment: .leading, spacing: SBSpacing.sm) {
                 SBStatusBadge(status: .failed, compact: true)
 
-                Text(upload.errorLabel ?? upload.file.statusMessage ?? "Yükleme başarısız.")
+                Text(upload.errorLabel ?? upload.file.statusMessage ?? "Kaynak hazırlanamadı.")
                     .font(SBTypography.bodySmall)
                     .foregroundStyle(SBColors.muted)
 

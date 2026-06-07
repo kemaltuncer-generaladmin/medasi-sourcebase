@@ -383,7 +383,7 @@ struct FolderView: View {
                     .font(SBTypography.titleSmall)
                     .foregroundStyle(SBColors.navy)
 
-                Text("Seçili kaynaklardan hızlıca öğrenme çıktısı üretin.")
+                Text("Seçili kaynaklardan hızlıca çalışma üret.")
                     .font(SBTypography.bodySmall)
                     .foregroundStyle(SBColors.muted)
 

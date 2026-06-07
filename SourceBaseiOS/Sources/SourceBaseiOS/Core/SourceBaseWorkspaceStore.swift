@@ -351,7 +351,7 @@ public final class SourceBaseWorkspaceStore {
     public func saveOutput(_ outputId: String, courseId: String, sectionId: String) async {
         let id = outputId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !id.isEmpty else { return }
-        await runBusy("Çıktı kaydediliyor...") {
+        await runBusy("Çalışma kaydediliyor...") {
             try await repository().moveGeneratedOutput(outputId: id, courseId: courseId, sectionId: sectionId)
             await refresh()
         }
@@ -368,7 +368,7 @@ public final class SourceBaseWorkspaceStore {
     }
 
     public func retryFileProcessing(_ fileId: String) async {
-        await runBusy("Dosya yeniden işleme alınıyor...") {
+        await runBusy("Kaynak yeniden hazırlanıyor...") {
             try await repository().retryFileProcessing(fileId)
             await refresh()
         }
@@ -502,16 +502,16 @@ public final class SourceBaseWorkspaceStore {
     public func generate(file: DriveFile? = nil, kind: GeneratedKind, options: [String: String]? = nil) async -> GeneratedOutput? {
         let source = file ?? selectedReadyFiles.first ?? readyFiles.first
         guard let source else {
-            toast("Üretim için önce hazır bir Drive kaynağı seç.")
+            toast("Önce hazır bir kaynak seç.")
             return nil
         }
         guard isReadyForGeneration(source) else {
-            toast("Üretim için dosyanın yüklenip işlenmesi tamamlanmalı.")
+            toast("Kaynak hazır olunca üretim başlayabilir.")
             return nil
         }
 
         guard kind.jobType != nil else {
-            toast("\(kind.titleLabel) üretimi bu sürümde henüz açılmadı.")
+            toast("\(kind.titleLabel) şu anda kullanılamıyor.")
             return nil
         }
 
@@ -544,16 +544,28 @@ public final class SourceBaseWorkspaceStore {
     public func startGeneration(file: DriveFile? = nil, kind: GeneratedKind, options: [String: String]? = nil) async -> SBGenerationJob? {
         let source = file ?? selectedReadyFiles.first ?? readyFiles.first
         guard let source else {
-            toast("Üretim için önce hazır bir Drive kaynağı seç.")
+            toast("Önce hazır bir kaynak seç.")
             return nil
         }
         guard isReadyForGeneration(source) else {
-            toast("Üretim için dosyanın yüklenip işlenmesi tamamlanmalı.")
+            toast("Kaynak hazır olunca üretim başlayabilir.")
             return nil
         }
 
         guard kind.jobType != nil else {
-            toast("\(kind.titleLabel) üretimi bu sürümde henüz açılmadı.")
+            toast("\(kind.titleLabel) şu anda kullanılamıyor.")
+            return nil
+        }
+
+        if !SBOfflineQueueService.shared.isOnline {
+            let request = OfflineGenerationRequest(
+                fileId: source.id,
+                fileTitle: source.title,
+                kind: kind.rawValue,
+                options: options ?? [:]
+            )
+            SBOfflineQueueService.shared.enqueue(request: request)
+            toast("Bağlantı gelince üretim başlayacak. Kuyruğa eklendi.")
             return nil
         }
 
@@ -582,8 +594,11 @@ public final class SourceBaseWorkspaceStore {
                 outputId: snapshot.outputId
             )
             upsertGenerationJob(job)
-            toast("\(kind.titleLabel) üretimi kuyruğa alındı.")
+            toast("Üretim başladı. Kuyruğa eklendi.")
             await refreshGenerationQueue()
+            
+            startBackgroundJobMonitor(jobId: job.id, jobTitle: kind.titleLabel, sourceTitle: source.title)
+            
             return generationJobs.first { $0.id == job.id } ?? job
         } catch {
             toast(friendlyError(error))
@@ -596,7 +611,7 @@ public final class SourceBaseWorkspaceStore {
 
     public func finalizeGenerationJob(_ job: SBGenerationJob) async -> GeneratedOutput? {
         guard let source = file(id: job.sourceFileId) else {
-            toast("Bu üretimi tamamlamak için kaynak bulunamadı.")
+            toast("Kaynak bulunamadı. Drive'dan yeniden seç.")
             return nil
         }
 
@@ -628,10 +643,10 @@ public final class SourceBaseWorkspaceStore {
             let repo = try await repository()
             try await repo.cancelJob(job.id)
             if let index = generationJobs.firstIndex(where: { $0.id == job.id }) {
-                generationJobs[index].status = .failed("Üretim durduruldu.")
+                generationJobs[index].status = .failed("İptal edildi.")
                 generationJobs[index].progress = 1
             }
-            toast("Üretim durduruldu.")
+            toast("Üretim iptal edildi.")
             try? await refreshGenerationJobs(using: repo)
         } catch {
             toast(friendlyError(error))
@@ -646,7 +661,7 @@ public final class SourceBaseWorkspaceStore {
                 generationJobs[index].status = .running
                 generationJobs[index].progress = 0.25
             }
-            toast("Üretim yeniden kuyruğa alındı.")
+            toast("Üretim yeniden başladı. Kuyruğa eklendi.")
             try? await refreshGenerationJobs(using: repo)
             await refresh()
         } catch {
@@ -725,6 +740,11 @@ public final class SourceBaseWorkspaceStore {
 
     public func friendlyError(_ error: Error) -> String {
         if let apiError = error as? DriveAPIError {
+            if apiError.isUnauthorized {
+                Task { @MainActor in
+                    await handleSessionExpired()
+                }
+            }
             return userFacingServerMessage(apiError.message, code: apiError.code, status: apiError.status)
         }
         if let repoError = error as? RepositoryError {
@@ -739,19 +759,44 @@ public final class SourceBaseWorkspaceStore {
             .replacingOccurrences(of: "StateError: ", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if text.contains("401") || text.contains("UNAUTHORIZED") {
+            Task { @MainActor in
+                await handleSessionExpired()
+            }
             return "Oturum süren doldu. Lütfen tekrar giriş yap."
         }
         return userFacingServerMessage(text, code: nil, status: nil)
     }
+    
+    @MainActor
+    private func handleSessionExpired() async {
+        guard !isHandlingSessionExpiry else { return }
+        isHandlingSessionExpiry = true
+        defer { isHandlingSessionExpiry = false }
+        
+        toast("Oturum süren doldu. Lütfen tekrar giriş yap.")
+        try? await Task.sleep(nanoseconds: 1_500_000_000)
+        await AppState.shared.signOut()
+    }
+    
+    private var isHandlingSessionExpiry = false
 
     private func userFacingServerMessage(_ message: String, code: String?, status: Int?) -> String {
         let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalized = "\(trimmed) \(code ?? "")".lowercased()
         if trimmed.isEmpty {
-            return "İşlem tamamlanamadı. Tekrar deneyebilirsin."
+            return "Tamamlanamadı. Tekrar deneyebilirsin."
         }
         if status == 401 || normalized.contains("unauthorized") || normalized.contains("auth") {
             return "Oturum süren doldu. Lütfen tekrar giriş yap."
+        }
+        if normalized.contains("cancelled")
+            || normalized.contains("canceled")
+            || normalized.contains("cancelledout")
+            || normalized.contains("cancelled out")
+            || normalized.contains("request has been cancelled")
+            || normalized.contains("aborted")
+            || normalized.contains("aborterror") {
+            return "Üretim yarıda kaldı. Kuyruktan tekrar deneyebilirsin."
         }
         if normalized.contains("ocr") || normalized.contains("scanned") || normalized.contains("no text") || normalized.contains("metin bulunamad") {
             return "Bu PDF görüntü tabanlı görünüyor. OCR/metin çıkarımı sonuç vermedi; daha net tarama veya metin içeren PDF deneyebilirsin."
@@ -777,10 +822,10 @@ public final class SourceBaseWorkspaceStore {
             return "Bu dosya biçimi şu anda desteklenmiyor. \(DriveUploadService.supportedExtensionsDisplay) formatlarından birini deneyebilirsin."
         }
         if normalized.contains("backend") || normalized.contains("edge function") || normalized.contains("job type") || normalized.contains("server") {
-            return "İşlem şu anda hazırlanamadı. Biraz sonra tekrar deneyebilirsin."
+            return "Şu anda hazırlanamadı. Biraz sonra tekrar deneyebilirsin."
         }
         if normalized.contains("network") || normalized.contains("timed out") || normalized.contains("timeout") {
-            return "Bağlantı kesildi. İnternetini kontrol edip tekrar deneyebilirsin."
+            return "Üretim beklenenden uzun sürdü. Kuyruktan takip edip tekrar deneyebilirsin."
         }
         return trimmed
     }
@@ -817,12 +862,62 @@ public final class SourceBaseWorkspaceStore {
         }
     }
 
+    private var monitoredJobIds = Set<String>()
+
+    private func startBackgroundJobMonitor(jobId: String, jobTitle: String, sourceTitle: String) {
+        guard !monitoredJobIds.contains(jobId) else { return }
+        monitoredJobIds.insert(jobId)
+
+        Task.detached(priority: .utility) { [weak self] in
+            guard let self else { return }
+            await SBNotificationService.shared.prepareGenerationNotificationsIfNeeded()
+
+            for _ in 0..<90 {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+
+                await self.refreshGenerationQueue()
+
+                let jobStatus: SBGenerationStatus? = await MainActor.run {
+                    self.generationJobs.first { $0.id == jobId }?.status
+                }
+
+                guard let status = jobStatus else {
+                    continue
+                }
+
+                switch status {
+                case .completed:
+                    await SBNotificationService.shared.notifyJobCompletion(
+                        jobId: jobId,
+                        jobTitle: jobTitle,
+                        jobKind: jobTitle,
+                        sourceTitle: sourceTitle
+                    )
+                    await MainActor.run { _ = self.monitoredJobIds.remove(jobId) }
+                    return
+                case .failed(let message):
+                    await SBNotificationService.shared.notifyJobFailure(
+                        jobId: jobId,
+                        jobTitle: jobTitle,
+                        errorMessage: message
+                    )
+                    await MainActor.run { _ = self.monitoredJobIds.remove(jobId) }
+                    return
+                case .queued, .running:
+                    continue
+                }
+            }
+
+            await MainActor.run { _ = self.monitoredJobIds.remove(jobId) }
+        }
+    }
+
     private func generationStatus(from raw: String, errorMessage: String?) -> SBGenerationStatus {
         switch GenerationJobPhase(rawStatus: raw) {
         case .completed:
             return .completed
         case .failed:
-            return .failed(errorMessage ?? "Üretim tamamlanamadı.")
+            return .failed(generationFailureMessage(errorMessage))
         case .queued:
             return .queued
         case .running:
@@ -836,6 +931,13 @@ public final class SourceBaseWorkspaceStore {
         } else {
             generationJobs.insert(job, at: 0)
         }
+    }
+
+    private func generationFailureMessage(_ message: String?) -> String {
+        guard let message, !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return "Üretim tamamlanamadı. Tekrar deneyebilirsin."
+        }
+        return userFacingServerMessage(message, code: nil, status: nil)
     }
 
     private func runBusy(_ label: String, action: () async throws -> Void) async {

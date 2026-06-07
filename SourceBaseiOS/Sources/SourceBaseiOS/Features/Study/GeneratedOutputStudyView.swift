@@ -29,7 +29,7 @@ struct GeneratedOutputStudyView: View {
                     }
             } else {
                 SBErrorState(
-                    title: "Çıktı bulunamadı",
+                    title: "Çalışma bulunamadı",
                     message: "Koleksiyon yenilenmiş olabilir. Koleksiyonlardan tekrar açmayı dene.",
                     actionLabel: "Koleksiyonlara Dön",
                     onAction: { appState.router.replaceCurrent(with: .collections) }
@@ -170,7 +170,7 @@ private struct FlashcardStudySurface: View {
                     SBEmptyState(
                         icon: "rectangle.stack.badge.exclamationmark",
                         title: "Kart bulunamadı",
-                        message: "Bu çıktı kart çalışma ekranı için hazır görünmüyor. Kaynağı yeniden üretmeyi deneyebilirsin.",
+                        message: "Bu çalışma kart ekranı için hazır değil. Kuyruktan yeniden deneyebilirsin.",
                         badges: ["Flashcard"]
                     )
                 }
@@ -458,34 +458,55 @@ private struct QuestionStudySurface: View {
 
 enum SBOutputStyle {
     static func accent(for kind: GeneratedKind) -> Color {
-        switch kind {
-        case .flashcard: return SBColors.blue
-        case .question: return SBColors.cyan
-        case .summary: return SBColors.blue
-        case .examMorningSummary: return SBColors.purple
-        case .algorithm: return SBColors.green
-        case .comparison, .table: return SBColors.orange
-        case .clinicalScenario: return SBColors.red
-        case .learningPlan: return SBColors.deepBlue
-        case .podcast: return SBColors.purple
-        case .infographic: return SBColors.cyan
-        case .mindMap: return SBColors.blue
-        }
+        outputColor(kind)
     }
 
     static func icon(for kind: GeneratedKind) -> String {
+        outputIcon(kind)
+    }
+
+    static func outputIcon(_ kind: GeneratedKind) -> String {
         switch kind {
         case .flashcard: return "rectangle.on.rectangle"
-        case .question: return "checklist"
+        case .question: return "questionmark.circle"
         case .summary: return "doc.text"
         case .examMorningSummary: return "alarm"
         case .algorithm: return "arrow.triangle.branch"
         case .comparison, .table: return "tablecells"
-        case .clinicalScenario: return "stethoscope"
-        case .learningPlan: return "calendar"
-        case .podcast: return "waveform"
-        case .infographic: return "photo.on.rectangle"
+        case .clinicalScenario: return "cross.case"
+        case .learningPlan: return "calendar.badge.clock"
+        case .podcast: return "headphones"
+        case .infographic: return "chart.bar"
         case .mindMap: return "point.3.connected.trianglepath.dotted"
+        }
+    }
+
+    static func outputColor(_ kind: GeneratedKind) -> Color {
+        switch kind {
+        case .flashcard: return SBColors.blue
+        case .question: return SBColors.cyan
+        case .summary, .examMorningSummary, .mindMap: return SBColors.purple
+        case .algorithm, .clinicalScenario: return SBColors.orange
+        case .comparison, .table: return SBColors.blue
+        case .learningPlan: return SBColors.green
+        case .podcast: return SBColors.red
+        case .infographic: return SBColors.cyan
+        }
+    }
+
+    static func outputKindLabel(_ kind: GeneratedKind) -> String {
+        switch kind {
+        case .flashcard: return "Flashcard"
+        case .question: return "Soru"
+        case .summary: return "Özet"
+        case .examMorningSummary: return "Sınav Sabahı"
+        case .algorithm: return "Algoritma"
+        case .comparison, .table: return "Tablo"
+        case .clinicalScenario: return "Klinik Senaryo"
+        case .learningPlan: return "Öğrenme Planı"
+        case .podcast: return "Podcast"
+        case .infographic: return "İnfografik"
+        case .mindMap: return "Zihin Haritası"
         }
     }
 
@@ -1501,7 +1522,7 @@ private struct InfographicStudySurface: View {
                     Text(assetIssue ? "Görsel bağlantısı yüklenemedi" : "Metin infografik")
                         .font(SBTypography.titleSmall)
                         .foregroundStyle(SBColors.navy)
-                    Text(assetIssue ? "Aynı içerik metin bloklarıyla gösteriliyor." : "Görsel asset beklenmeden okunabilir çıktı.")
+                    Text(assetIssue ? "Aynı içerik metin bloklarıyla gösteriliyor." : "Görsel beklenmeden okunabilir çalışma.")
                         .font(SBTypography.caption)
                         .foregroundStyle(SBColors.muted)
                 }
@@ -1567,7 +1588,7 @@ private struct InfographicStudySurface: View {
             do {
                 imageExportURL = try await SBStudyExportService.exportInfographicImage(for: output)
             } catch {
-                imageExportMessage = "Görsel dosyası indirilemedi. PDF çıktısı hâlâ kullanılabilir."
+                imageExportMessage = "Görsel dosyası indirilemedi. PDF hâlâ kullanılabilir."
             }
             isExportingImage = false
         }

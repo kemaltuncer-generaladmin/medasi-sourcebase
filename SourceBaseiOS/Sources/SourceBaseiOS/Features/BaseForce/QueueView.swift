@@ -6,6 +6,8 @@ struct QueueView: View {
 
     @Environment(AppState.self) private var appState
     @Environment(SourceBaseWorkspaceStore.self) private var workspaceStore
+    @StateObject private var cancellationService = SBJobCancellationService.shared
+    @StateObject private var offlineQueue = SBOfflineQueueService.shared
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var selectedFilter: QueueFilter = .all
@@ -54,10 +56,10 @@ struct QueueView: View {
     }
 
     enum QueueFilter: String, CaseIterable {
-        case all = "Tümü"
-        case preparing = "Çıktı hazırlanıyor"
-        case ready = "Çıktı hazır"
-        case failed = "Çıktı oluşturulamadı"
+        case all = "Hepsi"
+        case preparing = "Hazırlanıyor"
+        case ready = "Hazır"
+        case failed = "Tekrar dene"
 
         var color: Color {
             switch self {
@@ -70,7 +72,7 @@ struct QueueView: View {
     }
 
     private var runningCount: Int {
-        jobs.filter { $0.status == .pending || $0.status == .running }.count
+        jobs.filter { $0.status == .pending || $0.status == .running }.count + offlineRequests.count
     }
 
     private var completedCount: Int {
@@ -79,6 +81,14 @@ struct QueueView: View {
 
     private var failedCount: Int {
         jobs.filter { $0.status == .failed }.count
+    }
+
+    private var offlineRequests: [OfflineGenerationRequest] {
+        guard selectedFilter == .all || selectedFilter == .preparing else { return [] }
+        return offlineQueue.pendingRequests.filter { request in
+            guard let kind = GeneratedKind(rawValue: request.kind) else { return surface == .all }
+            return surface.includes(kind)
+        }
     }
 
     private var filteredJobs: [JobState] {
@@ -94,11 +104,7 @@ struct QueueView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: SBSpacing.lg) {
                 if isLoading {
-                    SBLoadingState(
-                        icon: "clock",
-                        title: "\(surface.title) yükleniyor",
-                        message: "İşlemler hazırlanıyor..."
-                    )
+                    SBLoadingState(icon: "clock", title: "Kuyruk açılıyor", message: "Çalışmalar güncelleniyor.")
                 } else if let error = errorMessage {
                     SBErrorState(
                         title: "Yüklenemedi",
@@ -140,9 +146,9 @@ struct QueueView: View {
             EmptyView()
         } footer: {
             SBMetricRibbon(items: [
-                .init(icon: "hourglass", value: "\(runningCount)", label: "bekleyen", tint: SBColors.blue),
-                .init(icon: "checkmark.circle", value: "\(completedCount)", label: "tamamlanan", tint: SBColors.green),
-                .init(icon: "xmark.circle", value: "\(failedCount)", label: "hatalı", tint: SBColors.red)
+                .init(icon: "hourglass", value: "\(runningCount)", label: "aktif", tint: SBColors.blue),
+                .init(icon: "checkmark.circle", value: "\(completedCount)", label: "hazır", tint: SBColors.green),
+                .init(icon: "arrow.clockwise", value: "\(failedCount)", label: "tekrar", tint: SBColors.red)
             ])
         }
     }
@@ -196,19 +202,71 @@ struct QueueView: View {
 
     @ViewBuilder
     private var jobsList: some View {
-        if filteredJobs.isEmpty {
+        if filteredJobs.isEmpty && offlineRequests.isEmpty {
             SBCard {
                 SBEmptyState(
                     icon: "clock.badge.questionmark",
-                    title: "Kuyruk boş",
+                    title: "Henüz çalışma yok",
                     message: surface.emptyMessage,
-                    badges: ["Bekleyen", "İşleniyor", "Tamamlandı", "Hatalı"]
+                    badges: ["Başladı", "Hazırlanıyor", "Hazır", "Tekrar dene"]
                 )
             }
         } else {
             LazyVStack(spacing: SBSpacing.md) {
+                ForEach(offlineRequests) { request in
+                    offlineRequestRow(request)
+                }
+
                 ForEach(filteredJobs) { job in
                     jobRow(job)
+                }
+            }
+        }
+    }
+
+    private func offlineRequestRow(_ request: OfflineGenerationRequest) -> some View {
+        SBCard(radius: 16, borderColor: SBColors.orange.opacity(0.2)) {
+            VStack(alignment: .leading, spacing: SBSpacing.md) {
+                HStack(alignment: .top, spacing: SBSpacing.md) {
+                    SBIconTile(icon: "wifi.slash", tint: SBColors.orange, size: 40, radius: 12)
+
+                    VStack(alignment: .leading, spacing: SBSpacing.xs) {
+                        Text(GeneratedKind(rawValue: request.kind)?.titleLabel ?? "Üretim")
+                            .font(SBTypography.titleSmall)
+                            .foregroundStyle(SBColors.navy)
+                            .lineLimit(1)
+
+                        Text(request.fileTitle)
+                            .font(SBTypography.caption)
+                            .foregroundStyle(SBColors.muted)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Text("Bağlantı bekliyor")
+                        .font(SBTypography.caption)
+                        .foregroundStyle(SBColors.orange)
+                        .padding(.horizontal, SBSpacing.sm)
+                        .padding(.vertical, SBSpacing.xs)
+                        .background(SBColors.orange.opacity(0.1))
+                        .clipShape(Capsule())
+                }
+
+                HStack {
+                    Text("İnternet gelince üretim başlar.")
+                        .font(SBTypography.caption)
+                        .foregroundStyle(SBColors.muted)
+
+                    Spacer()
+
+                    SBButton(
+                        "Kaldır",
+                        icon: "trash",
+                        variant: .secondary,
+                        size: .small,
+                        action: { offlineQueue.cancelRequest(request.id) }
+                    )
                 }
             }
         }
@@ -218,7 +276,7 @@ struct QueueView: View {
         SBCard(radius: 16) {
             VStack(alignment: .leading, spacing: SBSpacing.md) {
                 HStack(alignment: .top, spacing: SBSpacing.md) {
-                    SBFileKindBadge(kind: job.sourceKind, compact: true)
+                    SBIconTile(icon: SBOutputStyle.outputIcon(job.kind), tint: statusColor(job.status), size: 42, radius: 12)
 
                     VStack(alignment: .leading, spacing: SBSpacing.xs) {
                         Text(job.title)
@@ -242,7 +300,7 @@ struct QueueView: View {
                 }
 
                 if let errorMsg = job.errorMessage {
-                    Text(errorMsg)
+                    Text(queueErrorMessage(errorMsg))
                         .font(SBTypography.bodySmall)
                         .foregroundStyle(SBColors.red)
                 }
@@ -266,16 +324,16 @@ struct QueueView: View {
 
         switch status {
         case .pending:
-            label = "Bekliyor"
+            label = "Başladı"
             color = SBColors.blue
         case .running:
-            label = "İşleniyor"
+            label = "Hazırlanıyor"
             color = SBColors.blue
         case .completed:
             label = "Hazır"
             color = SBColors.green
         case .failed:
-            label = "Hatalı"
+            label = "Tamamlanamadı"
             color = SBColors.red
         }
 
@@ -306,13 +364,13 @@ struct QueueView: View {
     private func progressLabel(_ job: JobState) -> String {
         switch job.status {
         case .pending:
-            return "İşlem sıraya alındı"
+            return "Kuyruğa eklendi"
         case .running:
-            return "Çıktı hazırlanıyor • \(Int(job.progress * 100))%"
+            return "Hazırlanıyor • \(Int(job.progress * 100))%"
         case .completed:
-            return "Çıktı hazır"
+            return "Açmaya hazır"
         case .failed:
-            return "Çıktı oluşturulamadı"
+            return "Tekrar deneyebilirsin"
         }
     }
 
@@ -349,29 +407,46 @@ struct QueueView: View {
                                 _ = await workspaceStore.enqueueDriveGeneration(file: file, kind: job.kind)
                                 await workspaceStore.refreshGenerationQueue()
                             } else {
-                                workspaceStore.toast("Bu üretimi tekrar başlatmak için kaynağı yeniden seç.")
+                                workspaceStore.toast("Kaynak bulunamadı. Drive'dan yeniden seç.")
                             }
                         }
                     }
                 )
 
             case .pending, .running:
-                SBButton(
-                    "İptal",
-                    icon: "xmark",
-                    variant: .secondary,
-                    size: .small,
-                    action: {
-                        Task {
-                            if let storeJob = workspaceStore.generationJobs.first(where: { $0.id == job.id || $0.output?.jobId == job.id }) {
-                                await workspaceStore.cancelJob(storeJob)
-                            } else {
-                                workspaceStore.toast("Bu iş zaten güncellenmiş; kuyruk yenileniyor.")
+                let isCancelling = cancellationService.cancellingJobIds.contains(job.id)
+                let cancelStatus = cancellationService.verificationStatus[job.id]
+                
+                VStack(spacing: SBSpacing.sm) {
+                    SBButton(
+                        isCancelling ? "İptal ediliyor..." : "İptal",
+                        icon: "xmark",
+                        variant: .secondary,
+                        size: .small,
+                        isLoading: isCancelling,
+                        action: {
+                            Task {
+                                if let storeJob = workspaceStore.generationJobs.first(where: { $0.id == job.id || $0.output?.jobId == job.id }) {
+                                    await cancellationService.cancelJob(storeJob)
+                                } else {
+                                    workspaceStore.toast("Kuyruk güncellendi. Tekrar kontrol et.")
+                                }
+                                await workspaceStore.refreshGenerationQueue()
                             }
-                            await workspaceStore.refreshGenerationQueue()
                         }
+                    )
+                    .disabled(isCancelling)
+                    
+                    if case .failed(let message) = cancelStatus {
+                        Text(message)
+                            .font(SBTypography.caption)
+                            .foregroundStyle(SBColors.red)
+                    } else if case .verifying = cancelStatus {
+                        Text("İptal doğrulanıyor...")
+                            .font(SBTypography.caption)
+                            .foregroundStyle(SBColors.muted)
                     }
-                )
+                }
             }
         }
     }
@@ -387,9 +462,9 @@ struct QueueView: View {
     }
 
     private func pollActiveJobs() async {
-        for _ in 0..<120 {
+        for _ in 0..<60 {
             guard jobs.contains(where: { $0.status == .pending || $0.status == .running }) else { return }
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
             await workspaceStore.refreshGenerationQueue()
         }
     }
@@ -401,6 +476,28 @@ struct QueueView: View {
         case .completed: return .completed
         case .failed: return .failed
         }
+    }
+
+    private func statusColor(_ status: JobStatus) -> Color {
+        switch status {
+        case .pending, .running: return SBColors.blue
+        case .completed: return SBColors.green
+        case .failed: return SBColors.red
+        }
+    }
+
+    private func queueErrorMessage(_ message: String) -> String {
+        let normalized = message.lowercased()
+        if normalized.contains("cancelled") || normalized.contains("canceled") || normalized.contains("cancelledout") {
+            return "Üretim yarıda kaldı. Tekrar deneyebilirsin."
+        }
+        if normalized.contains("timed out") || normalized.contains("timeout") {
+            return "Üretim uzun sürdü. Tekrar deneyebilir veya sonra kontrol edebilirsin."
+        }
+        if normalized.contains("backend") || normalized.contains("edge function") || normalized.contains("server") {
+            return "Şu anda hazırlanamadı. Biraz sonra tekrar dene."
+        }
+        return message
     }
 }
 
@@ -415,39 +512,39 @@ struct QueueView: View {
 extension SourceBaseQueueSurface {
     var title: String {
         switch self {
-        case .all: return "Hazırlanan Çalışmalar"
-        case .baseForce: return "Çalışma Setleri"
-        case .sourceLab: return "Derin Çalışmalar"
+        case .all: return "Kuyruk"
+        case .baseForce: return "Çalışma Kuyruğu"
+        case .sourceLab: return "Derin Çalışma Kuyruğu"
         }
     }
 
     var eyebrow: String {
         switch self {
-        case .all: return "Çalışma takibi"
+        case .all: return "Üretim takibi"
         case .baseForce: return "Kart, soru, özet"
-        case .sourceLab: return "Klinik ve görsel üretim"
+        case .sourceLab: return "Klinik, plan, görsel"
         }
     }
 
     var message: String {
         switch self {
         case .all:
-            return "Hazırlanan, hazır olan ve tekrar denenmesi gereken çalışma çıktıları burada."
+            return "Başlayan, hazırlanan ve hazır olan çalışmalar burada."
         case .baseForce:
-            return "Kart, soru, son tekrar, algoritma ve tablo çıktılarının durumunu izle."
+            return "Kart, soru, son tekrar, akış ve tabloları buradan takip et."
         case .sourceLab:
-            return "Sınav sabahı, klinik senaryo, plan, podcast ve görsel çalışmalarını izle."
+            return "Klinik senaryo, plan, podcast ve görsel çalışmalarını buradan takip et."
         }
     }
 
     var emptyMessage: String {
         switch self {
         case .all:
-            return "Bir çalışma başlatınca hazırlanan ve hazır çıktılar burada görünür."
+            return "Üretim başlayınca burada görünür."
         case .baseForce:
-            return "Kart, soru veya özet hazırlayınca burada takip edersin."
+            return "Kart, soru veya özet başlatınca burada takip edersin."
         case .sourceLab:
-            return "Vaka, plan, podcast veya infografik hazırlayınca burada takip edersin."
+            return "Vaka, plan, podcast veya infografik başlatınca burada takip edersin."
         }
     }
 

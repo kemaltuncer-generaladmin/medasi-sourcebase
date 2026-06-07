@@ -105,7 +105,7 @@ struct GenerationProcessingView: View {
                 hero.sbEntrance(0)
                 sourceCard.sbEntrance(1)
                 progressCard.sbEntrance(2)
-                    .sbCompletionGlow(isComplete, tint: tint(for: kind))
+                    .sbCompletionGlow(isComplete, tint: SBOutputStyle.outputColor(kind))
 
                 if let errorMessage {
                     SBErrorState(
@@ -121,19 +121,19 @@ struct GenerationProcessingView: View {
                 } else if isComplete {
                     SBSuccessState(
                         icon: "checkmark.seal.fill",
-                        title: "Üretim başlatıldı",
-                        message: "Hazır olur olmaz sonuç ekranına geçebilirsin. İstersen şimdi kuyruktan takip et.",
+                        title: "Üretim başladı",
+                        message: "Çalışman kuyruğa eklendi. Hazır olunca buradan açabilirsin.",
                         actionLabel: "Kuyruğu gör",
                         onAction: {
                             router.replaceCurrent(with: .queue(surface: SourceBaseQueueSurface.surface(for: kind)))
                         },
-                        tint: tint(for: kind)
+                        tint: SBOutputStyle.outputColor(kind)
                     )
                 } else {
                     SBNotice(
                         icon: "clock.badge.checkmark",
-                        message: "Kaynak işleniyor. Sonuç hazır olduğunda kuyrukta ve koleksiyonlarda görebilirsin.",
-                        tint: tint(for: kind)
+                        message: "Üretim başladı. Çalışmanı Kuyruk ekranında takip edebilirsin.",
+                        tint: SBOutputStyle.outputColor(kind)
                     )
                 }
             }
@@ -150,16 +150,16 @@ struct GenerationProcessingView: View {
     private var hero: some View {
         SBSignatureHero(
             eyebrow: "Üretim",
-            title: "\(label) hazırlanıyor",
-            message: mode.isEmpty ? "Kaynak adım adım işleniyor." : mode,
-            icon: icon(for: kind),
-            tint: tint(for: kind)
+            title: "\(label) başlıyor",
+            message: mode.isEmpty ? "Üretim kuyruğa ekleniyor." : mode,
+            icon: SBOutputStyle.outputIcon(kind),
+            tint: SBOutputStyle.outputColor(kind)
         ) {
             EmptyView()
         } footer: {
             SBMetricRibbon(items: [
-                .init(icon: "doc.text", value: sourceFile?.kind.rawValue.uppercased() ?? "Kaynak", label: "format", tint: tint(for: kind)),
-                .init(icon: "list.bullet.rectangle", value: label, label: "çıktı", tint: SBColors.purple),
+                .init(icon: "doc.text", value: sourceFile?.kind.rawValue.uppercased() ?? "Kaynak", label: "format", tint: SBOutputStyle.outputColor(kind)),
+                .init(icon: "list.bullet.rectangle", value: label, label: "tür", tint: SBColors.purple),
                 .init(icon: "clock", value: "\(Int(progress * 100))%", label: "ilerleme", tint: SBColors.green)
             ])
         }
@@ -187,11 +187,11 @@ struct GenerationProcessingView: View {
     }
 
     private var progressCard: some View {
-        SBCard(radius: 18, borderColor: tint(for: kind).opacity(0.18)) {
+        SBCard(radius: 18, borderColor: SBOutputStyle.outputColor(kind).opacity(0.18)) {
             VStack(alignment: .leading, spacing: SBSpacing.lg) {
                 HStack {
                     Spacer()
-                    SBProgressRing(progress: progress, tint: tint(for: kind))
+                    SBProgressRing(progress: progress, tint: SBOutputStyle.outputColor(kind))
                         .padding(.vertical, SBSpacing.sm)
                     Spacer()
                 }
@@ -201,7 +201,7 @@ struct GenerationProcessingView: View {
                         HStack(alignment: .top, spacing: SBSpacing.md) {
                             Image(systemName: index < currentStep ? "checkmark.circle.fill" : index == currentStep ? "circle.dotted" : "circle")
                                 .sbScaledFont(size: 20, weight: .semibold)
-                                .foregroundStyle(index <= currentStep ? tint(for: kind) : SBColors.softText)
+                                .foregroundStyle(index <= currentStep ? SBOutputStyle.outputColor(kind) : SBColors.softText)
                                 .frame(width: 26)
 
                             VStack(alignment: .leading, spacing: 3) {
@@ -217,7 +217,7 @@ struct GenerationProcessingView: View {
                             Spacer(minLength: 0)
                         }
                         .padding(SBSpacing.sm)
-                        .background(index == currentStep ? tint(for: kind).opacity(0.08) : SBColors.field)
+                        .background(index == currentStep ? SBOutputStyle.outputColor(kind).opacity(0.08) : SBColors.field)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }
@@ -261,8 +261,8 @@ struct GenerationProcessingView: View {
             SBHaptics.success()
             await workspaceStore.refreshGenerationQueue()
             withAnimation(SBMotion.softSpring) { isComplete = true }
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            router.replaceCurrent(with: .result(jobId: job.id))
+            try? await Task.sleep(nanoseconds: 650_000_000)
+            router.replaceCurrent(with: .queue(surface: SourceBaseQueueSurface.surface(for: job.kind)))
         } else if let toast = workspaceStore.toastMessage {
             errorMessage = toast
         } else {
@@ -343,38 +343,6 @@ struct GenerationProcessingView: View {
         didStart = false
         isComplete = false
         Task { await startIfNeeded() }
-    }
-
-    private func icon(for kind: GeneratedKind) -> String {
-        switch kind {
-        case .flashcard: return "rectangle.on.rectangle"
-        case .question: return "questionmark.circle"
-        case .summary: return "doc.text"
-        case .examMorningSummary: return "alarm"
-        case .algorithm: return "arrow.triangle.branch"
-        case .comparison, .table: return "tablecells"
-        case .clinicalScenario: return "cross.case"
-        case .learningPlan: return "calendar.badge.clock"
-        case .podcast: return "waveform"
-        case .infographic: return "chart.bar.doc.horizontal"
-        case .mindMap: return "point.3.connected.trianglepath.dotted"
-        }
-    }
-
-    private func tint(for kind: GeneratedKind) -> Color {
-        switch kind {
-        case .flashcard: return SBColors.blue
-        case .question: return SBColors.cyan
-        case .summary: return SBColors.purple
-        case .examMorningSummary: return SBColors.purple
-        case .algorithm: return SBColors.orange
-        case .comparison, .table: return SBColors.blue
-        case .clinicalScenario: return SBColors.orange
-        case .learningPlan: return SBColors.green
-        case .podcast: return SBColors.purple
-        case .infographic: return SBColors.cyan
-        case .mindMap: return SBColors.purple
-        }
     }
 }
 

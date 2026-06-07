@@ -52,19 +52,6 @@ struct ProfileView: View {
         .sbPageBackground()
         .navigationTitle("Profil")
         .sbOpaqueNavBar()
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    router.navigate(to: .search)
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                        .sbScaledFont(size: 18, weight: .semibold)
-                        .foregroundStyle(SBColors.navy)
-                        .frame(width: 44, height: 44)
-                }
-                .accessibilityLabel("Profilde ara")
-            }
-        }
         .refreshable {
             await loadProfileData()
         }
@@ -376,6 +363,10 @@ struct ProfileView: View {
                     Text(title)
                         .font(SBTypography.labelSmall)
                         .foregroundStyle(SBColors.navy)
+                    Text(description)
+                        .font(SBTypography.caption)
+                        .foregroundStyle(SBColors.muted)
+                        .lineLimit(2)
                 }
 
                 Spacer()

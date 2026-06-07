@@ -134,7 +134,7 @@ struct DriveHomeView: View {
                         showUploadSheet = true
                     }
                     if processingCount > 0 {
-                        SBButton("İşlenenleri gör", icon: "clock", variant: .secondary, size: .medium) {
+                        SBButton("Hazırlananları gör", icon: "clock", variant: .secondary, size: .medium) {
                             router.navigate(to: .uploads)
                         }
                     }
@@ -143,7 +143,7 @@ struct DriveHomeView: View {
         } footer: {
             SBMetricRibbon(items: [
                 .init(icon: "checkmark.seal", value: "\(readyCount)", label: "hazır", tint: SBColors.green),
-                .init(icon: "clock", value: "\(processingCount)", label: "işlemde", tint: SBColors.orange),
+                .init(icon: "clock", value: "\(processingCount)", label: "hazırlanıyor", tint: SBColors.orange),
                 .init(icon: "rectangle.stack", value: "\(workspace.collections.count)", label: "koleksiyon", tint: SBColors.purple)
             ])
         }
@@ -155,11 +155,11 @@ struct DriveHomeView: View {
                 SBQuickContinueSurface(
                     eyebrow: "Kaldığın yer",
                     title: entry.output.title,
-                    message: "En son ürettiğin çıktıya kaldığın yerden dön.",
+                    message: "Son çalışmana kaldığın yerden dön.",
                     metadata: "\(entry.file.courseTitle) • \(entry.output.updatedLabel)",
-                    actionLabel: "Çıktıyı aç",
-                    icon: outputIcon(entry.output.kind),
-                    tint: outputColor(entry.output.kind)
+                    actionLabel: "Aç",
+                    icon: SBOutputStyle.outputIcon(entry.output.kind),
+                    tint: SBOutputStyle.outputColor(entry.output.kind)
                 ) {
                     router.navigate(to: .studyOutput(outputId: entry.output.id))
                 }
@@ -314,7 +314,7 @@ struct DriveHomeView: View {
             if workspace.collections.isEmpty {
                 SBEmptyState(
                     icon: "rectangle.stack",
-                    title: "Çalışma çıktısı yok",
+                    title: "Henüz çalışma yok",
                     message: "Kart, soru veya özet üretince burada çalışırsın.",
                     badges: ["Flashcard", "Soru", "Özet"],
                     actionLabel: "Koleksiyonlar",
@@ -397,34 +397,6 @@ struct DriveHomeView: View {
         workspaceStore.toast("Kaynak seçildi. Üretim türünü seç.")
         router.beginSourceSelection(from: .baseForce, destination: .baseForceHome)
     }
-
-    private func outputIcon(_ kind: GeneratedKind) -> String {
-        switch kind {
-        case .flashcard: return "rectangle.on.rectangle"
-        case .question: return "questionmark.circle"
-        case .summary: return "doc.text"
-        case .examMorningSummary: return "alarm"
-        case .algorithm: return "arrow.triangle.branch"
-        case .comparison, .table: return "tablecells"
-        case .clinicalScenario: return "cross.case"
-        case .learningPlan: return "calendar.badge.clock"
-        case .podcast: return "headphones"
-        case .infographic: return "chart.bar"
-        case .mindMap: return "point.3.connected.trianglepath.dotted"
-        }
-    }
-
-    private func outputColor(_ kind: GeneratedKind) -> Color {
-        switch kind {
-        case .flashcard: return SBColors.blue
-        case .question, .infographic: return SBColors.cyan
-        case .summary, .examMorningSummary, .comparison, .table, .mindMap: return SBColors.purple
-        case .algorithm, .clinicalScenario: return SBColors.orange
-        case .learningPlan: return SBColors.green
-        case .podcast: return SBColors.red
-        }
-    }
-
 }
 
 #Preview {

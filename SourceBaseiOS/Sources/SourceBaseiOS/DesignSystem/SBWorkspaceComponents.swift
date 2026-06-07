@@ -466,7 +466,7 @@ public struct SBWorkspaceMomentumRibbon: View {
 
                 SBMetricRibbon(items: [
                     .init(icon: "checkmark.seal", value: "\(readyCount)", label: "hazır kaynak", tint: SBColors.green),
-                    .init(icon: "sparkles.rectangle.stack", value: "\(outputCount)", label: "üretilen çıktı", tint: SBColors.purple),
+                    .init(icon: "sparkles.rectangle.stack", value: "\(outputCount)", label: "çalışma", tint: SBColors.purple),
                     .init(icon: "stethoscope", value: focusTitle, label: "odak konu", tint: SBColors.cyan)
                 ])
             }

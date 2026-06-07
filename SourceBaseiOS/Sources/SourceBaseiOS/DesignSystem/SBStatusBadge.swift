@@ -9,7 +9,7 @@ public enum SBStatus: Equatable {
         case .ready: return "Hazır"
         case .processing: return "İşleniyor"
         case .uploading: return "Yükleniyor"
-        case .failed: return "Hatalı"
+        case .failed: return "Tamamlanamadı"
         case .draft: return "Beklemede"
         }
     }

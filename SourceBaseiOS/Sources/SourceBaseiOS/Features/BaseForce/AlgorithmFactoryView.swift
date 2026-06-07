@@ -213,8 +213,6 @@ struct AlgorithmFactoryView: View {
                 }
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Önce hazır bir kaynak seç. Alttaki Hazır kaynak seç düğmesini kullan.")
     }
 
     private var sourceRequiredCard: some View {
@@ -253,9 +251,10 @@ struct AlgorithmFactoryView: View {
                     .foregroundStyle(SBColors.navy)
                     .lineLimit(1)
 
-                Text(file.sizeLabel)
+                Text("\(file.courseTitle) • \(file.sectionTitle) • \(file.sizeLabel)")
                     .font(SBTypography.caption)
                     .foregroundStyle(SBColors.muted)
+                    .lineLimit(2)
             }
         }
         .padding(.horizontal, SBSpacing.sm)
@@ -355,7 +354,7 @@ struct AlgorithmFactoryView: View {
             }
 
             // Output Format
-            settingsSection(label: "Çıktı") {
+            settingsSection(label: "Çalışma") {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
                     ForEach(OutputFormat.allCases, id: \.self) { format in
                         segmentButton(
@@ -513,7 +512,7 @@ struct AlgorithmFactoryView: View {
 
     private func generate() {
         guard let file = readySources.first else {
-            workspaceStore.toast("Üretim için önce hazır bir kaynak seç.")
+            workspaceStore.toast("Önce hazır bir kaynak seç.")
             return
         }
         isGenerating = true

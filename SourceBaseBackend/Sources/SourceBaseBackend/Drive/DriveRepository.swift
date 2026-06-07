@@ -604,7 +604,7 @@ public struct DriveRepository: Sendable {
     }
 
     private func waitForGeneratedContent(jobId: String) async throws -> AnyJSON? {
-        let maxAttempts = 90 // 180s (90 × 2s) — heavy jobs (infographic, clinical) may exceed 120s
+        let maxAttempts = 90 // 180s (90 x 2s) for heavy jobs; timeout still points users to Queue.
         for _ in 0..<maxAttempts {
             let statusResponse = try await api.getJobStatus(jobId)
             let statusData = statusResponse["data"]?.dictValue
@@ -644,13 +644,23 @@ public struct DriveRepository: Sendable {
 
             _ = try? await api.cancelJob(jobId)
             _ = try? await api.retryJob(jobId)
-            try await Task.sleep(nanoseconds: 1_000_000_000)
+            try await Task.sleep(nanoseconds: 1_500_000_000)
 
             do {
                 _ = try await api.processGenerationJob(jobId)
             } catch {
                 if try await generationJobCanContinue(jobId, api: api) { return }
-                throw error
+                
+                _ = try? await api.cancelJob(jobId)
+                _ = try? await api.retryJob(jobId)
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+                
+                do {
+                    _ = try await api.processGenerationJob(jobId)
+                } catch {
+                    if try await generationJobCanContinue(jobId, api: api) { return }
+                    throw error
+                }
             }
         }
     }

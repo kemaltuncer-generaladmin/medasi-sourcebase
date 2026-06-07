@@ -64,12 +64,12 @@ struct BaseForceHomeView: View {
 
     private var heroSection: some View {
         VStack(alignment: .leading, spacing: SBSpacing.sm) {
-            Text("Üret, Drive'daki hazır kaynaklarını çalışma setlerine çevirdiğin yer.")
+            Text("Hazır kaynaklarını çalışma materyaline dönüştür.")
                 .font(SBTypography.heading3)
                 .foregroundStyle(SBColors.navy)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Notu getir; flashcard, soru, özet, tablo ve sınav sabahı telaşını azaltan mini tekrarlar buradan çıkar. Dağınık PDF'ler biraz nefes alsın.")
+            Text("Flashcard, soru, özet, akış, tablo ve klinik tekrarları tek yerden başlat.")
                 .font(SBTypography.bodyMedium)
                 .foregroundStyle(SBColors.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -83,11 +83,11 @@ struct BaseForceHomeView: View {
                 SBQuickContinueSurface(
                     eyebrow: "Kaldığın yer",
                     title: entry.output.title,
-                    message: "Son ürettiğin çıktıya tek dokunuşla geri dön.",
+                    message: "Son çalışmana kaldığın yerden dön.",
                     metadata: "\(entry.file.courseTitle) • \(entry.output.updatedLabel)",
-                    actionLabel: "Çıktıyı aç",
-                    icon: outputIcon(entry.output.kind),
-                    tint: outputColor(entry.output.kind)
+                    actionLabel: "Aç",
+                    icon: SBOutputStyle.outputIcon(entry.output.kind),
+                    tint: SBOutputStyle.outputColor(entry.output.kind)
                 ) {
                     router.navigate(to: .studyOutput(outputId: entry.output.id))
                 }
@@ -149,7 +149,7 @@ struct BaseForceHomeView: View {
             .init(icon: "doc.text", title: "Son tekrar", subtitle: "Kısa ve net özet", color: SBColors.purple, route: .summaryFactory),
             .init(icon: "arrow.triangle.branch", title: "Akış", subtitle: "Karar adımlarını sadeleştir", color: SBColors.orange, route: .algorithmFactory),
             .init(icon: "tablecells", title: "Tablo", subtitle: "Konuları yan yana kıyasla", color: SBColors.purple, route: .comparisonFactory),
-            .init(icon: "clock", title: "Kuyruk", subtitle: activeBaseForceJobs == 0 ? "Hazırlananları takip et" : "\(activeBaseForceJobs) çıktı hazırlanıyor", color: SBColors.blue, route: .queue(surface: .all))
+            .init(icon: "clock", title: "Kuyruk", subtitle: activeBaseForceJobs == 0 ? "Başlayan çalışmaları takip et" : "\(activeBaseForceJobs) çalışma hazırlanıyor", color: SBColors.blue, route: .queue(surface: .all))
         ]
     }
 
@@ -205,17 +205,17 @@ struct BaseForceHomeView: View {
 
     private var recentGenerationsSection: some View {
         VStack(alignment: .leading, spacing: SBSpacing.md) {
-            SBSectionHeader(title: "Son üretimler", action: "Tümünü gör") {
+            SBSectionHeader(title: "Son çalışmalar", action: "Tümünü gör") {
                 router.navigate(to: .queue(surface: .all))
             }
 
             if latestGenerations.isEmpty {
                 SBEmptyState(
                     icon: "rectangle.stack.badge.plus",
-                    title: "Henüz üretim yok",
-                    message: "Bir kaynak seçip üretim modlarından birini başlattığında sonuçların burada görünür.",
+                    title: "Henüz çalışma yok",
+                    message: "Bir kaynak seçip çalışma başlattığında burada görünür.",
                     badges: ["Flashcard", "Soru", "Özet"],
-                    actionLabel: "Üretime başla",
+                    actionLabel: "Başla",
                     onAction: { openSourcePicker() },
                     context: .baseForce
                 )
@@ -235,16 +235,16 @@ struct BaseForceHomeView: View {
                 HStack(spacing: SBSpacing.md) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(outputColor(output.kind).opacity(0.12))
+                            .fill(SBOutputStyle.outputColor(output.kind).opacity(0.12))
                             .frame(width: 40, height: 40)
 
-                        Image(systemName: outputIcon(output.kind))
+                        Image(systemName: SBOutputStyle.outputIcon(output.kind))
                             .sbScaledFont(size: 18)
-                            .foregroundStyle(outputColor(output.kind))
+                            .foregroundStyle(SBOutputStyle.outputColor(output.kind))
                     }
 
                     VStack(alignment: .leading, spacing: SBSpacing.xs) {
-                        Text(outputKindLabel(output.kind))
+                        Text(SBOutputStyle.outputKindLabel(output.kind))
                             .font(SBTypography.titleSmall)
                             .foregroundStyle(SBColors.navy)
                             .lineLimit(1)
@@ -271,7 +271,7 @@ struct BaseForceHomeView: View {
 
                 HStack(spacing: SBSpacing.sm) {
                     SBButton(
-                        "Çıktıyı aç",
+                        "Aç",
                         icon: "arrow.up.right.square",
                         variant: .primary,
                         size: .small,
@@ -298,51 +298,6 @@ struct BaseForceHomeView: View {
     }
 
     // MARK: - Helpers
-
-    private func outputIcon(_ kind: GeneratedKind) -> String {
-        switch kind {
-        case .flashcard: return "rectangle.on.rectangle"
-        case .question: return "questionmark.circle"
-        case .summary: return "doc.text"
-        case .examMorningSummary: return "alarm"
-        case .algorithm: return "arrow.triangle.branch"
-        case .comparison, .table: return "tablecells"
-        case .clinicalScenario: return "cross.case"
-        case .learningPlan: return "calendar.badge.clock"
-        case .podcast: return "headphones"
-        case .infographic: return "chart.bar"
-        case .mindMap: return "point.3.connected.trianglepath.dotted"
-        }
-    }
-
-    private func outputColor(_ kind: GeneratedKind) -> Color {
-        switch kind {
-        case .flashcard: return SBColors.blue
-        case .question: return SBColors.questionTint
-        case .summary, .examMorningSummary, .comparison, .table, .mindMap: return SBColors.purple
-        case .algorithm: return SBColors.orange
-        case .clinicalScenario: return SBColors.orange
-        case .learningPlan: return SBColors.green
-        case .podcast: return SBColors.red
-        case .infographic: return SBColors.cyan
-        }
-    }
-
-    private func outputKindLabel(_ kind: GeneratedKind) -> String {
-        switch kind {
-        case .flashcard: return "Flashcard"
-        case .question: return "Soru"
-        case .summary: return "Özet"
-        case .examMorningSummary: return "Sınav Sabahı"
-        case .algorithm: return "Algoritma"
-        case .comparison, .table: return "Tablo"
-        case .clinicalScenario: return "Klinik Senaryo"
-        case .learningPlan: return "Öğrenme Planı"
-        case .podcast: return "Podcast"
-        case .infographic: return "İnfografik"
-        case .mindMap: return "Zihin Haritası"
-        }
-    }
 
     private func openSourcePicker(with file: DriveFile) {
         workspaceStore.setSelectedSources([file.id])

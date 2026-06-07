@@ -140,7 +140,7 @@ struct ExamMorningView: View {
                     Spacer()
 
                     Button {
-                        router.navigate(to: .sourcePicker)
+                        router.beginSourceSelection(from: .baseForce, destination: .route(.examMorning))
                     } label: {
                         HStack(spacing: SBSpacing.xs) {
                             Image(systemName: "folder")
@@ -242,7 +242,7 @@ struct ExamMorningView: View {
     private var step3LengthFormat: some View {
         SBCard(radius: 16) {
             VStack(alignment: .leading, spacing: SBSpacing.md) {
-                stepHeader(number: 3, title: "Süre ve çıktı")
+                stepHeader(number: 3, title: "Süre ve çalışma")
 
                 // Length
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
@@ -326,7 +326,7 @@ struct ExamMorningView: View {
                 if canGenerate {
                     generate()
                 } else if !hasSources {
-                    router.navigate(to: .sourcePicker)
+                    router.beginSourceSelection(from: .baseForce, destination: .route(.examMorning))
                 } else {
                     workspaceStore.toast("Seçili kaynak hazır değil.")
                 }
@@ -411,7 +411,7 @@ struct ExamMorningView: View {
         guard let file = selectedSources
             .compactMap({ workspaceStore.file(id: $0) })
             .first(where: { workspaceStore.isReadyForGeneration($0) }) else {
-            workspaceStore.toast("Üretim için önce hazır bir kaynak seç.")
+            workspaceStore.toast("Önce hazır bir kaynak seç.")
             return
         }
         isGenerating = true

@@ -24,7 +24,7 @@ struct SourceLabHomeView: View {
                 if isLoading {
                     SBLoadingState(
                         icon: "flask",
-                        title: "SourceLab yükleniyor",
+                        title: "Derin çalışma açılıyor",
                         message: "Araçlar hazırlanıyor..."
                     )
                 } else if let error = errorMessage {
@@ -55,11 +55,11 @@ struct SourceLabHomeView: View {
     private var headerSection: some View {
         HStack {
             VStack(alignment: .leading, spacing: SBSpacing.xs) {
-                Text("SourceLab")
+                Text("Derin Çalışma")
                     .font(SBTypography.heading1)
                     .foregroundStyle(SBColors.navy)
 
-                Text("Bir kaynak seç, aracı çalıştır.")
+                Text("Klinik, plan, podcast ve görsel tekrarları başlat.")
                     .font(SBTypography.bodyMedium)
                     .foregroundStyle(SBColors.muted)
             }
@@ -82,8 +82,8 @@ struct SourceLabHomeView: View {
     private var quickStartHero: some View {
         SBSignatureHero(
             eyebrow: "Derin çalışma",
-            title: "Klinik tekrar araçları",
-            message: selectedSources.isEmpty ? "Hazır bir kaynak seç, sonra vaka, plan veya görsel tekrar üret." : "\(selectedSources.count) kaynak seçili. Klinik ve uzun tekrar araçlarını aç.",
+            title: "Derin çalışma araçları",
+            message: selectedSources.isEmpty ? "Hazır bir kaynak seç, sonra çalışma türünü aç." : "\(selectedSources.count) kaynak seçili. Derin çalışma araçlarını aç.",
             icon: "flask.fill",
             tint: SBColors.purple
         ) {
@@ -132,7 +132,7 @@ struct SourceLabHomeView: View {
                 toolCard(
                     icon: "clock",
                     title: "Kuyruk",
-                    subtitle: activeSourceLabJobs == 0 ? "Hazırlanan çalışmaları izle." : "\(activeSourceLabJobs) çıktı hazırlanıyor.",
+                    subtitle: activeSourceLabJobs == 0 ? "Başlayan çalışmaları izle." : "\(activeSourceLabJobs) çalışma hazırlanıyor.",
                     color: SBColors.orange
                 ) {
                     router.navigate(to: .queue(surface: .sourceLab))

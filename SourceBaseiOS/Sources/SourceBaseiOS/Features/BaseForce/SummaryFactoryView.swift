@@ -368,7 +368,7 @@ struct SummaryFactoryView: View {
 
     private func generate() {
         guard let readyFile else {
-            workspaceStore.toast("Üretim için önce hazır bir kaynak seç.")
+            workspaceStore.toast("Önce hazır bir kaynak seç.")
             return
         }
         isGenerating = true

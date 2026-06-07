@@ -133,7 +133,7 @@ struct SearchView: View {
         } footer: {
             SBMetricRibbon(items: [
                 .init(icon: "checkmark.circle", value: "\(readyCount)", label: "hazır", tint: SBColors.green),
-                .init(icon: "arrow.triangle.2.circlepath", value: "\(processingCount)", label: "işleniyor", tint: SBColors.orange),
+                .init(icon: "arrow.triangle.2.circlepath", value: "\(processingCount)", label: "hazırlanıyor", tint: SBColors.orange),
                 .init(icon: "line.3.horizontal.decrease.circle", value: hasFilters ? "\(results.count)" : "-", label: "sonuç", tint: SBColors.cyan)
             ])
         }
@@ -404,7 +404,7 @@ struct SearchView: View {
                 icon: "magnifyingglass",
                 title: "Ara",
                 message: "Dosya, ders veya bölüm yaz.",
-                badges: ["Hazır kaynaklar", "PPTX sunumlar", "Flashcard çıktıları"]
+                badges: ["Hazır kaynaklar", "PPTX sunumlar", "Flashcard"]
             )
         } else if results.isEmpty {
             SBEmptyState(

@@ -27,7 +27,7 @@ struct FileDetailView: View {
         }
         switch file.status {
         case .completed: return "Kaynak üretime hazır."
-        case .processing: return "Dosya işleniyor. İşlem tamamlanınca üretim başlatabilirsin."
+        case .processing: return "Kaynak hazırlanıyor. Hazır olunca üretim başlatabilirsin."
         case .uploading: return "Yükleme devam ediyor."
         case .failed: return "Dosya işlenemedi. Farklı bir dosya deneyebilirsin."
         case .draft: return "Kaynak henüz hazır değil."
@@ -410,13 +410,13 @@ struct FileDetailView: View {
                             .sbScaledFont(size: 28)
                             .foregroundStyle(SBColors.muted.opacity(0.5))
 
-                        Text("Henüz çıktı üretilmedi")
+                        Text("Henüz çalışma yok")
                             .font(SBTypography.bodySmall)
                             .foregroundStyle(SBColors.muted)
 
                         Text(isReadyForGeneration
-                             ? "Yukarıdaki üretim seçeneklerinden biriyle bu dosyadan içerik oluşturabilirsin."
-                             : "Dosya işlendikten sonra üretilen çıktılar burada listelenir.")
+                             ? "Yukarıdaki seçeneklerden biriyle çalışma başlatabilirsin."
+                             : "Kaynak hazır olunca çalışmalar burada görünür.")
                             .font(SBTypography.caption)
                             .foregroundStyle(SBColors.softText)
                             .multilineTextAlignment(.center)
@@ -445,9 +445,9 @@ struct FileDetailView: View {
 
     private func generatedRow(output: GeneratedOutput) -> some View {
         HStack(spacing: SBSpacing.md) {
-            Image(systemName: outputIcon(output.kind))
+            Image(systemName: SBOutputStyle.outputIcon(output.kind))
                 .sbScaledFont(size: 22)
-                .foregroundStyle(outputColor(output.kind))
+                .foregroundStyle(SBOutputStyle.outputColor(output.kind))
 
             VStack(alignment: .leading, spacing: SBSpacing.xs) {
                 Text(output.title)
@@ -471,37 +471,6 @@ struct FileDetailView: View {
                 .foregroundStyle(SBColors.softText)
         }
         .padding(SBSpacing.md)
-    }
-
-    private func outputIcon(_ kind: GeneratedKind) -> String {
-        switch kind {
-        case .flashcard: return "rectangle.on.rectangle"
-        case .question: return "questionmark.circle"
-        case .summary: return "doc.text"
-        case .examMorningSummary: return "alarm"
-        case .algorithm: return "arrow.triangle.branch"
-        case .comparison, .table: return "tablecells"
-        case .clinicalScenario: return "cross.case"
-        case .learningPlan: return "calendar.badge.clock"
-        case .podcast: return "mic"
-        case .infographic: return "chart.bar"
-        case .mindMap: return "point.3.connected.trianglepath.dotted"
-        }
-    }
-
-    private func outputColor(_ kind: GeneratedKind) -> Color {
-        switch kind {
-        case .flashcard: return SBColors.blue
-        case .question: return SBColors.questionTint
-        case .summary, .examMorningSummary: return SBColors.purple
-        case .algorithm: return SBColors.orange
-        case .comparison, .table: return SBColors.blue
-        case .clinicalScenario: return SBColors.orange
-        case .learningPlan: return SBColors.green
-        case .podcast: return SBColors.red
-        case .infographic: return SBColors.cyan
-        case .mindMap: return SBColors.purple
-        }
     }
 
     // MARK: - Loading
