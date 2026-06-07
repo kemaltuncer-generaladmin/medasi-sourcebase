@@ -425,7 +425,7 @@ extension SourceBaseQueueSurface {
         switch self {
         case .all: return "Çalışma takibi"
         case .baseForce: return "Kart, soru, özet"
-        case .sourceLab: return "Vaka, plan, medya"
+        case .sourceLab: return "Klinik ve görsel üretim"
         }
     }
 
@@ -436,7 +436,7 @@ extension SourceBaseQueueSurface {
         case .baseForce:
             return "Kart, soru, son tekrar, algoritma ve tablo çıktılarının durumunu izle."
         case .sourceLab:
-            return "Sınav sabahı, klinik senaryo, podcast ve görsel çalışmalarını izle."
+            return "Sınav sabahı, klinik senaryo, plan, podcast ve görsel çalışmalarını izle."
         }
     }
 

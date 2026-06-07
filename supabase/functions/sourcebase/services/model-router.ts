@@ -39,7 +39,17 @@ export interface RouteOptions {
   imageQuality?: "draft" | "standard" | "premium" | "low";
   imageModel?: string;
   imageRequired?: boolean;
+  audioRequired?: boolean;
   sourceCount?: number;
+}
+
+export interface PodcastAudioRoute {
+  provider: "openai";
+  model: string;
+  hostVoice: string;
+  expertVoice: string;
+  narratorVoice: string;
+  format: "mp3";
 }
 
 type RouteJobType = GenerationType | "central_ai_chat" | "infographic_spec";
@@ -219,7 +229,7 @@ export function resolveImageRoute(
   const defaultModel = normalizedQuality === "draft"
     ? imageModel("IMAGE_MODEL_DRAFT", "gpt-image-1-mini")
     : normalizedQuality === "premium"
-    ? imageModel("IMAGE_MODEL_PREMIUM", "gpt-image-1.5")
+    ? imageModel("IMAGE_MODEL_PREMIUM", "gpt-image-2")
     : imageModel("IMAGE_MODEL_STANDARD", "gpt-image-1.5");
   const selectedModel = requestedModel?.trim() || defaultModel;
   const defaultProvider = imageProviderEnv("IMAGE_PROVIDER_DEFAULT") ??
@@ -381,6 +391,15 @@ export function routeOptionsFromPayload(
       visualOutputContract.includes("remote_image") ||
       visualOutputContract.includes("shareable") ||
       visualOutputContract.includes("visual"),
+    audioRequired: truthy(
+      options.audioAssetRequired ??
+        options.audio_asset_required ??
+        options.audioRequired ??
+        options.audio_required,
+    ) ||
+      optionText(
+        options.podcastOutputContract ?? options.podcast_output_contract,
+      ).includes("audio"),
     sourceCount,
   };
 }
@@ -407,6 +426,39 @@ export function syncInfographicImageEnabled() {
 
 export function shouldGenerateInfographicImage(options?: RouteOptions) {
   return syncInfographicImageEnabled() || Boolean(options?.imageRequired);
+}
+
+export function isAudioProviderAvailable() {
+  return Boolean(Deno.env.get("OPENAI_API_KEY"));
+}
+
+export function shouldGeneratePodcastAudio(options?: RouteOptions) {
+  if (!isAudioProviderAvailable()) return false;
+  return podcastAudioEnabled() || Boolean(options?.audioRequired);
+}
+
+function podcastAudioEnabled() {
+  const value = (Deno.env.get("SOURCEBASE_PODCAST_AUDIO_ENABLED") ??
+    Deno.env.get("PODCAST_AUDIO_ENABLED") ??
+    "true")
+    .trim()
+    .toLowerCase();
+  return value === "1" || value === "true" || value === "yes" ||
+    value === "on";
+}
+
+export function resolvePodcastAudioRoute(
+  options?: RouteOptions,
+): PodcastAudioRoute {
+  const model = textModel("AUDIO_MODEL_TTS", "gpt-4o-mini-tts");
+  return {
+    provider: "openai",
+    model,
+    hostVoice: textModel("AUDIO_VOICE_HOST", "alloy"),
+    expertVoice: textModel("AUDIO_VOICE_EXPERT", "onyx"),
+    narratorVoice: textModel("AUDIO_VOICE_NARRATOR", "alloy"),
+    format: "mp3",
+  };
 }
 
 function desiredTextTier(

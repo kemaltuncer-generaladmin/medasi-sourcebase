@@ -14,6 +14,7 @@ struct FlashcardFactoryView: View {
     @State private var difficulty: Difficulty = .medium
     @State private var extractKeyConcepts = true
     @State private var addHints = true
+    @State private var quality: SBQualityTier = .standard
 
     private var router: AppRouter { appState.router }
     private var selectedSources: Set<String> { workspaceStore.selectedSourceIds }
@@ -67,7 +68,7 @@ struct FlashcardFactoryView: View {
     }
 
     private var costLabel: String {
-        SBGenerationCost.compactEstimate(for: .flashcard, requestedCount: cardCount)
+        SBGenerationCost.compactEstimate(for: .flashcard, requestedCount: cardCount, quality: quality.rawValue)
     }
 
     var body: some View {
@@ -234,11 +235,11 @@ struct FlashcardFactoryView: View {
                     )
 
                     VStack(alignment: .leading, spacing: SBSpacing.xs) {
-                        Text("Hazır kaynak ekle")
+                        Text(selectedSources.isEmpty ? "Hazır kaynak seç" : "Kaynağı değiştir")
                             .font(SBTypography.labelMedium)
                             .foregroundStyle(SBColors.blue)
 
-                        Text("Drive'dan seç.")
+                        Text(selectedSources.isEmpty ? "Drive'dan hazır kaynak seç." : "Başka bir Drive kaynağı seç.")
                             .font(SBTypography.caption)
                             .foregroundStyle(SBColors.muted)
                     }
@@ -335,6 +336,8 @@ struct FlashcardFactoryView: View {
                 toggleRow(label: "Kavram çıkar", isOn: $extractKeyConcepts)
                 toggleRow(label: "İpucu ekle", isOn: $addHints)
             }
+
+            SBQualityPicker(selection: $quality)
         }
     }
 
@@ -445,14 +448,15 @@ struct FlashcardFactoryView: View {
             difficulty.rawValue,
             "\(cardCount) kart",
             extractKeyConcepts ? "önemli kavram çıkar" : "tüm kapsamdan seç",
-            addHints ? "ipucu ekle" : "ipucu ekleme"
+            addHints ? "ipucu ekle" : "ipucu ekleme",
+            quality.rawValue
         ].joined(separator: " • ")
         Task {
             let job = await workspaceStore.enqueueGeneration(
                 file: readyFile,
                 kind: .flashcard,
                 label: "Flashcard Seti",
-                surface: "BaseForce Flashcard",
+                surface: "Üret Flashcard",
                 mode: mode,
                 extraOptions: [
                     "card_style": cardStyle.backendValue,

@@ -4,6 +4,7 @@ import {
   resolveTextRoute,
   routeOptionsFromPayload,
   shouldGenerateInfographicImage,
+  shouldGeneratePodcastAudio,
 } from "./model-router.ts";
 
 Deno.test("router keeps lightweight summaries on cheap model when requested", () => {
@@ -119,6 +120,66 @@ Deno.test("payload route options keep explicit infographic visual asset request"
 
     assertEquals(options.imageRequired, true);
     assertEquals(shouldGenerateInfographicImage(options), true);
+  });
+});
+
+Deno.test("router treats premium structured summaries as reasoning work", () => {
+  withEnv({
+    OPENAI_API_KEY: "test-key",
+    TEXT_MODEL_REASONING: undefined,
+  }, () => {
+    const options = routeOptionsFromPayload({
+      modelPolicy: "premium_balanced_long_context_summary_synthesis_first",
+      outputLengthPolicy: "comprehensive_structured_not_short",
+      preferredModelTier: "latest_premium_reasoning_long_context",
+    });
+    const route = resolveTextRoute("summary", options, 1_200);
+
+    assertEquals(options.premium, true);
+    assertEquals(options.longContext, true);
+    assertEquals(route.model, "gpt-5.4");
+    assertEquals(route.tier, "reasoning");
+  });
+});
+
+Deno.test("router promotes structured learning plans away from cheap tier", () => {
+  withEnv({
+    OPENAI_API_KEY: "test-key",
+    TEXT_MODEL_REASONING: undefined,
+  }, () => {
+    const options = routeOptionsFromPayload({
+      qualityTier: "standard",
+      minimumDepth: "premium_balanced_deep",
+      outputLengthPolicy: "balanced_comprehensive_structured_not_short",
+      planGoal: "7 gun",
+      dailyTime: "45 dk",
+    });
+    const route = resolveTextRoute("learning_plan", options, 1_200);
+
+    assertEquals(options.complex, true);
+    assertEquals(options.personalized, true);
+    assertEquals(route.model, "gpt-5.4");
+    assertEquals(route.tier, "reasoning");
+  });
+});
+
+Deno.test("podcast audio is requested when client sets audio asset contract", () => {
+  withEnv({ OPENAI_API_KEY: "test-key" }, () => {
+    const options = routeOptionsFromPayload({
+      audioAssetRequired: "true",
+      podcastOutputContract:
+        "return_audio_url_when_available_plus_full_segment_transcript",
+    });
+    assertEquals(options.audioRequired, true);
+    assertEquals(shouldGeneratePodcastAudio(options), true);
+  });
+});
+
+Deno.test("podcast audio is skipped when no provider key is configured", () => {
+  withEnv({ OPENAI_API_KEY: undefined }, () => {
+    const options = routeOptionsFromPayload({ audioAssetRequired: "true" });
+    assertEquals(options.audioRequired, true);
+    assertEquals(shouldGeneratePodcastAudio(options), false);
   });
 });
 

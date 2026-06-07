@@ -129,19 +129,39 @@ import SourceBaseBackend
 }
 
 @Test func comparisonContractRequiresFullSourceMatrix() async throws {
+    // No quality token in the mode → standard is the balanced default tier.
     let contract = SourceBaseGenerationContract.contract(
         for: .comparison,
         mode: "klinik tablo",
         source: nil
     )
 
-    #expect(contract.modelPolicy == "premium_latest_long_context_matrix_reasoning_first")
-    #expect(contract.minimumDepth == "full_source_matrix_deep")
-    #expect(contract.preferredModelTier == "latest_premium_high_reasoning_long_context")
+    #expect(contract.qualityTier == "standard")
+    #expect(contract.modelPolicy == "premium_balanced_long_context_matrix_reasoning_first")
+    #expect(contract.minimumDepth == "balanced_full_source_matrix_deep")
+    #expect(contract.preferredModelTier == "latest_premium_balanced_long_context")
     #expect(contract.outputContract.contains("source_coverage"))
     #expect(contract.outputContract.contains("source_refs"))
     #expect(contract.outputContract.contains("En az 8"))
     #expect(contract.qualityGate.contains("under_8_criteria"))
+}
+
+@Test func generationContractDefaultsToStandardWhenNoQualityChosen() async throws {
+    // No economy/standard/premium token in the mode → balanced standard tier
+    // (good quality at a fair MC cost); the user upgrades or downgrades.
+    let defaulted = SourceBaseGenerationContract.contract(
+        for: .summary,
+        mode: "yüksek getirili",
+        source: nil
+    )
+    let premium = SourceBaseGenerationContract.contract(
+        for: .summary,
+        mode: "premium yüksek getirili",
+        source: nil
+    )
+
+    #expect(defaulted.qualityTier == "standard")
+    #expect(premium.qualityTier == "premium")
 }
 
 @Test func generatedOutputBuildsLayeredStudyWorkspaceBlocks() async throws {
@@ -285,6 +305,17 @@ import SourceBaseBackend
     router.completeSourceSelection()
     #expect(router.selectedTab == .baseForce)
     #expect(router.path == [.queue(surface: .baseForce)])
+
+    router.beginSourceSelection(from: .sourceLab, destination: .sourceLabHome)
+    #expect(router.selectedTab == .baseForce)
+    #expect(router.path == [.sourcePicker])
+    router.completeSourceSelection()
+    #expect(router.selectedTab == .baseForce)
+    #expect(router.path.isEmpty)
+
+    router.showGenerationQueue(.sourceLab)
+    #expect(router.selectedTab == .baseForce)
+    #expect(router.path == [.queue(surface: .sourceLab)])
 
     router.reset(to: .drive)
 }

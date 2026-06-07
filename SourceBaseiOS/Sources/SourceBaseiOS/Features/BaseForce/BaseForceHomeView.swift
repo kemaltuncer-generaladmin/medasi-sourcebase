@@ -29,13 +29,13 @@ struct BaseForceHomeView: View {
                 if isLoading {
                     SBLoadingState(
                         icon: "bolt.fill",
-                        title: "BaseForce yükleniyor",
+                        title: "Üret yükleniyor",
                         message: "Kaynaklar ve üretimler hazırlanıyor...",
                         context: .baseForce
                     )
                 } else if let error = errorMessage {
                     SBErrorState(
-                        title: "BaseForce yüklenemedi",
+                        title: "Üret yüklenemedi",
                         message: error,
                         actionLabel: "Tekrar dene",
                         onAction: { Task { await loadWorkspace() } },
@@ -43,12 +43,9 @@ struct BaseForceHomeView: View {
                     )
                 } else {
                     heroSection.sbEntrance(0)
-                    quickContinueSection.sbEntrance(1)
-                    momentumSection.sbEntrance(2)
-                    primaryFactoriesSection.sbEntrance(3)
-                    secondaryFactoriesSection.sbEntrance(4)
-                    deepToolsSection.sbEntrance(5)
-                    recentGenerationsSection.sbEntrance(6)
+                    productionToolsSection.sbEntrance(1)
+                    quickContinueSection.sbEntrance(2)
+                    recentGenerationsSection.sbEntrance(3)
                 }
             }
             .padding(SBSpacing.lg)
@@ -63,50 +60,21 @@ struct BaseForceHomeView: View {
         }
     }
 
-    // MARK: - Header
-
-    private var headerSection: some View {
-        VStack(alignment: .leading, spacing: SBSpacing.xs) {
-            Text("Kaynaklarından sınav odaklı çalışma setleri üret.")
-                .font(SBTypography.bodyMedium)
-                .foregroundStyle(SBColors.muted)
-        }
-    }
-
     // MARK: - Hero Section
 
     private var heroSection: some View {
-        SBSignatureHero(
-            eyebrow: "Çalışma setleri",
-            title: "Hazır kaynakla hemen başla",
-            message: readyFiles.isEmpty ? "Önce Drive'dan hazır bir kaynak seç." : "\(readyFiles.count) kaynak hazır. Önce kaynağını seç, sonra üretim türünü aç.",
-            icon: "bolt.fill",
-            tint: SBColors.blue,
-            mode: .action
-        ) {
-            HStack(spacing: SBSpacing.sm) {
-                SBButton(
-                    "Kaynak seç",
-                    icon: "folder",
-                    variant: .primary,
-                    size: .medium,
-                    fullWidth: true,
-                    action: { openSourcePicker() }
-                )
-                SBButton(
-                    "Kuyruğu gör",
-                    icon: "clock",
-                    variant: .secondary,
-                    size: .medium,
-                    action: { router.navigate(to: .queue(surface: .all)) }
-                )
-            }
-        } footer: {
-            SBMetricRibbon(items: [
-                .init(icon: "square.stack.3d.up", value: "\(readyFiles.count)", label: "hazır", tint: SBColors.green),
-                .init(icon: "clock.arrow.circlepath", value: "\(latestGenerations.count)", label: "son", tint: SBColors.orange)
-            ])
+        VStack(alignment: .leading, spacing: SBSpacing.sm) {
+            Text("Üret, Drive'daki hazır kaynaklarını çalışma setlerine çevirdiğin yer.")
+                .font(SBTypography.heading3)
+                .foregroundStyle(SBColors.navy)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("Notu getir; flashcard, soru, özet, tablo ve sınav sabahı telaşını azaltan mini tekrarlar buradan çıkar. Dağınık PDF'ler biraz nefes alsın.")
+                .font(SBTypography.bodyMedium)
+                .foregroundStyle(SBColors.muted)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .padding(.top, SBSpacing.xs)
     }
 
     private var quickContinueSection: some View {
@@ -139,148 +107,61 @@ struct BaseForceHomeView: View {
         }
     }
 
-    private var momentumSection: some View {
-        SBWorkspaceMomentumRibbon(
-            readyCount: readyFiles.count,
-            outputCount: workspaceStore.totalGeneratedOutputCount,
-            focusTitle: workspaceStore.momentumFocusTitle
-        )
+    private var productionToolsSection: some View {
+        VStack(alignment: .leading, spacing: SBSpacing.md) {
+            SBSectionHeader(title: "Üretim türleri")
+
+            toolGroup(title: "Ana", tools: mainTools)
+            toolGroup(title: "Derin", tools: deepTools)
+        }
     }
 
-    private var primaryFactoriesSection: some View {
+    private func toolGroup(title: String, tools: [ProductionTool]) -> some View {
         VStack(alignment: .leading, spacing: SBSpacing.md) {
-            SBSectionHeader(title: "Hemen üret", action: readyFiles.isEmpty ? nil : "Kaynağı değiştir") {
-                openSourcePicker()
-            }
+            Text(title)
+                .font(SBTypography.labelMedium)
+                .foregroundStyle(SBColors.muted)
+                .textCase(.uppercase)
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 154), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
-                factoryTile(
-                    icon: "rectangle.on.rectangle",
-                    title: "Flashcard",
-                    subtitle: "Hızlı tekrar kartları hazırla",
-                    color: SBColors.blue
-                ) {
-                    openFactory(.flashcardFactory)
-                }
-
-                factoryTile(
-                    icon: "questionmark.circle",
-                    title: "Soru",
-                    subtitle: "Klinik soru pratiğine geç",
-                    color: SBColors.cyan
-                ) {
-                    openFactory(.questionFactory)
-                }
-
-                factoryTile(
-                    icon: "doc.text",
-                    title: "Son tekrar",
-                    subtitle: "Kısa ve net özet al",
-                    color: SBColors.purple
-                ) {
-                    openFactory(.summaryFactory)
+                ForEach(tools) { tool in
+                    factoryTile(
+                        icon: tool.icon,
+                        title: tool.title,
+                        subtitle: tool.subtitle,
+                        color: tool.color
+                    ) {
+                        if tool.isDeepTool {
+                            openDeepTool(tool.route)
+                        } else {
+                            openFactory(tool.route)
+                        }
+                    }
                 }
             }
         }
     }
 
-    private var secondaryFactoriesSection: some View {
-        VStack(alignment: .leading, spacing: SBSpacing.md) {
-            SBSectionHeader(title: "Diğer araçlar")
-
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 154), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
-                factoryTile(
-                    icon: "arrow.triangle.branch",
-                    title: "Akış",
-                    subtitle: "Karar akışını sadeleştir",
-                    color: SBColors.orange
-                ) {
-                    openFactory(.algorithmFactory)
-                }
-
-                factoryTile(
-                    icon: "tablecells",
-                    title: "Tablo",
-                    subtitle: "Konuları yan yana kıyasla",
-                    color: SBColors.purple
-                ) {
-                    openFactory(.comparisonFactory)
-                }
-
-                factoryTile(
-                    icon: "clock",
-                    title: "Kuyruk",
-                    subtitle: activeBaseForceJobs == 0 ? "Hazırlananları takip et" : "\(activeBaseForceJobs) çıktı hazırlanıyor",
-                    color: SBColors.blue
-                ) {
-                    router.navigate(to: .queue(surface: .all))
-                }
-            }
-        }
+    private var mainTools: [ProductionTool] {
+        [
+            .init(icon: "rectangle.on.rectangle", title: "Flashcard", subtitle: "Tekrar kartları", color: SBColors.blue, route: .flashcardFactory),
+            .init(icon: "questionmark.circle", title: "Soru", subtitle: "Klinik soru pratiği", color: SBColors.questionTint, route: .questionFactory),
+            .init(icon: "doc.text", title: "Son tekrar", subtitle: "Kısa ve net özet", color: SBColors.purple, route: .summaryFactory),
+            .init(icon: "arrow.triangle.branch", title: "Akış", subtitle: "Karar adımlarını sadeleştir", color: SBColors.orange, route: .algorithmFactory),
+            .init(icon: "tablecells", title: "Tablo", subtitle: "Konuları yan yana kıyasla", color: SBColors.purple, route: .comparisonFactory),
+            .init(icon: "clock", title: "Kuyruk", subtitle: activeBaseForceJobs == 0 ? "Hazırlananları takip et" : "\(activeBaseForceJobs) çıktı hazırlanıyor", color: SBColors.blue, route: .queue(surface: .all))
+        ]
     }
 
-    // MARK: - Deep / clinical tools (merged from the old SourceLab tab)
-
-    private var deepToolsSection: some View {
-        VStack(alignment: .leading, spacing: SBSpacing.md) {
-            SBSectionHeader(title: "Klinik & derin tekrar")
-
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 154), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
-                factoryTile(
-                    icon: "cross.case",
-                    title: "Klinik Senaryo",
-                    subtitle: "Ayırıcı tanı ve karar pratiği",
-                    color: SBColors.purple
-                ) {
-                    openDeepTool(.clinical)
-                }
-
-                factoryTile(
-                    icon: "bolt",
-                    title: "Sınav Sabahı",
-                    subtitle: "7 dakikalık kritik tarama",
-                    color: SBColors.orange
-                ) {
-                    openDeepTool(.examMorning)
-                }
-
-                factoryTile(
-                    icon: "checklist",
-                    title: "Öğrenme Planı",
-                    subtitle: "Bugün, 72 saat ve 7 gün",
-                    color: SBColors.green
-                ) {
-                    openDeepTool(.plan)
-                }
-
-                factoryTile(
-                    icon: "mic",
-                    title: "Podcast",
-                    subtitle: "Yolda dinlenecek tekrar",
-                    color: SBColors.red
-                ) {
-                    openDeepTool(.podcast)
-                }
-
-                factoryTile(
-                    icon: "chart.bar.doc.horizontal",
-                    title: "İnfografik",
-                    subtitle: "Tek bakışlık görsel hafıza",
-                    color: SBColors.cyan
-                ) {
-                    openDeepTool(.infographic)
-                }
-
-                factoryTile(
-                    icon: "point.3.connected.trianglepath.dotted",
-                    title: "Zihin Haritası",
-                    subtitle: "Kavram ilişkilerini ayır",
-                    color: SBColors.blue
-                ) {
-                    openDeepTool(.mindMap)
-                }
-            }
-        }
+    private var deepTools: [ProductionTool] {
+        [
+            .init(icon: "cross.case", title: "Klinik Senaryo", subtitle: "Ayırıcı tanı pratiği", color: SBColors.purple, route: .clinical, isDeepTool: true),
+            .init(icon: "bolt", title: "Sınav Sabahı", subtitle: "7 dakikalık kritik tarama", color: SBColors.orange, route: .examMorning, isDeepTool: true),
+            .init(icon: "checklist", title: "Öğrenme Planı", subtitle: "Bugün, 72 saat, 7 gün", color: SBColors.green, route: .plan, isDeepTool: true),
+            .init(icon: "mic", title: "Podcast", subtitle: "Dinlenebilir tekrar", color: SBColors.red, route: .podcast, isDeepTool: true),
+            .init(icon: "chart.bar.doc.horizontal", title: "İnfografik", subtitle: "Tek bakışlık görsel hafıza", color: SBColors.cyan, route: .infographic, isDeepTool: true),
+            .init(icon: "point.3.connected.trianglepath.dotted", title: "Zihin Haritası", subtitle: "Kavram ilişkilerini ayır", color: SBColors.blue, route: .mindMap, isDeepTool: true)
+        ]
     }
 
     private func factoryTile(
@@ -474,6 +355,11 @@ struct BaseForceHomeView: View {
     }
 
     private func openFactory(_ route: AppRoute) {
+        if case .queue = route {
+            router.navigate(to: route)
+            return
+        }
+
         if workspaceStore.selectedReadyFiles.isEmpty {
             router.beginSourceSelection(from: .baseForce, destination: .route(route))
         } else {
@@ -496,6 +382,16 @@ struct BaseForceHomeView: View {
         errorMessage = workspaceStore.errorMessage
         isLoading = false
     }
+}
+
+private struct ProductionTool: Identifiable {
+    var id: AppRoute { route }
+    let icon: String
+    let title: String
+    let subtitle: String
+    let color: Color
+    let route: AppRoute
+    var isDeepTool = false
 }
 
 private extension SBGenerationJob {

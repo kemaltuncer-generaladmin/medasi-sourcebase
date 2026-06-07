@@ -14,16 +14,23 @@ import {
 } from "../types.ts";
 import { logAiPipeline } from "./ai-logger.ts";
 import { storeGeneratedImageFromDataUrl } from "./generated-image-storage.ts";
+import { storeGeneratedAudioFromDataUrl } from "./generated-audio-storage.ts";
 import {
   buildInfographicImagePrompt,
   generateInfographicImage,
 } from "./image-provider.ts";
+import { generatePodcastAudio } from "./audio-provider.ts";
 import { captureMedasiCoin, refundMedasiCoin } from "./medasicoin-wallet.ts";
 import type { McPricingQuote } from "./medasicoin-pricing.ts";
+import {
+  normalizeQualityTier,
+  routeOptionsForQuality,
+} from "./medasicoin-pricing.ts";
 import {
   resolveTextRoute,
   RouteOptions,
   shouldGenerateInfographicImage,
+  shouldGeneratePodcastAudio,
   TextRoute,
 } from "./model-router.ts";
 import {
@@ -407,9 +414,14 @@ export class JobProcessor {
         provider: result.modelRoute.provider,
         model: result.modelRoute.model,
       });
-      const content = input.jobType === "infographic"
+      const storedContent = input.jobType === "infographic"
         ? await this.attachInfographicStorage(job, result.content)
+        : input.jobType === "podcast"
+        ? await this.attachPodcastStorage(job, result.content)
         : result.content;
+      // Drop the heavy base64 data URLs once the asset lives in object storage;
+      // clients receive freshly signed read URLs at fetch time.
+      const content = contentForGeneratedOutput(storedContent);
       const completedAt = new Date().toISOString();
       const completedMetadata = {
         ...job.metadata,
@@ -618,9 +630,16 @@ export class JobProcessor {
     sourceText: string,
     options: JobGenerationOptions,
   ) {
+    // qualityTier is authoritative: route the actual generation with the same
+    // tier-adjusted options the price was quoted from, so the reserved MC and
+    // the model that runs always match.
+    const routeOptions = routeOptionsForQuality(
+      normalizeQualityTier(options.qualityTier),
+      options.routeOptions ?? {},
+    );
     const route = resolveTextRoute(
       jobType,
-      options.routeOptions,
+      routeOptions,
       sourceText.length,
     );
     const routedOptions: GenerationOptions = {
@@ -696,9 +715,10 @@ export class JobProcessor {
           this.ai.generateComparison(sourceText, routedOptions),
         );
       case "podcast":
-        return this.withRoute(
+        return this.generatePodcastWithAudio(
+          sourceText,
+          { ...routedOptions, routeOptions },
           route,
-          this.ai.generatePodcast(sourceText, routedOptions),
         );
       case "clinical_scenario":
         return this.withRoute(
@@ -713,7 +733,7 @@ export class JobProcessor {
       case "infographic":
         return this.generateInfographicWithImage(
           sourceText,
-          { ...routedOptions, routeOptions: options.routeOptions },
+          { ...routedOptions, routeOptions },
           route,
         );
       case "mind_map":
@@ -783,6 +803,87 @@ export class JobProcessor {
         },
       },
       modelRoute: safeRouteMetadata(route),
+    };
+  }
+
+  private async generatePodcastWithAudio(
+    sourceText: string,
+    options: GenerationOptions & { routeOptions?: RouteOptions },
+    route: TextRoute,
+  ): Promise<RoutedGenerationResult<unknown>> {
+    const scriptResult = await this.ai.generatePodcast(sourceText, options);
+    if (!shouldGeneratePodcastAudio(options.routeOptions)) {
+      return {
+        ...scriptResult,
+        content: {
+          ...scriptResult.content,
+          audio: { status: "deferred" },
+        },
+        modelRoute: safeRouteMetadata(route),
+      };
+    }
+
+    let audio;
+    try {
+      audio = await generatePodcastAudio(
+        scriptResult.content,
+        options.routeOptions,
+      );
+    } catch (error) {
+      const code = error instanceof SafeError ? error.code : "AUDIO_FAILED";
+      console.error("Podcast audio generation failed:", code);
+      return {
+        ...scriptResult,
+        content: {
+          ...scriptResult.content,
+          audio: { status: "failed", fallback: "transcript_only" },
+        },
+        modelRoute: safeRouteMetadata(route),
+      };
+    }
+
+    return {
+      ...scriptResult,
+      content: {
+        ...scriptResult.content,
+        audio: {
+          status: "ready",
+          provider: audio.provider,
+          model: audio.model,
+          mimeType: audio.mimeType,
+          dataUrl: audio.dataUrl,
+          voices: audio.voices,
+          characterCount: audio.characterCount,
+          segmentCount: audio.segmentCount,
+          truncated: audio.truncated,
+        },
+      },
+      modelRoute: safeRouteMetadata(route),
+    };
+  }
+
+  private async attachPodcastStorage(
+    job: GenerationJob,
+    content: unknown,
+  ): Promise<unknown> {
+    if (!isRecord(content)) return content;
+    const audio = isRecord(content.audio) ? content.audio : null;
+    const dataUrl = audio?.dataUrl?.toString();
+    if (!audio || !dataUrl) return content;
+    const stored = await storeGeneratedAudioFromDataUrl({
+      userId: job.owner_user_id,
+      jobId: job.id,
+      dataUrl,
+    });
+    if (!stored) return content;
+    return {
+      ...content,
+      audio: {
+        ...audio,
+        storageUrl: stored.storageUrl,
+        storageBucket: stored.bucket,
+        storageObjectName: stored.objectName,
+      },
     };
   }
 
@@ -1072,13 +1173,18 @@ function countGeneratedItems(content: unknown): number | undefined {
 
 function contentForGeneratedOutput(content: unknown): unknown {
   if (!isRecord(content)) return content;
-  const image = isRecord(content.image) ? content.image : null;
-  if (!image || !image.storageUrl) return content;
-  const { dataUrl: _dataUrl, ...safeImage } = image;
-  return {
-    ...content,
-    image: safeImage,
-  };
+  let next = content;
+  const image = isRecord(next.image) ? next.image : null;
+  if (image && image.storageUrl) {
+    const { dataUrl: _imageDataUrl, ...safeImage } = image;
+    next = { ...next, image: safeImage };
+  }
+  const audio = isRecord(next.audio) ? next.audio : null;
+  if (audio && audio.dataUrl) {
+    const { dataUrl: _audioDataUrl, ...safeAudio } = audio;
+    next = { ...next, audio: safeAudio };
+  }
+  return next;
 }
 
 function isPricingQuote(value: unknown): value is McPricingQuote {

@@ -91,18 +91,42 @@ export function normalizeQualityTier(value: unknown): QualityTier {
   return "standard";
 }
 
+/**
+ * The user-selected quality tier is authoritative for model + price. The client
+ * floods premium-leaning policy strings (modelPolicy "premium_…",
+ * outputLengthPolicy "comprehensive_…", longContext, etc.) on every request, so
+ * without this override every tier would route to the reasoning model and cost
+ * the same. Here qualityTier wins:
+ *  - economy  → cheap model, draft images; promotion signals stripped
+ *  - standard → standard model, standard images; only source SIZE still
+ *               promotes to reasoning (large/huge sources need it)
+ *  - premium  → reasoning/reviewer, premium images; keep all signals
+ */
 export function routeOptionsForQuality(
   qualityTier: QualityTier,
   options: RouteOptions,
 ): RouteOptions {
-  return {
+  if (qualityTier === "premium") {
+    return { ...options, cheap: false, premium: true, imageQuality: "premium" };
+  }
+  const base: RouteOptions = {
     ...options,
-    cheap: qualityTier === "economy" || options.cheap,
-    premium: qualityTier === "premium" || options.premium,
-    imageQuality: qualityTier === "premium"
-      ? "premium"
-      : qualityTier === "economy"
-      ? "draft"
+    premium: false,
+    reviewer: false,
+    complex: false,
+    longContext: false,
+    personalized: false,
+    naturalNarration: false,
+    hard: false,
+  };
+  if (qualityTier === "economy") {
+    return { ...base, cheap: true, imageQuality: "draft" };
+  }
+  return {
+    ...base,
+    cheap: false,
+    imageQuality: options.imageQuality === "premium"
+      ? "standard"
       : options.imageQuality ?? "standard",
   };
 }

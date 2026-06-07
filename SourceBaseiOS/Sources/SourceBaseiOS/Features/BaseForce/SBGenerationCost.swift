@@ -14,12 +14,12 @@ enum SBGenerationCost {
         case .flashcard: return 0.75
         case .question: return 1.0
         case .algorithm: return 1.0
-        case .comparison, .table: return 1.5
+        case .comparison, .table: return 1.0
         case .mindMap: return 1.0
         case .clinicalScenario: return 2.0
         case .learningPlan: return 1.5
         case .podcast: return 1.5
-        case .infographic: return 3.0
+        case .infographic: return 0.5
         }
     }
 

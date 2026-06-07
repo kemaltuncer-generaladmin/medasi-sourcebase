@@ -5,6 +5,7 @@ export function parseModelJson<T>(text: string): T {
   const attempts = [
     jsonText,
     repairJsonText(jsonText),
+    closeTruncatedJson(repairJsonText(jsonText)),
   ];
   for (const attempt of attempts) {
     try {
@@ -85,6 +86,38 @@ function repairJsonText(text: string) {
     .replace(/,\s*([}\]])/g, "$1")
     .replace(/[“”]/g, `"`)
     .replace(/[‘’]/g, "'");
+}
+
+function closeTruncatedJson(text: string) {
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+
+  for (const char of text) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === "\\" && inString) {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+
+    if (char === "{") stack.push("}");
+    else if (char === "[") stack.push("]");
+    else if (char === "}" || char === "]") {
+      if (stack[stack.length - 1] === char) stack.pop();
+    }
+  }
+
+  let repaired = text.trimEnd();
+  if (inString) repaired += '"';
+  return repaired + stack.reverse().join("");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

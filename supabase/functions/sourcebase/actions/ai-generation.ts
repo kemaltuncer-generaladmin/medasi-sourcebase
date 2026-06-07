@@ -18,6 +18,7 @@ import {
   SafeError,
 } from "../types.ts";
 import { logAiPipeline } from "../services/ai-logger.ts";
+import { createSignedReadUrl } from "../services/object-storage.ts";
 import {
   JobGenerationOptions,
   JobProcessor,
@@ -837,7 +838,7 @@ export async function getGeneratedContent(
   }
 
   const metadata = isRecord(job.metadata) ? job.metadata : {};
-  const content = metadata.content ?? null;
+  const content = await signContentAssetUrls(metadata.content ?? null);
 
   return {
     jobId: job.id,
@@ -847,6 +848,54 @@ export async function getGeneratedContent(
     outputTokens: job.output_tokens,
     costEstimate: job.cost_estimate,
   };
+}
+
+const ASSET_READ_URL_TTL_SECONDS = 3600;
+
+/**
+ * Generated assets (infografik görseli, podcast sesi) object storage'da private
+ * tutulur. İstemci yalnızca http(s) URL oynatabildiği için, okuma anında kısa
+ * ömürlü imzalı URL üretip içeriğe gömeriz.
+ */
+async function signContentAssetUrls(content: unknown): Promise<unknown> {
+  if (!isRecord(content)) return content;
+  let next = content;
+
+  const image = isRecord(next.image) ? next.image : null;
+  const imageObject = image?.storageObjectName?.toString();
+  if (image && imageObject) {
+    const url = await signAssetUrl(imageObject);
+    if (url) next = { ...next, image: { ...image, url, signedUrl: url } };
+  }
+
+  const audio = isRecord(next.audio) ? next.audio : null;
+  const audioObject = audio?.storageObjectName?.toString();
+  if (audio && audioObject) {
+    const url = await signAssetUrl(audioObject);
+    if (url) {
+      next = {
+        ...next,
+        audio: { ...audio, url, signedUrl: url },
+        audioUrl: url,
+      };
+    }
+  }
+
+  return next;
+}
+
+async function signAssetUrl(objectName: string): Promise<string | undefined> {
+  try {
+    return await createSignedReadUrl({
+      storage: getObjectStorageConfig(),
+      objectName,
+      expiresInSeconds: ASSET_READ_URL_TTL_SECONDS,
+    });
+  } catch (error) {
+    const code = error instanceof SafeError ? error.code : "ASSET_SIGN_FAILED";
+    console.warn("generated asset url signing skipped:", code);
+    return undefined;
+  }
 }
 
 /**
@@ -1153,23 +1202,30 @@ function booleanOption(value: unknown) {
   return undefined;
 }
 
-function defaultMaxTokens(
+export function defaultMaxTokens(
   jobType: GenerationType,
   sourceTextLength: number,
   outputLengthPolicy?: string,
 ) {
   const policy = outputLengthPolicy?.toLowerCase() ?? "";
   if (jobType === "summary") {
-    if (policy.includes("comprehensive") || sourceTextLength >= 16_000) {
+    if (
+      policy.includes("comprehensive") ||
+      policy.includes("structured") ||
+      policy.includes("not_short") ||
+      sourceTextLength >= 16_000
+    ) {
       return 4096;
     }
     if (policy.includes("detailed") || sourceTextLength >= 8_000) {
       return 3072;
     }
+    return 4096;
   }
   if (
     jobType === "exam_morning_summary" || jobType === "clinical_scenario" ||
-    jobType === "podcast"
+    jobType === "podcast" || jobType === "learning_plan" ||
+    jobType === "algorithm"
   ) {
     return 4096;
   }

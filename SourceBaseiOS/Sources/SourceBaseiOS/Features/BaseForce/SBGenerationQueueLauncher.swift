@@ -6,7 +6,7 @@ extension SourceBaseWorkspaceStore {
         file: DriveFile,
         kind: GeneratedKind,
         sourceIds: Set<String>? = nil,
-        mode: String = "Premium"
+        mode: String = "Standart"
     ) async -> SBGenerationJob? {
         let ids = sourceIds ?? [file.id]
         setSelectedSources(ids)
@@ -16,7 +16,7 @@ extension SourceBaseWorkspaceStore {
             file: file,
             kind: kind,
             label: kind.titleLabel,
-            surface: surface == .sourceLab ? "SourceLab" : "BaseForce",
+            surface: surface == .sourceLab ? "Derin Çalışma" : "Üret",
             mode: mode
         )
     }
@@ -100,12 +100,7 @@ extension SourceBaseWorkspaceStore {
 
 extension AppRouter {
     public func showGenerationQueue(_ surface: SourceBaseQueueSurface = .baseForce) {
-        switch surface {
-        case .sourceLab:
-            switchTab(to: .sourceLab)
-        case .all, .baseForce:
-            switchTab(to: .baseForce)
-        }
+        switchTab(to: .baseForce)
         navigate(to: .queue(surface: surface))
     }
 }

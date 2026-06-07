@@ -1,4 +1,4 @@
-import { validateInfographicSpec } from "./schema-validator.ts";
+import { parseModelJson, validateInfographicSpec } from "./schema-validator.ts";
 
 Deno.test("validateInfographicSpec accepts panel based output variants", () => {
   const spec = validateInfographicSpec({
@@ -25,6 +25,15 @@ Deno.test("validateInfographicSpec accepts panel based output variants", () => {
     spec.sections[1].bullets[0],
     "ST elevasyonu acil reperfüzyon gerektirir.",
   );
+});
+
+Deno.test("parseModelJson repairs truncated closing braces", () => {
+  const parsed = parseModelJson<{ title: string; items: string[] }>(
+    '{"title":"Kalp yetmezligi","items":["EF sinifla","Diuretik semptom azaltir"]',
+  );
+
+  assertEquals(parsed.title, "Kalp yetmezligi");
+  assertEquals(parsed.items.length, 2);
 });
 
 function assertEquals(actual: unknown, expected: unknown) {

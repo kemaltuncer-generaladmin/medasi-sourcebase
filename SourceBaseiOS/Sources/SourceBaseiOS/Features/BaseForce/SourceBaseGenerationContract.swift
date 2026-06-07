@@ -112,11 +112,14 @@ struct SourceBaseGenerationContract {
             || normalized.contains("ucuz") {
             return .economy
         }
-        if normalized.contains("standart")
-            || normalized.contains("standard") {
-            return .standard
+        if normalized.contains("premium")
+            || normalized.contains("en iyi")
+            || normalized.contains("en üst") {
+            return .premium
         }
-        return .premium
+        // Standart, kullanıcı aksini seçmedikçe dengeli varsayılan kalitedir:
+        // iyi sonuç + adil MC. Kullanıcı ekonomik/premium ile değiştirir.
+        return .standard
     }
 
     private static func infographicImageModel(for quality: QualitySelection) -> String {

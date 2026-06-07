@@ -193,7 +193,7 @@ struct MainNavigationView: View {
         case .centralAI:
             CentralAIView()
         case .sourceLab:
-            SourceLabHomeView()
+            BaseForceHomeView()
         case .profile:
             ProfileView()
 

@@ -116,7 +116,7 @@ struct DriveHomeView: View {
         SBSignatureHero(
             eyebrow: "Bugünkü çalışma",
             title: "Bugün nereden devam edelim?",
-            message: readyCount == 0 ? "\(DriveUploadService.supportedExtensionsDisplay) yükle. Hazır olduğunda tek dokunuşla BaseForce'a geç." : "\(readyCount) kaynak hazır. Hazır kaynağı seçebilir ya da yeni kaynak ekleyebilirsin.",
+            message: readyCount == 0 ? "\(DriveUploadService.supportedExtensionsDisplay) yükle. Hazır olduğunda tek dokunuşla Üret ekranına geç." : "\(readyCount) kaynak hazır. Hazır kaynağı seçebilir ya da yeni kaynak ekleyebilirsin.",
             icon: "folder.badge.gearshape",
             tint: SBColors.blue,
             mode: .action
@@ -163,18 +163,6 @@ struct DriveHomeView: View {
                 ) {
                     router.navigate(to: .studyOutput(outputId: entry.output.id))
                 }
-            } else if let file = quickContinueFile {
-                SBQuickContinueSurface(
-                    eyebrow: "Kaldığın yer",
-                    title: file.title,
-                    message: "Hazır kaynak seçili. Tek dokunuşla üretime geçebilirsin.",
-                    metadata: "\(file.courseTitle) • \(file.updatedLabel)",
-                    actionLabel: "Bu kaynakla devam et",
-                    icon: "doc.text",
-                    tint: SBColors.cyan
-                ) {
-                    selectSourceAndOpenBaseForce(file)
-                }
             }
         }
     }
@@ -204,9 +192,7 @@ struct DriveHomeView: View {
 
     private var readySourcesSection: some View {
         VStack(alignment: .leading, spacing: SBSpacing.md) {
-            SBSectionHeader(title: "Hazır kaynaklar", action: recentReadyFiles.isEmpty ? nil : "Kaynak seç") {
-                router.beginSourceSelection(from: .baseForce, destination: .baseForceHome)
-            }
+            SBSectionHeader(title: "Hazır kaynaklar")
 
             if recentReadyFiles.isEmpty {
                 SBEmptyState(
@@ -214,14 +200,6 @@ struct DriveHomeView: View {
                     title: processingCount > 0 ? "Kaynak işleniyor" : "Henüz hazır kaynak yok",
                     message: processingCount > 0 ? "Metin çıkınca burada seçip çalışma seti hazırlayabilirsin." : "Bir ders notu yükle. Hazır olunca buradan çalışmaya geç.",
                     badges: ["PDF", "PPTX", "DOCX"],
-                    actionLabel: processingCount > 0 ? "İşlenenleri gör" : "Kaynak yükle",
-                    onAction: {
-                        if processingCount > 0 {
-                            router.navigate(to: .uploads)
-                        } else {
-                            showUploadSheet = true
-                        }
-                    },
                     context: .drive
                 )
             } else {
@@ -249,7 +227,7 @@ struct DriveHomeView: View {
         VStack(alignment: .leading, spacing: SBSpacing.md) {
             SBSectionHeader(
                 title: "Derslerim",
-                action: "Ders ekle"
+                action: workspace.courses.isEmpty ? nil : "Ders ekle"
             ) {
                 showCreateCourse = true
             }

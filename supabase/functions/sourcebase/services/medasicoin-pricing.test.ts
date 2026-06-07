@@ -96,6 +96,64 @@ Deno.test("infographic pricing skips image route unless sync image generation is
   });
 });
 
+Deno.test("quality tier is authoritative over leaked premium signals", () => {
+  withEnv({
+    OPENAI_API_KEY: "test-key",
+    TEXT_MODEL_CHEAP: "gpt-5.4-mini",
+    TEXT_MODEL_STANDARD: "gpt-5.4-mini",
+    TEXT_MODEL_REASONING: "gpt-5.4",
+  }, () => {
+    // The client floods premium-leaning policy strings on every request.
+    const flooded = routeOptionsFromPayload({
+      modelPolicy: "premium_latest_long_context_summary_synthesis_first",
+      preferredModelTier: "latest_premium_reasoning_long_context",
+      outputLengthPolicy: "comprehensive_structured_not_short",
+      minimumDepth: "premium_deep",
+    });
+
+    const economy = summaryQuote("economy", flooded);
+    const standard = summaryQuote("standard", flooded);
+    const premium = summaryQuote("premium", flooded);
+
+    // Despite the flooded premium signals, the chosen tier wins the model.
+    assertEquals(economy.route.model, "gpt-5.4-mini");
+    assertEquals(standard.route.model, "gpt-5.4-mini");
+    assertEquals(premium.route.model, "gpt-5.4");
+    assertEquals(economy.route.tier, "cheap");
+    assertEquals(premium.route.tier, "reasoning");
+
+    // …and MC consumption scales with the tier.
+    assert(economy.final_mc_cost < standard.final_mc_cost);
+    assert(standard.final_mc_cost < premium.final_mc_cost);
+  });
+});
+
+Deno.test("standard tier still promotes huge sources to the reasoning model", () => {
+  withEnv({
+    OPENAI_API_KEY: "test-key",
+    TEXT_MODEL_STANDARD: "gpt-5.4-mini",
+    TEXT_MODEL_REASONING: "gpt-5.4",
+  }, () => {
+    const small = summaryQuote("standard", undefined, 4_000);
+    const huge = summaryQuote("standard", undefined, 400_000);
+    assertEquals(small.route.model, "gpt-5.4-mini");
+    assertEquals(huge.route.model, "gpt-5.4");
+  });
+});
+
+function summaryQuote(
+  qualityTier: "economy" | "standard" | "premium",
+  routeOptions?: ReturnType<typeof routeOptionsFromPayload>,
+  sourceTextLength = 4_000,
+) {
+  return estimateGenerationPricing({
+    jobType: "summary",
+    sourceTextLength,
+    qualityTier,
+    routeOptions,
+  });
+}
+
 function infographicQuote(
   qualityTier: "economy" | "standard" | "premium",
   routeOptions?: ReturnType<typeof routeOptionsFromPayload>,

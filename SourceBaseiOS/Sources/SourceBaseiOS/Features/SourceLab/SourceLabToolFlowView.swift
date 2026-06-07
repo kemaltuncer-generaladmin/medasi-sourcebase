@@ -17,7 +17,7 @@ struct SourceLabToolFlowView: View {
     @State private var errorMessage: String?
     @State private var isGenerating = false
     @State private var selectedControl: String
-    @State private var selectedQuality: InfographicQuality = .standard
+    @State private var selectedQuality: SBQualityTier = .standard
 
     init(
         title: String,
@@ -45,44 +45,22 @@ struct SourceLabToolFlowView: View {
     private var canGenerate: Bool { readyFile != nil }
     private var isInfographic: Bool { kind == .infographic }
     private var costLabel: String {
-        SBGenerationCost.compactEstimate(for: kind, quality: isInfographic ? selectedQuality.rawValue : nil)
+        SBGenerationCost.compactEstimate(for: kind, quality: selectedQuality.rawValue)
     }
 
-    private enum InfographicQuality: String, CaseIterable {
-        case economy = "Ekonomik"
-        case standard = "Standart"
-        case premium = "Premium"
-
-        var tier: String {
-            switch self {
-            case .economy: return "economy"
-            case .standard: return "standard"
-            case .premium: return "premium"
-            }
+    private func infographicImageModel(for quality: SBQualityTier) -> String {
+        switch quality {
+        case .economy: return "gpt-image-1-mini"
+        case .standard: return "gpt-image-1.5"
+        case .premium: return "gpt-image-2"
         }
+    }
 
-        var icon: String {
-            switch self {
-            case .economy: return "banknote"
-            case .standard: return "checkmark.circle"
-            case .premium: return "crown"
-            }
-        }
-
-        var imageModel: String {
-            switch self {
-            case .economy: return "gpt-image-1-mini"
-            case .standard: return "gpt-image-1.5"
-            case .premium: return "gpt-image-2"
-            }
-        }
-
-        var imageQuality: String {
-            switch self {
-            case .economy: return "low"
-            case .standard: return "standard"
-            case .premium: return "premium"
-            }
+    private func infographicImageQuality(for quality: SBQualityTier) -> String {
+        switch quality {
+        case .economy: return "low"
+        case .standard: return "standard"
+        case .premium: return "premium"
         }
     }
 
@@ -99,9 +77,7 @@ struct SourceLabToolFlowView: View {
                     hero.sbEntrance(0)
                     sourceCard.sbEntrance(1)
                     controlsCard.sbEntrance(2)
-                    if isInfographic {
-                        qualityCard.sbEntrance(3)
-                    }
+                    qualityCard.sbEntrance(3)
                     previewCard.sbEntrance(4)
                     generateButton.sbEntrance(5)
                 }
@@ -268,7 +244,7 @@ struct SourceLabToolFlowView: View {
                         Text("Kalite")
                             .font(SBTypography.titleSmall)
                             .foregroundStyle(SBColors.navy)
-                        Text(selectedQuality.imageModel)
+                        Text(isInfographic ? infographicImageModel(for: selectedQuality) : selectedQuality.subtitle)
                             .font(SBTypography.caption)
                             .foregroundStyle(SBColors.muted)
                     }
@@ -279,7 +255,7 @@ struct SourceLabToolFlowView: View {
                 }
 
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
-                    ForEach(InfographicQuality.allCases, id: \.self) { quality in
+                    ForEach(SBQualityTier.allCases, id: \.self) { quality in
                         qualityButton(quality)
                     }
                 }
@@ -287,7 +263,7 @@ struct SourceLabToolFlowView: View {
         }
     }
 
-    private func qualityButton(_ quality: InfographicQuality) -> some View {
+    private func qualityButton(_ quality: SBQualityTier) -> some View {
         Button {
             SBHaptics.selection()
             selectedQuality = quality
@@ -312,8 +288,9 @@ struct SourceLabToolFlowView: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(quality.rawValue)
-        .accessibilityValue(selectedQuality == quality ? "Seçili, \(quality.imageModel)" : "\(quality.imageModel)")
+        .accessibilityLabel("\(quality.rawValue) kalite")
+        .accessibilityValue(selectedQuality == quality ? "Seçili" : "Seçili değil")
+        .accessibilityHint(quality.subtitle)
     }
 
     private var generateButton: some View {
@@ -348,19 +325,21 @@ struct SourceLabToolFlowView: View {
         case .infographic: controlKey = "infographic_type"
         default: controlKey = "detail_level"
         }
-        let mode = kind == .infographic ? "\(selectedControl) • \(selectedQuality.rawValue)" : selectedControl
+        let mode = "\(selectedControl) • \(selectedQuality.rawValue)"
         var options = [controlKey: selectedControl]
+        options["qualityTier"] = selectedQuality.tier
+        options["quality_tier"] = selectedQuality.tier
         if kind == .infographic {
-            options["qualityTier"] = selectedQuality.tier
-            options["quality_tier"] = selectedQuality.tier
-            options["imageModelPolicy"] = selectedQuality.imageModel
-            options["image_model_policy"] = selectedQuality.imageModel
-            options["gptImageModel"] = selectedQuality.imageModel
-            options["gpt_image_model"] = selectedQuality.imageModel
-            options["openaiImageModel"] = selectedQuality.imageModel
-            options["openai_image_model"] = selectedQuality.imageModel
-            options["imageQuality"] = selectedQuality.imageQuality
-            options["image_quality"] = selectedQuality.imageQuality
+            let imageModel = infographicImageModel(for: selectedQuality)
+            let imageQuality = infographicImageQuality(for: selectedQuality)
+            options["imageModelPolicy"] = imageModel
+            options["image_model_policy"] = imageModel
+            options["gptImageModel"] = imageModel
+            options["gpt_image_model"] = imageModel
+            options["openaiImageModel"] = imageModel
+            options["openai_image_model"] = imageModel
+            options["imageQuality"] = imageQuality
+            options["image_quality"] = imageQuality
             options["visual_layout"] = selectedControl == "Kare" ? "Kare" : "Dikey"
             options["visual_density"] = selectedControl == "Sade" ? "Sade" : selectedControl == "Yoğun" ? "Yoğun" : "Dengeli"
             options["learning_focus"] = infographicLearningFocus(for: selectedControl)
@@ -385,7 +364,7 @@ struct SourceLabToolFlowView: View {
                 file: readyFile,
                 kind: kind,
                 label: outputLabel,
-                surface: "SourceLab \(outputLabel)",
+                surface: "Derin Çalışma \(outputLabel)",
                 mode: mode,
                 extraOptions: options
             )

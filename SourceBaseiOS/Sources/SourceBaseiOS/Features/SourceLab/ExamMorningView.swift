@@ -421,7 +421,7 @@ struct ExamMorningView: View {
                 file: file,
                 kind: .examMorningSummary,
                 label: "Sınav Sabahı Özeti",
-                surface: "SourceLab Exam Morning",
+                surface: "Derin Çalışma Sınav Sabahı",
                 mode: mode,
                 extraOptions: [
                     "summary_mode": summaryMode.rawValue,

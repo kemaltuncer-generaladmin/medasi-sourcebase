@@ -229,9 +229,7 @@ struct FolderView: View {
             SBEmptyState(
                 icon: "doc.badge.plus",
                 title: "Bu bölümde henüz dosya yok",
-                message: "Yeni dosyalar yükleyerek başlayabilirsin.",
-                actionLabel: "Dosya yükle",
-                onAction: { showUploadSheet = true }
+                message: "Yeni dosyalar yükleyerek başlayabilirsin."
             )
         } else if visibleFiles.isEmpty {
             SBEmptyState(

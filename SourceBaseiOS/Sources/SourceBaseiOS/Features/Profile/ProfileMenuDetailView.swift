@@ -394,7 +394,7 @@ struct ProfileMenuDetailView: View {
 
             SBNotice(
                 icon: "info.circle",
-                message: "SourceBase, Medasi içinde kişisel kaynaklarını canlı çalışma materyaline dönüştüren premium öğrenme alanıdır. Drive kaynakları, BaseForce üretimleri, SourceLab şablonları ve MedasiChat aynı çalışma bağlamını paylaşır.",
+                message: "SourceBase, Medasi içinde kişisel kaynaklarını canlı çalışma materyaline dönüştüren premium öğrenme alanıdır. Drive kaynakları ve Üret çıktıları aynı çalışma alanında tutulur.",
                 tint: SBColors.blue
             )
 
@@ -405,7 +405,7 @@ struct ProfileMenuDetailView: View {
                 aboutBullet("PDF, PPTX, DOCX, PPT ve DOC kaynaklarını ders-bölüm düzeninde saklar.")
                 aboutBullet("Flashcard, Qlinik formatlı soru, sınav sabahı özeti, algoritma, karşılaştırma ve zihin haritası üretir.")
                 aboutBullet("Özel çalışma ekranları ve Medasi PDF şablonlarıyla çıktıyı okunabilir çalışma materyaline taşır.")
-                aboutBullet("MC üretim kredisi ve MedasiChat akışıyla ortak profil deneyimi sunar.")
+                aboutBullet("MedasiChat, Recall ekosistem bağlantısı tamamlanana kadar geliştirme aşamasında kalır.")
             }
         }
     }

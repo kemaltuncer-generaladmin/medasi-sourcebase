@@ -238,7 +238,7 @@ struct UploadsView: View {
             VStack(alignment: .leading, spacing: SBSpacing.sm) {
                 SBStatusBadge(status: .ready, compact: true)
 
-                Text("Kaynak hazır. BaseForce ve SourceLab içinde kullanılabilir.")
+                Text("Kaynak hazır. Üret ekranında kullanılabilir.")
                     .font(SBTypography.bodySmall)
                     .foregroundStyle(SBColors.muted)
             }

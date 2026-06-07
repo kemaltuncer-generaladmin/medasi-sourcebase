@@ -101,19 +101,19 @@ public final class AppRouter {
     }
 
     public func switchTab(to tab: AppRoute) {
-        selectedTab = tab
+        selectedTab = rootTab(for: tab)
         path.removeAll()
     }
 
     public func reset(to route: AppRoute) {
         path.removeAll()
-        selectedTab = route
+        selectedTab = rootTab(for: route)
         sourcePickerDestination = nil
     }
 
     public func beginSourceSelection(from tab: AppRoute? = nil, destination: SourcePickerDestination) {
         if let tab {
-            selectedTab = tab
+            selectedTab = rootTab(for: tab)
             path.removeAll()
         }
         sourcePickerDestination = destination

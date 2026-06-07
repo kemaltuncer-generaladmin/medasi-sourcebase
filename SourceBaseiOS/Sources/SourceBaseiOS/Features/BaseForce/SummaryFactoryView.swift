@@ -14,6 +14,7 @@ struct SummaryFactoryView: View {
     @State private var markTerms = true
     @State private var toTable = true
     @State private var checklist = true
+    @State private var quality: SBQualityTier = .standard
 
     private var router: AppRouter { appState.router }
     private var selectedSources: Set<String> { workspaceStore.selectedSourceIds }
@@ -41,7 +42,7 @@ struct SummaryFactoryView: View {
     }
 
     private var costLabel: String {
-        SBGenerationCost.compactEstimate(for: .summary)
+        SBGenerationCost.compactEstimate(for: .summary, quality: quality.rawValue)
     }
 
     var body: some View {
@@ -303,6 +304,10 @@ struct SummaryFactoryView: View {
                     .toggleStyle(SwitchToggleStyle(tint: SBColors.blue))
                 }
             }
+
+            BaseForceFactoryStyle.panel {
+                SBQualityPicker(selection: $quality)
+            }
         }
     }
 
@@ -372,14 +377,15 @@ struct SummaryFactoryView: View {
             summaryFocus.rawValue,
             markTerms ? "terim vurgulu" : "terim vurgusuz",
             toTable ? "mini tablolu" : "düz metin",
-            checklist ? "kontrol listeli" : "kontrol listesiz"
+            checklist ? "kontrol listeli" : "kontrol listesiz",
+            quality.rawValue
         ].joined(separator: " • ")
         Task {
             let job = await workspaceStore.enqueueGeneration(
                 file: readyFile,
                 kind: .summary,
                 label: "Sınav Sabahı Özeti",
-                surface: "BaseForce Summary",
+                surface: "Üret Özet",
                 mode: mode,
                 extraOptions: [
                     "summary_mode": summaryFocus.rawValue,

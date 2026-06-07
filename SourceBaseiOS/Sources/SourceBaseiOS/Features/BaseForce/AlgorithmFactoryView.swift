@@ -532,7 +532,7 @@ struct AlgorithmFactoryView: View {
                 file: file,
                 kind: .algorithm,
                 label: "Klinik Algoritma",
-                surface: "BaseForce Algorithm",
+                surface: "Üret Algoritma",
                 mode: mode,
                 extraOptions: [
                     "algorithm_type": algorithmType.rawValue,

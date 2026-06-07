@@ -384,7 +384,7 @@ struct GenerationProcessingView: View {
             sourceFileId: "preview-source",
             kindRawValue: GeneratedKind.flashcard.rawValue,
             label: "Flashcard Seti",
-            surface: "BaseForce Flashcard",
+            surface: "Üret Flashcard",
             mode: "Dengeli"
         )
         .environment(AppState.shared)

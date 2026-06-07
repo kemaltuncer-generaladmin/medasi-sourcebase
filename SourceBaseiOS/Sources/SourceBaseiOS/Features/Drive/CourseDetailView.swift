@@ -149,12 +149,6 @@ struct CourseDetailView: View {
     private var courseActionsMenu: some View {
         if let course {
             Menu {
-                Button("Bölüm ekle", systemImage: "folder.badge.plus") {
-                    showCreateSection = true
-                }
-                Button("Dosya yükle", systemImage: "icloud.and.arrow.up") {
-                    showUploadSheet = true
-                }
                 Button("Yeniden adlandır", systemImage: "pencil") {
                     renameTitle = course.title
                     showRenameAlert = true
@@ -257,9 +251,7 @@ struct CourseDetailView: View {
                 SBEmptyState(
                     icon: "folder.badge.plus",
                     title: "Bu derste henüz bölüm yok",
-                    message: "Bölüm ekleyerek dosyalarını düzenlemeye başlayabilirsin.",
-                    actionLabel: "Bölüm Ekle",
-                    onAction: { Task { await workspaceStore.createSection(courseId: courseId) } }
+                    message: "Bölüm ekleyerek dosyalarını düzenlemeye başlayabilirsin."
                 )
             } else if let sections = course?.sections {
                 ForEach(Array(sections.enumerated()), id: \.element.id) { index, section in
@@ -370,11 +362,7 @@ struct CourseDetailView: View {
                 SBEmptyState(
                     icon: "doc.badge.plus",
                     title: "Bu derste henüz dosya yok",
-                    message: "\(DriveUploadService.supportedExtensionsDisplay) yükleyerek başlayabilirsin.",
-                    actionLabel: "Dosya yükle",
-                    onAction: {
-                        showUploadSheet = true
-                    }
+                    message: "\(DriveUploadService.supportedExtensionsDisplay) yükleyerek başlayabilirsin."
                 )
             } else {
                 ForEach(allFiles) { file in

@@ -413,7 +413,7 @@ struct ClinicalView: View {
                 file: file,
                 kind: .clinicalScenario,
                 label: "Klinik Senaryo",
-                surface: "SourceLab Clinical",
+                surface: "Derin Çalışma Klinik Senaryo",
                 mode: mode,
                 extraOptions: [
                     "scenario_type": clinicalType.rawValue,

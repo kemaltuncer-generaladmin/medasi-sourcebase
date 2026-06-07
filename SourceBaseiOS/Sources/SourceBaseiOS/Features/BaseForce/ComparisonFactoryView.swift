@@ -241,11 +241,11 @@ struct ComparisonFactoryView: View {
                 )
 
                 VStack(alignment: .leading, spacing: SBSpacing.xs) {
-                    Text("Hazır kaynak ekle")
+                    Text("Karşılaştırılacak kaynak ekle")
                         .font(SBTypography.labelMedium)
                         .foregroundStyle(SBColors.blue)
 
-                    Text("Drive'dan seç.")
+                    Text("Drive'dan ikinci bir hazır kaynak seç.")
                         .font(SBTypography.caption)
                         .foregroundStyle(SBColors.muted)
                 }
@@ -429,7 +429,7 @@ struct ComparisonFactoryView: View {
                 file: file,
                 kind: .comparison,
                 label: "Karşılaştırma Tablosu",
-                surface: "BaseForce Comparison",
+                surface: "Üret Karşılaştırma",
                 mode: mode,
                 extraOptions: [
                     "comparison_type": comparisonType.rawValue,

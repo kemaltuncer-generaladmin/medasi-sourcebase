@@ -10,6 +10,7 @@ Deno.test("createSignedPutUrl uses SourceBase S3 path-style object paths", async
   const url = await createSignedPutUrl({
     storage: {
       provider: "s3",
+      publicEndpoint: "https://storage.medasi.com.tr",
       endpoint: "https://storage.medasi.com.tr",
       bucket: "medasistorage",
       region: "us-east-1",
@@ -37,6 +38,7 @@ Deno.test("createSignedPutUrl rejects unsafe object paths", async () => {
       createSignedPutUrl({
         storage: {
           provider: "s3",
+          publicEndpoint: "https://storage.medasi.com.tr",
           endpoint: "https://storage.medasi.com.tr",
           bucket: "medasistorage",
           region: "us-east-1",

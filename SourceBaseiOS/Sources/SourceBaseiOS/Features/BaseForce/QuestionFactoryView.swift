@@ -13,6 +13,7 @@ struct QuestionFactoryView: View {
     @State private var difficulty: Difficulty = .medium
     @State private var questionCount: Int = 20
     @State private var addExplanation = true
+    @State private var quality: SBQualityTier = .standard
 
     private var router: AppRouter { appState.router }
     private var selectedSources: Set<String> { workspaceStore.selectedSourceIds }
@@ -41,7 +42,7 @@ struct QuestionFactoryView: View {
     }
 
     private var costLabel: String {
-        SBGenerationCost.compactEstimate(for: .question, requestedCount: questionCount)
+        SBGenerationCost.compactEstimate(for: .question, requestedCount: questionCount, quality: quality.rawValue)
     }
 
     var body: some View {
@@ -285,6 +286,8 @@ struct QuestionFactoryView: View {
                         .foregroundStyle(SBColors.navy)
                 }
                 .toggleStyle(SwitchToggleStyle(tint: SBColors.blue))
+
+                SBQualityPicker(selection: $quality)
             }
         }
     }
@@ -393,14 +396,15 @@ struct QuestionFactoryView: View {
             "\(questionCount) soru",
             "5 şıklı",
             addExplanation ? "açıklamalı" : "kısa geri bildirimli",
-            "Qlinik uyumlu"
+            "Qlinik uyumlu",
+            quality.rawValue
         ].joined(separator: " • ")
         Task {
             let job = await workspaceStore.enqueueGeneration(
                 file: readyFile,
                 kind: .question,
                 label: "Soru Seti",
-                surface: "BaseForce Soru Çözümü",
+                surface: "Üret Soru Çözümü",
                 mode: mode,
                 extraOptions: [
                     "question_type": questionType.rawValue,
