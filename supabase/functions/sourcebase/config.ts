@@ -1,12 +1,7 @@
-import { isRecord, SafeError } from "./types.ts";
+import { SafeError } from "./types.ts";
 
-export interface GoogleServiceAccount {
-  clientEmail: string;
-  privateKey: string;
-  projectId?: string;
-}
-
-export interface ObjectStorageConfig {
+export interface S3Config {
+  publicEndpoint: string;
   provider: "s3";
   bucket: string;
   endpoint: string;
@@ -15,15 +10,7 @@ export interface ObjectStorageConfig {
   secretAccessKey: string;
 }
 
-export interface VertexConfig {
-  supabaseUrl: string;
-  serviceRoleKey: string;
-  vertexProjectId: string;
-  vertexLocation: string;
-  vertexModel: string;
-  vertexServiceAccountJson: string;
-  serviceAccount: GoogleServiceAccount;
-}
+export type ObjectStorageConfig = S3Config;
 
 export function envValue(...names: string[]) {
   return firstEnv(...names);
@@ -54,29 +41,18 @@ export function getAllowedOrigin() {
     "https://sourcebase.medasi.com.tr";
 }
 
-export function getClientExtractionEnabled(): boolean {
-  const value = envValue(
-    "CLIENT_EXTRACTION_ENABLED",
-    "SOURCEBASE_CLIENT_EXTRACTION_ENABLED",
-  ).toLowerCase();
-  if (!value) return true;
-  return value !== "false" && value !== "0" && value !== "off";
-}
-
 export function getObjectStorageConfig(): ObjectStorageConfig {
   const driver = envValue("STORAGE_DRIVER", "SOURCEBASE_STORAGE_DRIVER")
     .toLowerCase();
-  const bucket = canonicalFirst("S3_BUCKET", "SOURCEBASE_S3_BUCKET") ||
-    "medasistorage";
-  const endpoint = canonicalFirst("S3_ENDPOINT", "SOURCEBASE_S3_ENDPOINT") ||
-    "https://storage.medasi.com.tr";
-  const accessKeyId = canonicalFirst(
+  const s3Bucket = canonicalFirst("S3_BUCKET", "SOURCEBASE_S3_BUCKET");
+  const s3Endpoint = canonicalFirst("S3_ENDPOINT", "SOURCEBASE_S3_ENDPOINT");
+  const s3AccessKey = canonicalFirst(
     "S3_ACCESS_KEY",
     "S3_ACCESS_KEY_ID",
     "SOURCEBASE_S3_ACCESS_KEY",
     "SOURCEBASE_S3_ACCESS_KEY_ID",
   );
-  const secretAccessKey = canonicalFirst(
+  const s3SecretKey = canonicalFirst(
     "S3_SECRET_KEY",
     "S3_SECRET_ACCESS_KEY",
     "SOURCEBASE_S3_SECRET_KEY",
@@ -89,92 +65,39 @@ export function getObjectStorageConfig(): ObjectStorageConfig {
       500,
     );
   }
-  if (!bucket || !endpoint || !accessKeyId || !secretAccessKey) {
+
+  if (!s3Bucket || !s3Endpoint || !s3AccessKey || !s3SecretKey) {
     throw new SafeError(
       "S3_NOT_CONFIGURED",
       "S3 yükleme ayarları tamamlanmamış.",
       500,
     );
   }
+
+  const s3PublicEndpoint = canonicalFirst(
+    "S3_PUBLIC_ENDPOINT",
+    "SOURCEBASE_S3_PUBLIC_ENDPOINT",
+  ) || s3Endpoint;
+
   return {
     provider: "s3",
-    bucket,
-    endpoint: normalizeEndpoint(endpoint),
-    region: canonicalFirst("S3_REGION", "SOURCEBASE_S3_REGION") ||
-      "us-east-1",
-    accessKeyId,
-    secretAccessKey,
-  };
-}
-
-export function getVertexConfig(): VertexConfig {
-  const supabaseUrl = getSupabaseUrl();
-  const serviceRoleKey = getSupabaseServiceRoleKey();
-  const vertexServiceAccountJson = canonicalFirst(
-    "VERTEX_SERVICE_ACCOUNT_JSON",
-    "SOURCEBASE_VERTEX_SERVICE_ACCOUNT_JSON",
-    "GOOGLE_VERTEX_SERVICE_ACCOUNT_JSON",
-  );
-  const serviceAccount = vertexServiceAccountJson
-    ? parseGoogleServiceAccount(
-      vertexServiceAccountJson,
-      "VERTEX_SERVICE_ACCOUNT_INVALID",
-    )
-    : undefined;
-  const vertexProjectId = envValue(
-    "VERTEX_PROJECT_ID",
-    "SOURCEBASE_VERTEX_PROJECT_ID",
-  ) ||
-    serviceAccount?.projectId ||
-    "";
-  const vertexLocation = envValue(
-    "VERTEX_LOCATION",
-    "SOURCEBASE_VERTEX_LOCATION",
-  ) ||
-    "us-central1";
-  const vertexModel = envValue("VERTEX_MODEL", "SOURCEBASE_VERTEX_MODEL") ||
-    "gemini-2.5-flash";
-
-  if (
-    !supabaseUrl || !serviceRoleKey || !vertexProjectId ||
-    !vertexServiceAccountJson || !serviceAccount
-  ) {
-    throw new SafeError(
-      "VERTEX_NOT_CONFIGURED",
-      "AI üretim yapılandırması eksik.",
-      500,
-    );
-  }
-
-  return {
-    supabaseUrl,
-    serviceRoleKey,
-    vertexProjectId,
-    vertexLocation,
-    vertexModel,
-    vertexServiceAccountJson,
-    serviceAccount,
+    bucket: s3Bucket,
+    endpoint: normalizeEndpoint(s3Endpoint),
+    publicEndpoint: normalizeEndpoint(s3PublicEndpoint),
+    region: canonicalFirst("S3_REGION", "SOURCEBASE_S3_REGION") || "nbg1",
+    accessKeyId: s3AccessKey,
+    secretAccessKey: s3SecretKey,
   };
 }
 
 export function runtimeConfigStatus() {
-  const vertexServiceJson = canonicalFirst(
-    "VERTEX_SERVICE_ACCOUNT_JSON",
-    "SOURCEBASE_VERTEX_SERVICE_ACCOUNT_JSON",
-    "GOOGLE_VERTEX_SERVICE_ACCOUNT_JSON",
-  );
-  const vertexAccount = vertexServiceJson
-    ? safeParseServiceAccount(vertexServiceJson)
-    : null;
   const openAiConfigured = Boolean(envValue("OPENAI_API_KEY"));
+  const anthropicConfigured = Boolean(envValue("ANTHROPIC_API_KEY"));
   const stabilityConfigured = Boolean(envValue("STABILITY_API_KEY"));
-  const storageDriver = envValue("STORAGE_DRIVER", "SOURCEBASE_STORAGE_DRIVER")
-    .toLowerCase();
+
   const s3Configured = Boolean(
-    (canonicalFirst("S3_BUCKET", "SOURCEBASE_S3_BUCKET") ||
-      "medasistorage") &&
-      (canonicalFirst("S3_ENDPOINT", "SOURCEBASE_S3_ENDPOINT") ||
-        "https://storage.medasi.com.tr") &&
+    canonicalFirst("S3_BUCKET", "SOURCEBASE_S3_BUCKET") &&
+      canonicalFirst("S3_ENDPOINT", "SOURCEBASE_S3_ENDPOINT") &&
       canonicalFirst(
         "S3_ACCESS_KEY",
         "S3_ACCESS_KEY_ID",
@@ -188,76 +111,27 @@ export function runtimeConfigStatus() {
         "SOURCEBASE_S3_SECRET_ACCESS_KEY",
       ),
   );
+  const storageDriver = envValue("STORAGE_DRIVER", "SOURCEBASE_STORAGE_DRIVER")
+    .toLowerCase();
 
   return {
     storage: {
       provider: storageDriver || "s3",
-      bucketConfigured: Boolean(
-        canonicalFirst("S3_BUCKET", "SOURCEBASE_S3_BUCKET") ||
-          "medasistorage",
-      ),
-      endpointConfigured: Boolean(
-        canonicalFirst("S3_ENDPOINT", "SOURCEBASE_S3_ENDPOINT") ||
-          "https://storage.medasi.com.tr",
-      ),
       s3Configured,
     },
-    vertex: {
-      projectConfigured: Boolean(
-        envValue("VERTEX_PROJECT_ID", "SOURCEBASE_VERTEX_PROJECT_ID") ||
-          vertexAccount?.projectId,
-      ),
-      location: envValue("VERTEX_LOCATION", "SOURCEBASE_VERTEX_LOCATION") ??
-        "us-central1",
-      model: envValue("VERTEX_MODEL", "SOURCEBASE_VERTEX_MODEL") ??
-        "gemini-2.5-flash",
-      serviceAccountConfigured: Boolean(vertexServiceJson),
-      serviceAccountValid: Boolean(vertexAccount),
+    ai: {
+      textProviderConfigured: openAiConfigured || anthropicConfigured,
+      openAiConfigured,
+      anthropicConfigured,
+      imageProviderConfigured: openAiConfigured || stabilityConfigured,
+      stabilityConfigured,
     },
     image: {
       openAiConfigured,
       stabilityConfigured,
       providerConfigured: openAiConfigured || stabilityConfigured,
     },
-    extraction: {
-      clientExtractionEnabled: getClientExtractionEnabled(),
-      fallback: "server",
-    },
   };
-}
-
-export function parseGoogleServiceAccount(
-  serviceAccountJson: string,
-  errorCode: string,
-): GoogleServiceAccount {
-  try {
-    const parsed = JSON.parse(serviceAccountJson);
-    if (!isRecord(parsed)) {
-      throw new Error("Service account JSON must be an object.");
-    }
-    const clientEmail = parsed.client_email?.toString().trim() ?? "";
-    const privateKey = normalizePrivateKey(
-      parsed.private_key?.toString() ?? "",
-    );
-    const projectId = parsed.project_id?.toString().trim() || undefined;
-    if (!clientEmail || !privateKey) {
-      throw new Error("Missing client_email or private_key.");
-    }
-    return { clientEmail, privateKey, projectId };
-  } catch (_error) {
-    throw new SafeError(errorCode, "Google service JSON geçersiz.", 500);
-  }
-}
-
-function safeParseServiceAccount(serviceAccountJson: string) {
-  try {
-    return parseGoogleServiceAccount(
-      serviceAccountJson,
-      "SERVICE_ACCOUNT_INVALID",
-    );
-  } catch (_error) {
-    return null;
-  }
 }
 
 function firstEnv(...names: string[]) {
@@ -295,6 +169,11 @@ function stripWrappingQuotes(value: string) {
   return value;
 }
 
+function normalizeEndpoint(value: string) {
+  const cleaned = value.trim().replace(/\/+$/, "");
+  return /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
+}
+
 function decodeBase64Env(value: string) {
   try {
     return new TextDecoder().decode(
@@ -306,15 +185,4 @@ function decodeBase64Env(value: string) {
   } catch (_error) {
     return "";
   }
-}
-
-function normalizeEndpoint(value: string) {
-  const cleaned = value.trim().replace(/\/+$/, "");
-  return /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
-}
-
-function normalizePrivateKey(privateKey: string) {
-  return privateKey.includes("\\n")
-    ? privateKey.replaceAll("\\n", "\n")
-    : privateKey;
 }

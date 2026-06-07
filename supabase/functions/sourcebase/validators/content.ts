@@ -84,11 +84,8 @@ export function validateQuizQuestion(question: unknown): ValidationResult {
   }
 
   // Options kontrolü
-  if (!Array.isArray(question.options) || question.options.length < 2) {
-    errors.push("En az 2 seçenek gerekli");
-  }
-  if (question.options.length > 6) {
-    warnings.push("Çok fazla seçenek (max 6 önerilir)");
+  if (!Array.isArray(question.options) || question.options.length !== 5) {
+    errors.push("Tam 5 seçenek gerekli");
   }
 
   // CorrectIndex kontrolü

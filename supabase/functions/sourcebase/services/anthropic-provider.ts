@@ -1,5 +1,5 @@
 import { SafeError } from "../types.ts";
-import type { GenerationOptions } from "./vertex-ai.ts";
+import type { GenerationOptions } from "./ai-generation-provider.ts";
 import type { TextGenerationResult } from "./openai-provider.ts";
 
 export class AnthropicProvider {

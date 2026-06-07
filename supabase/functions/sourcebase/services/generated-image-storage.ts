@@ -1,6 +1,9 @@
 import { getObjectStorageConfig } from "../config.ts";
+import {
+  createSignedPutUrl,
+  objectStorageUrl,
+} from "./object-storage.ts";
 import { SafeError } from "../types.ts";
-import { createSignedPutUrl } from "./object-storage.ts";
 
 export interface StoredGeneratedImage {
   bucket: string;
@@ -42,7 +45,7 @@ export async function storeGeneratedImageFromDataUrl(input: {
   return {
     bucket: storage.bucket,
     objectName,
-    storageUrl: `s3://${storage.bucket}/${objectName}`,
+    storageUrl: objectStorageUrl(storage, objectName),
   };
 }
 

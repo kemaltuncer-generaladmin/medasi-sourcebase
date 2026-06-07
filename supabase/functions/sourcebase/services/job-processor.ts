@@ -14,21 +14,23 @@ import {
 } from "../types.ts";
 import { logAiPipeline } from "./ai-logger.ts";
 import { storeGeneratedImageFromDataUrl } from "./generated-image-storage.ts";
-import { generateInfographicImage } from "./image-provider.ts";
+import {
+  buildInfographicImagePrompt,
+  generateInfographicImage,
+} from "./image-provider.ts";
 import { captureMedasiCoin, refundMedasiCoin } from "./medasicoin-wallet.ts";
 import type { McPricingQuote } from "./medasicoin-pricing.ts";
 import {
-  isImageRouteAvailable,
-  resolveImageRoute,
   resolveTextRoute,
   RouteOptions,
+  shouldGenerateInfographicImage,
   TextRoute,
 } from "./model-router.ts";
 import {
+  AITextClient,
   GenerationOptions,
   GenerationResult,
-  VertexAIClient,
-} from "./vertex-ai.ts";
+} from "./ai-generation-provider.ts";
 
 export interface JobUpdate {
   status?: JobStatus;
@@ -214,16 +216,14 @@ export async function cancelJob(
 export interface JobProcessorConfig {
   supabaseUrl: string;
   serviceRoleKey: string;
-  vertexProjectId: string;
-  vertexLocation: string;
-  vertexModel: string;
-  vertexServiceAccountJson: string;
 }
 
 export type JobGenerationOptions = {
   count?: number;
   temperature?: number;
   maxTokens?: number;
+  sourceTextLength?: number;
+  sourceIds?: string[];
   routeOptions?: RouteOptions;
   pricing?: McPricingQuote;
   summaryMode?: string;
@@ -250,6 +250,12 @@ export type JobGenerationOptions = {
   dailyTime?: string;
   studyStyle?: string;
   qualityTier?: string;
+  modelPolicy?: string;
+  minimumDepth?: string;
+  outputLengthPolicy?: string;
+  imageModelPolicy?: string;
+  aiBrief?: string;
+  outputContract?: string;
 };
 
 type RoutedGenerationResult<T> = GenerationResult<T> & {
@@ -259,15 +265,10 @@ type RoutedGenerationResult<T> = GenerationResult<T> & {
 type GeneratedOutputRow = Record<string, unknown>;
 
 export class JobProcessor {
-  private vertex: VertexAIClient;
+  private ai: AITextClient;
 
   constructor(private config: JobProcessorConfig) {
-    this.vertex = new VertexAIClient({
-      projectId: config.vertexProjectId,
-      location: config.vertexLocation,
-      model: config.vertexModel,
-      serviceAccountJson: config.vertexServiceAccountJson,
-    });
+    this.ai = new AITextClient();
   }
 
   async createJob(input: {
@@ -288,10 +289,12 @@ export class JobProcessor {
     sourceText: string;
     options?: JobGenerationOptions;
   }): Promise<GenerationJob> {
+    const sourceTextLength = input.options?.sourceTextLength ??
+      input.sourceText.length;
     const route = resolveTextRoute(
       input.jobType,
       input.options?.routeOptions,
-      input.sourceText.length,
+      sourceTextLength,
     );
     const job = await createJob(
       this.config.supabaseUrl,
@@ -302,7 +305,7 @@ export class JobProcessor {
         job_type: input.jobType,
         model: route.model,
         metadata: {
-          sourceTextLength: input.sourceText.length,
+          sourceTextLength,
           modelRoute: safeRouteMetadata(route),
           pricing: input.options?.pricing,
           sourceText: input.sourceFileId ? undefined : input.sourceText,
@@ -310,6 +313,9 @@ export class JobProcessor {
             count: input.options?.count,
             temperature: input.options?.temperature,
             maxTokens: input.options?.maxTokens,
+            sourceTextLength,
+            sourceIds: input.options?.sourceIds,
+            sourceCount: input.options?.sourceIds?.length,
             routeOptions: input.options?.routeOptions,
             summaryMode: input.options?.summaryMode,
             lengthTarget: input.options?.lengthTarget,
@@ -335,6 +341,12 @@ export class JobProcessor {
             dailyTime: input.options?.dailyTime,
             studyStyle: input.options?.studyStyle,
             qualityTier: input.options?.qualityTier,
+            modelPolicy: input.options?.modelPolicy,
+            minimumDepth: input.options?.minimumDepth,
+            outputLengthPolicy: input.options?.outputLengthPolicy,
+            imageModelPolicy: input.options?.imageModelPolicy,
+            aiBrief: input.options?.aiBrief,
+            outputContract: input.options?.outputContract,
           },
         },
       },
@@ -637,12 +649,18 @@ export class JobProcessor {
       dailyTime: options.dailyTime,
       studyStyle: options.studyStyle,
       qualityTier: options.qualityTier,
+      modelPolicy: options.modelPolicy,
+      minimumDepth: options.minimumDepth,
+      outputLengthPolicy: options.outputLengthPolicy,
+      imageModelPolicy: options.imageModelPolicy,
+      aiBrief: options.aiBrief,
+      outputContract: options.outputContract,
     };
     switch (jobType) {
       case "flashcard":
         return this.withRoute(
           route,
-          this.vertex.generateFlashcards(
+          this.ai.generateFlashcards(
             sourceText,
             options.count ?? 20,
             routedOptions,
@@ -651,7 +669,7 @@ export class JobProcessor {
       case "quiz":
         return this.withRoute(
           route,
-          this.vertex.generateQuiz(
+          this.ai.generateQuiz(
             sourceText,
             options.count ?? 10,
             routedOptions,
@@ -660,37 +678,37 @@ export class JobProcessor {
       case "summary":
         return this.withRoute(
           route,
-          this.vertex.generateSummary(sourceText, routedOptions),
+          this.ai.generateSummary(sourceText, routedOptions),
         );
       case "exam_morning_summary":
         return this.withRoute(
           route,
-          this.vertex.generateExamMorningSummary(sourceText, routedOptions),
+          this.ai.generateExamMorningSummary(sourceText, routedOptions),
         );
       case "algorithm":
         return this.withRoute(
           route,
-          this.vertex.generateAlgorithm(sourceText, routedOptions),
+          this.ai.generateAlgorithm(sourceText, routedOptions),
         );
       case "comparison":
         return this.withRoute(
           route,
-          this.vertex.generateComparison(sourceText, routedOptions),
+          this.ai.generateComparison(sourceText, routedOptions),
         );
       case "podcast":
         return this.withRoute(
           route,
-          this.vertex.generatePodcast(sourceText, routedOptions),
+          this.ai.generatePodcast(sourceText, routedOptions),
         );
       case "clinical_scenario":
         return this.withRoute(
           route,
-          this.vertex.generateClinicalScenario(sourceText, routedOptions),
+          this.ai.generateClinicalScenario(sourceText, routedOptions),
         );
       case "learning_plan":
         return this.withRoute(
           route,
-          this.vertex.generateLearningPlan(sourceText, routedOptions),
+          this.ai.generateLearningPlan(sourceText, routedOptions),
         );
       case "infographic":
         return this.generateInfographicWithImage(
@@ -701,7 +719,7 @@ export class JobProcessor {
       case "mind_map":
         return this.withRoute(
           route,
-          this.vertex.generateMindMap(sourceText, routedOptions),
+          this.ai.generateMindMap(sourceText, routedOptions),
         );
     }
   }
@@ -711,24 +729,46 @@ export class JobProcessor {
     options: GenerationOptions & { routeOptions?: RouteOptions },
     route: TextRoute,
   ): Promise<RoutedGenerationResult<unknown>> {
-    const specResult = await this.vertex.generateInfographic(
+    const specResult = await this.ai.generateInfographic(
       sourceText,
       options,
     );
-    const imageRoute = resolveImageRoute(options.routeOptions?.imageQuality);
-    if (!isImageRouteAvailable(imageRoute)) {
-      console.warn(
-        "Infographic image generation skipped: IMAGE_PROVIDER_NOT_CONFIGURED",
-      );
+    if (!shouldGenerateInfographicImage(options.routeOptions)) {
       return {
         ...specResult,
+        content: {
+          ...specResult.content,
+          image: {
+            status: "deferred",
+            prompt: buildInfographicImagePrompt(specResult.content),
+          },
+        },
         modelRoute: safeRouteMetadata(route),
       };
     }
-    const image = await generateInfographicImage(
-      specResult.content,
-      options.routeOptions,
-    );
+
+    let image;
+    try {
+      image = await generateInfographicImage(
+        specResult.content,
+        options.routeOptions,
+      );
+    } catch (error) {
+      console.error("Infographic image generation failed:", error);
+      return {
+        ...specResult,
+        content: {
+          ...specResult.content,
+          image: {
+            status: "failed",
+            prompt: buildInfographicImagePrompt(specResult.content),
+            fallback: "structured_text_blocks",
+          },
+        },
+        modelRoute: safeRouteMetadata(route),
+      };
+    }
+
     return {
       ...specResult,
       content: {
@@ -788,6 +828,8 @@ function safeRouteMetadata(route: TextRoute) {
     tier: route.tier,
     reason: route.reason,
     fallbackUsed: route.fallbackUsed,
+    sourceSizeTier: route.sourceSizeTier,
+    signals: route.signals,
   };
 }
 
@@ -800,8 +842,7 @@ function userMessageForGenerationFailure(error: unknown) {
 
 function isProviderOrRawErrorCode(code: string) {
   const normalized = code.toUpperCase();
-  return normalized.startsWith("VERTEX_") ||
-    normalized.startsWith("OPENAI_") ||
+  return normalized.startsWith("OPENAI_") ||
     normalized.startsWith("ANTHROPIC_") ||
     normalized.startsWith("IMAGE_") ||
     normalized.includes("UPSTREAM") ||

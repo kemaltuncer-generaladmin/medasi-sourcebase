@@ -1,35 +1,27 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { runtimeConfigStatus } from "./config.ts";
 
-Deno.test("runtime config reports S3 and invalid Vertex JSON status", () => {
+Deno.test("runtime config reports storage and AI provider readiness", () => {
   withEnv(
     {
       SOURCEBASE_S3_BUCKET: "medasistorage",
       SOURCEBASE_S3_ENDPOINT: "https://storage.medasi.com.tr",
       SOURCEBASE_S3_ACCESS_KEY: "access",
       SOURCEBASE_S3_SECRET_KEY: "secret",
-      VERTEX_SERVICE_ACCOUNT_JSON: "not-json",
-      CLIENT_EXTRACTION_ENABLED: undefined,
-      OPENAI_API_KEY: undefined,
+      OPENAI_API_KEY: "openai-test-key",
+      ANTHROPIC_API_KEY: undefined,
       STABILITY_API_KEY: undefined,
     },
     () => {
       const status = runtimeConfigStatus();
       assertEquals(status.storage.provider, "s3");
       assertEquals(status.storage.s3Configured, true);
-      assertEquals(status.vertex.serviceAccountConfigured, true);
-      assertEquals(status.vertex.serviceAccountValid, false);
-      assertEquals(status.image.providerConfigured, false);
-      assertEquals(status.extraction.clientExtractionEnabled, true);
+      assertEquals(status.ai.textProviderConfigured, true);
+      assertEquals(status.ai.openAiConfigured, true);
+      assertEquals(status.ai.anthropicConfigured, false);
+      assertEquals(status.image.providerConfigured, true);
     },
   );
-});
-
-Deno.test("runtime config can disable client extraction", () => {
-  withEnv({ CLIENT_EXTRACTION_ENABLED: "off" }, () => {
-    const status = runtimeConfigStatus();
-    assertEquals(status.extraction.clientExtractionEnabled, false);
-  });
 });
 
 function withEnv(

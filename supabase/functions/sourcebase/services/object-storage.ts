@@ -7,6 +7,13 @@ export interface ObjectMetadata {
   contentType: string;
 }
 
+export function objectStorageUrl(
+  storage: ObjectStorageConfig,
+  objectName: string,
+) {
+  return `${storage.provider}://${storage.bucket}/${objectName}`;
+}
+
 export async function createSignedPutUrl(input: {
   storage: ObjectStorageConfig;
   objectName: string;
@@ -17,6 +24,7 @@ export async function createSignedPutUrl(input: {
     method: "PUT",
     objectName: input.objectName,
     expiresInSeconds: input.expiresInSeconds,
+    usePublicEndpoint: true,
   });
 }
 
@@ -30,6 +38,7 @@ export async function createSignedReadUrl(input: {
     method: "GET",
     objectName: input.objectName,
     expiresInSeconds: input.expiresInSeconds,
+    usePublicEndpoint: true,
   });
 }
 
@@ -38,14 +47,16 @@ export async function getObjectMetadata(input: {
   bucket: string;
   objectName: string;
 }): Promise<ObjectMetadata> {
+  assertExpectedBucket(input.storage, input.bucket);
   const response = await fetch(
     await createS3PresignedUrl({
       storage: input.storage,
-      method: "HEAD",
+      method: "GET",
       objectName: input.objectName,
       expiresInSeconds: 300,
+      usePublicEndpoint: true,
     }),
-    { method: "HEAD" },
+    { headers: { Range: "bytes=0-0" } },
   );
   if (response.status === 404) {
     throw new SafeError(
@@ -69,7 +80,7 @@ export async function getObjectMetadata(input: {
     );
   }
 
-  const contentLength = Number(response.headers.get("content-length") ?? 0);
+  const contentLength = contentLengthFromMetadataResponse(response);
   if (!Number.isFinite(contentLength) || contentLength <= 0) {
     throw new SafeError(
       "FILE_OBJECT_EMPTY",
@@ -86,54 +97,127 @@ export async function getObjectMetadata(input: {
   };
 }
 
+function contentLengthFromMetadataResponse(response: Response) {
+  const contentRange = response.headers.get("content-range") ?? "";
+  const totalMatch = contentRange.match(/\/(\d+)$/);
+  if (totalMatch) return Number(totalMatch[1]);
+  return Number(response.headers.get("content-length") ?? 0);
+}
+
+export async function downloadObject(input: {
+  storage: ObjectStorageConfig;
+  bucket: string;
+  objectName: string;
+}): Promise<ArrayBuffer> {
+  assertExpectedBucket(input.storage, input.bucket);
+  const response = await fetch(
+    await createSignedReadUrl({
+      storage: input.storage,
+      objectName: input.objectName,
+      expiresInSeconds: 300,
+    }),
+  );
+  if (response.status === 404) {
+    throw new SafeError(
+      "FILE_OBJECT_MISSING",
+      "Yüklenen dosya depolama alanında bulunamadı.",
+      400,
+    );
+  }
+  if (!response.ok) {
+    throw new SafeError(
+      "FILE_OBJECT_MISSING",
+      "Yüklenen dosya depolama alanında bulunamadı.",
+      500,
+    );
+  }
+  return response.arrayBuffer();
+}
+
 export async function deleteObject(input: {
   storage: ObjectStorageConfig;
   bucket: string;
   objectName: string;
 }) {
   try {
-    const response = await fetch(
-      await createS3PresignedUrl({
-        storage: input.storage,
-        method: "DELETE",
-        objectName: input.objectName,
-        expiresInSeconds: 300,
-      }),
-      { method: "DELETE" },
-    );
+    assertExpectedBucket(input.storage, input.bucket);
+    const url = await createS3PresignedUrl({
+      storage: input.storage,
+      method: "DELETE",
+      objectName: input.objectName,
+      expiresInSeconds: 300,
+      usePublicEndpoint: true,
+    });
+    const response = await fetch(url, { method: "DELETE" });
     if (!response.ok && response.status !== 404) {
-      console.warn("S3 delete skipped:", response.status);
+      console.warn("storage delete skipped:", response.status);
     }
   } catch (error) {
     const safeCode = error instanceof SafeError
       ? error.code
       : "STORAGE_DELETE_ERROR";
-    console.warn("S3 delete skipped:", safeCode);
+    console.warn("storage delete skipped:", safeCode);
+  }
+}
+
+export async function assertBucketPermissions(storage: ObjectStorageConfig) {
+  const response = await fetch(
+    await createS3PresignedUrl({
+      storage,
+      method: "HEAD",
+      objectName: "sourcebase/.permission-check",
+      expiresInSeconds: 60,
+      usePublicEndpoint: true,
+    }),
+    { method: "HEAD" },
+  );
+  if (response.status === 401 || response.status === 403) {
+    throw new SafeError(
+      "S3_PERMISSION_DENIED",
+      "Dosya yükleme yetkisi doğrulanamadı.",
+      500,
+    );
+  }
+  if (!response.ok && response.status !== 404) {
+    throw new SafeError(
+      "S3_UPSTREAM_ERROR",
+      "Dosya depolama servisine ulaşılamadı.",
+      502,
+    );
+  }
+}
+
+function assertExpectedBucket(storage: ObjectStorageConfig, bucket: string) {
+  if (bucket !== storage.bucket) {
+    throw new SafeError(
+      "STORAGE_BUCKET_MISMATCH",
+      "Dosya depolama alanı doğrulanamadı.",
+      403,
+    );
   }
 }
 
 async function createS3PresignedUrl(input: {
   storage: ObjectStorageConfig;
-  method: "DELETE" | "GET" | "HEAD" | "PUT";
+  method: "GET" | "PUT" | "HEAD" | "DELETE";
   objectName: string;
   expiresInSeconds: number;
+  usePublicEndpoint?: boolean;
 }) {
   assertObjectName(input.objectName);
-  const now = new Date();
-  const date = now.toISOString().slice(0, 10).replaceAll("-", "");
-  const timestamp = `${date}T${
-    now.toISOString().slice(11, 19).replaceAll(":", "")
-  }Z`;
-  const scope = `${date}/${input.storage.region}/s3/aws4_request`;
-  const credential = `${input.storage.accessKeyId}/${scope}`;
-  const endpoint = new URL(input.storage.endpoint);
+  const endpointUrl = input.usePublicEndpoint && input.storage.publicEndpoint
+    ? input.storage.publicEndpoint
+    : input.storage.endpoint;
+  const endpoint = new URL(endpointUrl);
   const host = endpoint.host;
-  const canonicalUri = `/${encodePath(input.storage.bucket)}/${
-    encodePath(input.objectName)
-  }`;
+  const now = new Date();
+  const date = formatDate(now);
+  const timestamp = `${date}T${formatTime(now)}Z`;
+  const credentialScope = `${date}/${input.storage.region}/s3/aws4_request`;
+  const canonicalUri = `/${input.storage.bucket}/${encodePath(input.objectName)}`;
   const query: Record<string, string> = {
     "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
-    "X-Amz-Credential": credential,
+    "X-Amz-Credential": `${input.storage.accessKeyId}/${credentialScope}`,
     "X-Amz-Date": timestamp,
     "X-Amz-Expires": String(input.expiresInSeconds),
     "X-Amz-SignedHeaders": "host",
@@ -147,16 +231,19 @@ async function createS3PresignedUrl(input: {
     "host",
     "UNSIGNED-PAYLOAD",
   ].join("\n");
-  const key = await signingKey(
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    timestamp,
+    credentialScope,
+    await sha256Hex(canonicalRequest),
+  ].join("\n");
+  const signingKey = await awsSigningKey(
     input.storage.secretAccessKey,
     date,
     input.storage.region,
   );
-  const signature = await hmacHex(
-    key,
-    await stringToSign(timestamp, scope, canonicalRequest),
-  );
-  return `${endpoint.origin}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+  const signature = toHex(await hmacSha256(signingKey, stringToSign));
+  return `${endpoint.protocol}//${host}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
 }
 
 function assertObjectName(objectName: string) {
@@ -169,17 +256,39 @@ function assertObjectName(objectName: string) {
   }
 }
 
-async function stringToSign(
-  timestamp: string,
-  scope: string,
-  canonicalRequest: string,
-) {
-  return [
-    "AWS4-HMAC-SHA256",
-    timestamp,
-    scope,
-    await sha256Hex(canonicalRequest),
-  ].join("\n");
+async function awsSigningKey(secret: string, date: string, region: string) {
+  const kDate = await hmacSha256(`AWS4${secret}`, date);
+  const kRegion = await hmacSha256(kDate, region);
+  const kService = await hmacSha256(kRegion, "s3");
+  return hmacSha256(kService, "aws4_request");
+}
+
+async function hmacSha256(key: string | Uint8Array, value: string) {
+  const rawKey = typeof key === "string"
+    ? new TextEncoder().encode(key)
+    : key;
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    rawKey,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  return new Uint8Array(
+    await crypto.subtle.sign(
+      "HMAC",
+      cryptoKey,
+      new TextEncoder().encode(value),
+    ),
+  );
+}
+
+function formatDate(date: Date) {
+  return date.toISOString().slice(0, 10).replaceAll("-", "");
+}
+
+function formatTime(date: Date) {
+  return date.toISOString().slice(11, 19).replaceAll(":", "");
 }
 
 function encodePath(path: string) {
@@ -200,40 +309,12 @@ function rfc3986Encode(value: string) {
   );
 }
 
-async function signingKey(secret: string, date: string, region: string) {
-  const dateKey = await hmacBytes(textBytes(`AWS4${secret}`), date);
-  const regionKey = await hmacBytes(dateKey, region);
-  const serviceKey = await hmacBytes(regionKey, "s3");
-  return await hmacBytes(serviceKey, "aws4_request");
-}
-
-async function hmacHex(keyBytes: Uint8Array, text: string) {
-  return toHex(await hmacBytes(keyBytes, text));
-}
-
-async function hmacBytes(keyBytes: Uint8Array, text: string) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    keyBytes,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  return new Uint8Array(
-    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(text)),
-  );
-}
-
-async function sha256Hex(text: string) {
+async function sha256Hex(value: string) {
   const digest = await crypto.subtle.digest(
     "SHA-256",
-    new TextEncoder().encode(text),
+    new TextEncoder().encode(value),
   );
   return toHex(new Uint8Array(digest));
-}
-
-function textBytes(text: string) {
-  return new TextEncoder().encode(text);
 }
 
 function toHex(bytes: Uint8Array) {

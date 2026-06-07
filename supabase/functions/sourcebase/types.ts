@@ -49,7 +49,7 @@ export type GenerationType =
   | "mind_map";
 
 // AI Provider Types
-export type AIProvider = "vertex" | "openai";
+export type AIProvider = "openai" | "anthropic";
 
 // Generation Job Interface
 export interface GenerationJob {
@@ -85,6 +85,7 @@ export interface QuizQuestion {
   options: string[];
   correctIndex: number;
   explanation: string;
+  optionRationales?: string[];
   difficulty?: "easy" | "medium" | "hard";
 }
 
@@ -93,6 +94,13 @@ export interface Summary {
   title: string;
   bulletPoints: string[];
   fullText: string;
+  keyTerms?: string[];
+  mainTopics?: string[];
+  mustKnow?: string[];
+  redFlags?: string[];
+  commonlyConfused?: string[];
+  clinicalDecisionFlow?: string[];
+  examTraps?: string[];
 }
 
 export interface ExamMorningSummary {

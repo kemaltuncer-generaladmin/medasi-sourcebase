@@ -1,9 +1,11 @@
 import { GenerationType, SafeError } from "../types.ts";
 import {
+  isImageProviderAvailable,
   isImageRouteAvailable,
   resolveImageRoute,
   resolveTextRoute,
   RouteOptions,
+  shouldGenerateInfographicImage,
 } from "./model-router.ts";
 
 export type QualityTier = "economy" | "standard" | "premium";
@@ -21,6 +23,12 @@ export interface McPricingQuote {
   model_tier: string;
   source_size_tier: SourceSizeTier;
   reserved_mc: number;
+  image_route?: {
+    provider: string;
+    model: string;
+    quality: string;
+    provider_quality?: string;
+  };
   route: {
     provider: string;
     model: string;
@@ -55,21 +63,25 @@ const MIN_UNITS: Record<string, Record<QualityTier, number>> = {
   clinical_scenario: { economy: 200, standard: 200, premium: 400 },
   learning_plan: { economy: 150, standard: 150, premium: 300 },
   podcast: { economy: 150, standard: 150, premium: 300 },
-  infographic: { economy: 300, standard: 300, premium: 600 },
+  infographic: { economy: 25, standard: 50, premium: 100 },
 };
 
 const MODEL_COST_MICRO_TL: Record<string, { input: number; output: number }> = {
-  "gemini-2.5-flash-lite": { input: 15, output: 60 },
-  "gemini-2.5-flash": { input: 30, output: 120 },
-  "gpt-5.4-mini": { input: 120, output: 480 },
-  "gpt-5.4": { input: 400, output: 1600 },
+  "gpt-4o-mini": { input: 30, output: 120 },
+  "gpt-5.4-mini": { input: 35, output: 207 },
+  "gpt-5.4": { input: 115, output: 690 },
+  "gpt-5.5": { input: 230, output: 1380 },
+  "claude-sonnet-4-5": { input: 115, output: 690 },
 };
 
-const IMAGE_COST_MICRO_TL: Record<string, number> = {
-  "gpt-image-1-mini": 1_500_000,
-  "gpt-image-2": 4_000_000,
-  "stable-image-ultra": 3_000_000,
+const IMAGE_COST_USD: Record<string, Record<ImageQuality, number>> = {
+  "gpt-image-2": { draft: 0.006, standard: 0.053, premium: 0.211 },
+  "gpt-image-1.5": { draft: 0.009, standard: 0.034, premium: 0.133 },
+  "gpt-image-1": { draft: 0.011, standard: 0.042, premium: 0.167 },
+  "gpt-image-1-mini": { draft: 0.005, standard: 0.011, premium: 0.036 },
+  "stable-image-ultra": { draft: 0.08, standard: 0.08, premium: 0.08 },
 };
+type ImageQuality = "draft" | "standard" | "premium";
 
 export function normalizeQualityTier(value: unknown): QualityTier {
   const text = value?.toString().trim().toLowerCase();
@@ -89,6 +101,8 @@ export function routeOptionsForQuality(
     premium: qualityTier === "premium" || options.premium,
     imageQuality: qualityTier === "premium"
       ? "premium"
+      : qualityTier === "economy"
+      ? "draft"
       : options.imageQuality ?? "standard",
   };
 }
@@ -123,35 +137,80 @@ export function estimateGenerationPricing(input: {
     providerCostMicroTl * SOURCE_MULTIPLIER_BPS[sourceSizeTier] / 10_000,
   );
 
-  if (input.jobType === "infographic") {
-    const imageRoute = resolveImageRoute(routeOptions.imageQuality);
-    if (isImageRouteAvailable(imageRoute)) {
-      providerCostMicroTl += imageCostMicroTl(imageRoute.model);
+  let imageRoute: McPricingQuote["image_route"];
+  if (
+    input.jobType === "infographic" &&
+    shouldGenerateInfographicImage(routeOptions)
+  ) {
+    const resolvedImageRoute = resolveImageRoute(
+      routeOptions.imageQuality,
+      routeOptions.imageModel,
+    );
+    if (isImageRouteAvailable(resolvedImageRoute)) {
+      const selectedImageRoute = isImageProviderAvailable(
+          resolvedImageRoute.provider,
+        )
+        ? {
+          provider: resolvedImageRoute.provider,
+          model: resolvedImageRoute.model,
+        }
+        : {
+          provider: resolvedImageRoute.fallbackProvider,
+          model: resolvedImageRoute.fallbackModel,
+        };
+      providerCostMicroTl += imageCostMicroTl(
+        selectedImageRoute.model,
+        resolvedImageRoute.quality,
+      );
+      imageRoute = {
+        ...selectedImageRoute,
+        quality: resolvedImageRoute.quality,
+        provider_quality: providerImageQuality(
+          selectedImageRoute.model,
+          resolvedImageRoute.quality,
+        ),
+      };
     }
   }
 
   const calculatedUnits = costMicroTlToMcUnits(providerCostMicroTl);
   const minimumUnits = minUnits(input.jobType, input.qualityTier);
-  const finalUnits = input.qualityTier === "premium"
-    ? roundUpUnitsToStep(Math.max(calculatedUnits, minimumUnits))
-    : roundUpUnitsToStep(Math.max(calculatedUnits, minimumUnits));
+  const finalUnits = roundUpUnitsToStep(
+    Math.max(calculatedUnits, minimumUnits),
+  );
   const standardUnits = input.qualityTier === "premium"
     ? estimateGenerationPricing({
       ...input,
       qualityTier: "standard",
-      routeOptions: { ...(input.routeOptions ?? {}), premium: false },
+      routeOptions: {
+        ...(input.routeOptions ?? {}),
+        premium: false,
+        imageQuality: "standard",
+        imageModel: undefined,
+      },
     }).amount_units
     : undefined;
-  const amountUnits = input.qualityTier === "premium" && standardUnits
+  const amountUnits = input.jobType !== "infographic" &&
+      input.qualityTier === "premium" && standardUnits
     ? roundUpUnitsToStep(Math.max(finalUnits, standardUnits * 2))
     : finalUnits;
+  const discountedAmountUnits = input.jobType === "infographic"
+    ? Math.max(minUnitAsUnits(), amountUnits - infographicDiscountUnits())
+    : amountUnits;
+  const tierAdjustedAmountUnits = input.jobType === "infographic" &&
+      input.qualityTier === "premium" && standardUnits
+    ? roundUpUnitsToStep(
+      Math.max(discountedAmountUnits, standardUnits + minUnitAsUnits()),
+    )
+    : discountedAmountUnits;
 
   return quoteFromUnits({
     providerCostMicroTl,
-    amountUnits,
+    amountUnits: tierAdjustedAmountUnits,
     qualityTier: input.qualityTier,
     sourceSizeTier,
     route,
+    imageRoute,
   });
 }
 
@@ -168,6 +227,7 @@ function quoteFromUnits(input: {
   qualityTier: QualityTier;
   sourceSizeTier: SourceSizeTier;
   route: ReturnType<typeof resolveTextRoute>;
+  imageRoute?: McPricingQuote["image_route"];
 }): McPricingQuote {
   const providerCostTl = input.providerCostMicroTl / 1_000_000;
   const revenueTl = providerCostTl / costRatio();
@@ -185,6 +245,7 @@ function quoteFromUnits(input: {
     model_tier: input.route.tier,
     source_size_tier: input.sourceSizeTier,
     reserved_mc: finalMc,
+    image_route: input.imageRoute,
     route: {
       provider: input.route.provider,
       model: input.route.model,
@@ -209,14 +270,20 @@ function minUnits(jobType: GenerationType | "central_ai", tier: QualityTier) {
 
 function modelCostMicroTl(model: string) {
   return MODEL_COST_MICRO_TL[model] ?? MODEL_COST_MICRO_TL[
-    Deno.env.get("TEXT_MODEL_STANDARD")?.trim() || "gemini-2.5-flash"
-  ] ?? MODEL_COST_MICRO_TL["gemini-2.5-flash"];
+    Deno.env.get("TEXT_MODEL_STANDARD")?.trim() || "gpt-5.4-mini"
+  ] ?? MODEL_COST_MICRO_TL["gpt-5.4-mini"];
 }
 
-function imageCostMicroTl(model: string) {
-  return IMAGE_COST_MICRO_TL[model] ?? IMAGE_COST_MICRO_TL[
-    Deno.env.get("IMAGE_MODEL_DRAFT")?.trim() || "gpt-image-1-mini"
-  ] ?? IMAGE_COST_MICRO_TL["gpt-image-1-mini"];
+function imageCostMicroTl(model: string, quality: ImageQuality) {
+  const usd = IMAGE_COST_USD[model]?.[providerImageQuality(model, quality)];
+  if (typeof usd === "number") {
+    return Math.ceil(usd * usdTryRate() * 1_000_000);
+  }
+  return 3_000_000;
+}
+
+function providerImageQuality(model: string, quality: ImageQuality) {
+  return quality;
 }
 
 function classifySourceSize(length: number): SourceSizeTier {
@@ -284,6 +351,17 @@ function minMcUnit() {
 
 function minUnitAsUnits() {
   return Math.max(1, Math.round(minMcUnit() * MC_UNITS_PER_MC));
+}
+
+function usdTryRate() {
+  return Number(Deno.env.get("USD_TRY_RATE") ?? "46") || 46;
+}
+
+function infographicDiscountUnits() {
+  return Math.max(
+    0,
+    Math.round(Number(Deno.env.get("INFOGRAPHIC_MC_DISCOUNT") ?? "1") * 100),
+  );
 }
 
 function roundMoney(value: number) {

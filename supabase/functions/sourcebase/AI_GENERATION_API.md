@@ -4,7 +4,8 @@ Bu doküman SourceBase AI içerik üretim sisteminin kullanımını açıklar.
 
 ## Genel Bakış
 
-SourceBase, Vertex AI kullanarak çeşitli eğitim materyalleri üretir:
+SourceBase, OpenAI ve gerektiğinde yapılandırılmış fallback sağlayıcılarıyla
+çeşitli eğitim materyalleri üretir:
 - **Flashcards**: Çalışma kartları
 - **Quiz**: Çoktan seçmeli sorular
 - **Summary**: Özet ve madde işaretli notlar
@@ -15,7 +16,7 @@ SourceBase, Vertex AI kullanarak çeşitli eğitim materyalleri üretir:
 ## Mimari
 
 ```
-Client -> Edge Function -> Job Processor -> Vertex AI -> Database
+Client -> Edge Function -> Job Processor -> AI Provider -> Database
 ```
 
 ### Async Job System
@@ -23,7 +24,7 @@ Client -> Edge Function -> Job Processor -> Vertex AI -> Database
 Tüm AI üretimi async job sistemi üzerinden çalışır:
 1. Client job oluşturur (status: `queued`)
 2. Job processor background'da işler (status: `processing`)
-3. Vertex AI'dan sonuç alınır
+3. Router'ın seçtiği AI sağlayıcısından sonuç alınır
 4. Job tamamlanır (status: `completed` veya `failed`)
 
 ## API Actions
@@ -427,9 +428,7 @@ const flashcards = await pollStatus();
 - **Supported Types**: PDF, DOCX, PPTX
 
 ### Cost Estimation
-Vertex AI Gemini Pro pricing:
-- Input: $0.00025 / 1K tokens
-- Output: $0.0005 / 1K tokens
+Router model ve kalite seviyesine göre provider maliyeti tahmin edilir.
 
 Örnek maliyet:
 - 20 flashcard (~3500 input, ~1200 output): ~$0.0015
@@ -452,8 +451,10 @@ Vertex AI Gemini Pro pricing:
 | `JOB_ALREADY_FINISHED` | İş zaten tamamlanmış |
 | `JOB_NOT_FAILED` | Sadece başarısız işler retry edilebilir |
 | `INVALID_CONTENT` | AI çıktısı validation'dan geçemedi |
-| `VERTEX_AUTH_FAILED` | Vertex AI kimlik doğrulama başarısız |
-| `VERTEX_API_ERROR` | AI içerik üretimi başarısız |
+| `OPENAI_AUTH_FAILED` | OpenAI kimlik doğrulama başarısız |
+| `ANTHROPIC_AUTH_FAILED` | Anthropic kimlik doğrulama başarısız |
+| `IMAGE_AUTH_FAILED` | Görsel sağlayıcı kimlik doğrulama başarısız |
+| `AI_FAILED` | AI içerik üretimi başarısız |
 
 ---
 
@@ -461,7 +462,7 @@ Vertex AI Gemini Pro pricing:
 
 ### AGENTS.md Kurallarına Uyum
 
-1. **API Key Güvenliği**: Vertex AI credentials sadece server-side
+1. **API Key Güvenliği**: AI provider key'leri sadece server-side
 2. **Prompt Injection Prevention**: Kaynak metni data olarak işlenir
 3. **Token Limitleri**: Max 8K input kontrolü
 4. **Cost Tracking**: Her job için maliyet kaydedilir
@@ -483,19 +484,18 @@ Vertex AI Gemini Pro pricing:
 SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=xxx
 
-# Vertex AI
-VERTEX_PROJECT_ID=your-gcp-project
-VERTEX_LOCATION=us-central1
-VERTEX_MODEL=gemini-1.5-pro
-VERTEX_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
+# AI Providers
+OPENAI_API_KEY=xxx
+ANTHROPIC_API_KEY=xxx # optional text fallback
+STABILITY_API_KEY=xxx # optional image fallback
 
-# S3-compatible storage / MinIO
-SOURCEBASE_STORAGE_DRIVER=s3
-SOURCEBASE_S3_ENDPOINT=https://storage.medasi.com.tr
-SOURCEBASE_S3_BUCKET=medasistorage
-SOURCEBASE_S3_REGION=us-east-1
-SOURCEBASE_S3_ACCESS_KEY=xxx
-SOURCEBASE_S3_SECRET_KEY=xxx
+# Object Storage (for file storage)
+STORAGE_DRIVER=s3
+S3_ENDPOINT=https://nbg1.your-objectstorage.com
+S3_REGION=nbg1
+S3_BUCKET=medasistorage
+S3_ACCESS_KEY=xxx
+S3_SECRET_KEY=xxx
 ```
 
 ---

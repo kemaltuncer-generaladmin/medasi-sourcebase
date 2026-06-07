@@ -24,14 +24,22 @@ export function validateInfographicSpec(value: unknown): InfographicPlan {
   if (!isRecord(value)) {
     throw invalid();
   }
-  const title = requiredText(value.title, "title");
-  const rawSections = Array.isArray(value.sections) ? value.sections : [];
+  const title = requiredText(
+    value.title ?? value.headline ?? value.main_title,
+    "title",
+  );
+  const rawSections = firstArray(
+    value.sections,
+    value.blocks,
+    value.panels,
+    value.items,
+    value.cards,
+  );
   const sections = rawSections
-    .filter(isRecord)
-    .map((section) => ({
-      heading: requiredText(section.heading, "heading"),
-      bullets: stringArray(section.bullets).slice(0, 8),
-    }))
+    .map(sectionFromUnknown)
+    .filter((section): section is { heading: string; bullets: string[] } =>
+      Boolean(section)
+    )
     .filter((section) => section.bullets.length > 0)
     .slice(0, 8);
 
@@ -105,6 +113,39 @@ function stringArray(value: unknown) {
   return value
     .map((item) => optionalText(item))
     .filter((item): item is string => Boolean(item));
+}
+
+function firstArray(...values: unknown[]) {
+  for (const value of values) {
+    if (Array.isArray(value) && value.length > 0) return value;
+  }
+  return [];
+}
+
+function sectionFromUnknown(value: unknown) {
+  if (typeof value === "string") {
+    return {
+      heading: value.slice(0, 80),
+      bullets: [value],
+    };
+  }
+  if (!isRecord(value)) return null;
+  const heading = optionalText(value.heading) ||
+    optionalText(value.title) ||
+    optionalText(value.label) ||
+    optionalText(value.name) ||
+    "Kritik bilgi";
+  const bullets = [
+    ...stringArray(value.bullets),
+    ...stringArray(value.points),
+    ...stringArray(value.items),
+    ...stringArray(value.key_points),
+  ];
+  const text = optionalText(value.text) ||
+    optionalText(value.summary) ||
+    optionalText(value.description);
+  if (text) bullets.push(text);
+  return { heading, bullets: bullets.slice(0, 8) };
 }
 
 function invalid() {

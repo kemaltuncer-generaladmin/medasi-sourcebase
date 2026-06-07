@@ -6,6 +6,8 @@ import {
   RouteOptions,
 } from "./model-router.ts";
 
+const DEFAULT_IMAGE_UPSTREAM_TIMEOUT_MS = 90_000;
+
 export interface GeneratedImage {
   provider: string;
   model: string;
@@ -19,7 +21,7 @@ export async function generateInfographicImage(
   spec: unknown,
   options: RouteOptions = {},
 ): Promise<GeneratedImage> {
-  const route = resolveImageRoute(options.imageQuality);
+  const route = resolveImageRoute(options.imageQuality, options.imageModel);
   const prompt = buildInfographicImagePrompt(spec);
   try {
     return await generateWithRoute(route, prompt, false);
@@ -68,7 +70,7 @@ async function generateWithRoute(
     );
   }
   if (provider === "openai") {
-    return await generateOpenAIImage(model, prompt);
+    return await generateOpenAIImage(model, prompt, route.quality);
   }
   return await generateStabilityImage(model, prompt);
 }
@@ -76,21 +78,26 @@ async function generateWithRoute(
 async function generateOpenAIImage(
   model: string,
   prompt: string,
+  quality: ImageRoute["quality"],
 ): Promise<GeneratedImage> {
   const apiKey = Deno.env.get("OPENAI_API_KEY")?.trim() ?? "";
-  const response = await fetch("https://api.openai.com/v1/images/generations", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+  const response = await fetchImageUpstream(
+    "https://api.openai.com/v1/images/generations",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        prompt,
+        quality: openAiQuality(model, quality),
+        size: "1024x1536",
+        n: 1,
+      }),
     },
-    body: JSON.stringify({
-      model,
-      prompt,
-      size: "1024x1536",
-      n: 1,
-    }),
-  });
+  );
   if (response.status === 401 || response.status === 403) {
     console.error("OpenAI image request rejected:", response.status);
     throw new SafeError(
@@ -136,7 +143,7 @@ async function generateStabilityImage(
   const form = new FormData();
   form.set("prompt", prompt);
   form.set("output_format", "png");
-  const response = await fetch(
+  const response = await fetchImageUpstream(
     "https://api.stability.ai/v2beta/stable-image/generate/ultra",
     {
       method: "POST",
@@ -179,4 +186,49 @@ async function generateStabilityImage(
     dataUrl: `data:image/png;base64,${b64}`,
     prompt,
   };
+}
+
+function openAiQuality(model: string, quality: ImageRoute["quality"]) {
+  if (quality === "draft") return "low";
+  if (quality === "premium") return "high";
+  return "medium";
+}
+
+async function fetchImageUpstream(
+  input: string,
+  init: RequestInit,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), imageTimeoutMs());
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (isAbortError(error)) {
+      console.error("Image upstream request timed out:", input);
+      throw new SafeError(
+        "IMAGE_UPSTREAM_TIMEOUT",
+        "İnfografik görsel servisi zaman aşımına uğradı.",
+        504,
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function imageTimeoutMs() {
+  const configured = Number(
+    Deno.env.get("SOURCEBASE_IMAGE_TIMEOUT_MS") ??
+      Deno.env.get("IMAGE_UPSTREAM_TIMEOUT_MS") ??
+      "",
+  );
+  if (Number.isFinite(configured) && configured >= 5_000) {
+    return Math.min(configured, 120_000);
+  }
+  return DEFAULT_IMAGE_UPSTREAM_TIMEOUT_MS;
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
 }

@@ -5,9 +5,9 @@
  * AGENTS.md Kural 12.4: Kaynak metni data olarak ele alınır
  */
 
-import { SafeError } from "../types.ts";
-import { createSignedReadUrl } from "./object-storage.ts";
 import { ObjectStorageConfig } from "../config.ts";
+import { downloadObject } from "./object-storage.ts";
+import { SafeError } from "../types.ts";
 
 const MAX_EXTRACTION_BYTES = 100 * 1024 * 1024;
 const MIN_EXTRACTED_TEXT_CHARS = 10;
@@ -30,23 +30,14 @@ export async function downloadFromObjectStorage(
   objectName: string,
   storage: ObjectStorageConfig,
 ): Promise<ArrayBuffer> {
-  if (
-    !bucket || bucket !== storage.bucket || !objectName ||
-    objectName.includes("..")
-  ) {
+  if (!bucket || !objectName || objectName.includes("..")) {
     throw new SafeError(
       "STORAGE_OBJECT_INVALID",
       "Dosya depolama yolu geçersiz.",
       400,
     );
   }
-  return downloadFile(
-    await createSignedReadUrl({
-      storage,
-      objectName,
-      expiresInSeconds: 300,
-    }),
-  );
+  return downloadObject({ storage, bucket, objectName });
 }
 
 export async function extractPdf(

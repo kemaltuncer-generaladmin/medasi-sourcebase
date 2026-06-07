@@ -15,14 +15,11 @@ export async function getWalletBalance(
   config: WalletConfig,
   userId: string,
 ): Promise<WalletBalance> {
-  const profile = await sharedWalletRpc(config, "sync_wallet_profile", {
+  const synced = await walletRpc(config, "sync_wallet_profile", {
     p_user_id: userId,
   });
-  const balanceUnits = Math.round(Number(profile.wallet_balance ?? 0) * 100);
-  return {
-    balance_units: balanceUnits,
-    balance_mc: balanceUnits / 100,
-  };
+  const balanceMc = moneyNumber(synced?.wallet_balance);
+  return balanceFromMc(balanceMc);
 }
 
 export async function reserveMedasiCoin(input: {
@@ -42,26 +39,15 @@ export async function reserveMedasiCoin(input: {
       402,
     );
   }
-  const afterUnits = before.balance_units - input.quote.amount_units;
-  await sharedWalletRpc(input.config, "consume_ai_credits", {
+  const afterMc = await walletRpc(input.config, "consume_ai_credits", {
     p_user_id: input.userId,
-    p_amount: input.quote.amount_units / 100,
+    p_amount: unitsToMc(input.quote.amount_units),
   });
-  await walletInsert(input.config, {
-    user_id: input.userId,
-    job_id: input.jobId,
-    amount_mc: -(input.quote.amount_units / 100),
-    amount_units: -input.quote.amount_units,
-    type: "reserve",
-    reason: input.reason,
-    balance_before: before.balance_units / 100,
-    balance_after: afterUnits / 100,
-    metadata: { pricing: input.quote },
-  });
+  const after = balanceFromMc(moneyNumber(afterMc));
   return {
     balance_before: before.balance_mc,
-    balance_after_reserve: afterUnits / 100,
-    reserved_mc: input.quote.amount_units / 100,
+    balance_after_reserve: after.balance_mc,
+    reserved_mc: unitsToMc(input.quote.amount_units),
   };
 }
 
@@ -72,18 +58,7 @@ export async function captureMedasiCoin(input: {
   reason: string;
   metadata?: Record<string, unknown>;
 }) {
-  const balance = await getWalletBalance(input.config, input.userId);
-  await walletInsert(input.config, {
-    user_id: input.userId,
-    job_id: input.jobId,
-    amount_mc: 0,
-    amount_units: 0,
-    type: "capture",
-    reason: input.reason,
-    balance_before: balance.balance_mc,
-    balance_after: balance.balance_mc,
-    metadata: input.metadata ?? {},
-  });
+  await getWalletBalance(input.config, input.userId);
 }
 
 export async function refundMedasiCoin(input: {
@@ -95,34 +70,38 @@ export async function refundMedasiCoin(input: {
   metadata?: Record<string, unknown>;
 }) {
   if (input.amountUnits <= 0) return;
-  const before = await getWalletBalance(input.config, input.userId);
-  const afterUnits = before.balance_units + input.amountUnits;
-  await sharedWalletRpc(input.config, "refund_ai_credits", {
+  await walletRpc(input.config, "refund_ai_credits", {
     p_user_id: input.userId,
-    p_amount: input.amountUnits / 100,
-  });
-  await walletInsert(input.config, {
-    user_id: input.userId,
-    job_id: input.jobId,
-    amount_mc: input.amountUnits / 100,
-    amount_units: input.amountUnits,
-    type: "refund",
-    reason: input.reason,
-    balance_before: before.balance_mc,
-    balance_after: afterUnits / 100,
-    metadata: input.metadata ?? {},
+    p_amount: unitsToMc(input.amountUnits),
   });
 }
 
-async function walletInsert(
+function unitsToMc(units: number) {
+  return Math.round(units) / 100;
+}
+
+function moneyNumber(value: unknown) {
+  const numberValue = Number(value ?? 0);
+  return Number.isFinite(numberValue) ? Math.round(numberValue * 100) / 100 : 0;
+}
+
+function balanceFromMc(balanceMc: number): WalletBalance {
+  return {
+    balance_units: Math.round(balanceMc * 100),
+    balance_mc: balanceMc,
+  };
+}
+
+async function walletRpc(
   config: WalletConfig,
+  rpcName: string,
   body: Record<string, unknown>,
 ) {
-  await walletFetch(config, "wallet_transactions", {
+  const response = await walletFetch(config, `rpc/${rpcName}`, {
     method: "POST",
-    headers: { prefer: "return=minimal" },
     body: JSON.stringify(body),
   });
+  return await response.json().catch(() => null);
 }
 
 async function walletFetch(
@@ -136,13 +115,22 @@ async function walletFetch(
       apikey: config.serviceRoleKey,
       authorization: `Bearer ${config.serviceRoleKey}`,
       "content-type": "application/json",
-      "accept-profile": "sourcebase",
-      "content-profile": "sourcebase",
       ...(init.headers ?? {}),
     },
   });
   if (!response.ok) {
+    const body = await response.text().catch(() => "");
     console.error("Wallet operation failed:", response.status);
+    if (
+      response.status === 400 &&
+      body.toLowerCase().includes("not sufficient")
+    ) {
+      throw new SafeError(
+        "INSUFFICIENT_MC",
+        "Yetersiz MedasiCoin bakiyesi.",
+        402,
+      );
+    }
     throw new SafeError(
       "WALLET_ERROR",
       "MedasiCoin işlemi tamamlanamadı.",
@@ -150,37 +138,4 @@ async function walletFetch(
     );
   }
   return response;
-}
-
-async function sharedWalletRpc(
-  config: WalletConfig,
-  name: string,
-  body: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  const response = await fetch(`${config.supabaseUrl}/rest/v1/rpc/${name}`, {
-    method: "POST",
-    headers: {
-      apikey: config.serviceRoleKey,
-      authorization: `Bearer ${config.serviceRoleKey}`,
-      "content-type": "application/json",
-      "accept-profile": "public",
-      "content-profile": "public",
-    },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    console.error("Shared wallet RPC failed:", name, response.status);
-    throw new SafeError(
-      "WALLET_ERROR",
-      "MedasiCoin işlemi tamamlanamadı.",
-      500,
-    );
-  }
-  const data: unknown = await response.json();
-  if (typeof data === "number" || typeof data === "string") {
-    return { wallet_balance: Number(data) };
-  }
-  return data && typeof data === "object"
-    ? data as Record<string, unknown>
-    : {};
 }

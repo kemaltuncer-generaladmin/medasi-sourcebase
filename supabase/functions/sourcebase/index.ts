@@ -1,7 +1,6 @@
 import { isRecord, SafeError } from "./types.ts";
 import {
   getAllowedOrigin,
-  getClientExtractionEnabled,
   getObjectStorageConfig,
   getSupabaseAnonKey,
   getSupabaseServiceRoleKey,
@@ -27,6 +26,7 @@ import {
 } from "./services/file-types.ts";
 import {
   createSignedPutUrl,
+  createSignedReadUrl,
   deleteObject,
   getObjectMetadata,
   ObjectMetadata,
@@ -34,8 +34,21 @@ import {
 
 type JsonMap = Record<string, unknown>;
 type StorageObjectMetadata = ObjectMetadata;
+type CompatibleQuestion = {
+  id: string;
+  subject: string;
+  topic: string;
+  difficulty: string;
+  text: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+  optionRationales: string[];
+  tags: string[];
+};
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_AVATAR_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 120;
 const MAX_SECTION_TITLE_LENGTH = 120;
 const MAX_INITIAL_SECTIONS = 25;
@@ -78,26 +91,10 @@ Deno.serve(async (request) => {
       return failure("METHOD_NOT_ALLOWED", "Bu işlem desteklenmiyor.", 405);
     }
 
-    const rawBodyText = await request.text().catch(() => "");
-    let parsedBody: unknown = {};
-    try {
-      parsedBody = rawBodyText ? JSON.parse(rawBodyText) : {};
-    } catch (_error) {
-      throw new SafeError("INVALID_JSON", "Geçersiz istek gövdesi.", 400);
-    }
-    const body = isRecord(parsedBody) ? parsedBody : {};
+    const rawBody = await request.json().catch(() => ({}));
+    const body = isRecord(rawBody) ? rawBody : {};
     const action = String(body.action ?? "");
     const payload = isRecord(body.payload) ? body.payload : {};
-
-    if (
-      action === "payment_entitlement_webhook" ||
-      action === "medasipay_webhook"
-    ) {
-      return success(
-        await handlePaymentEntitlementWebhook(request, body, rawBodyText),
-      );
-    }
-
     const user = await authenticate(request);
 
     switch (action) {
@@ -135,13 +132,24 @@ Deno.serve(async (request) => {
       case "add_to_collection":
         return success(await addToCollection(user.id, payload));
       case "purchase_medasicoin":
-        return success(await purchaseMedasiCoin(user, payload));
+        return success(await purchaseMedasiCoin(user.id, payload));
+      case "sourcebase_question_session":
+        return success(await sourcebaseQuestionSession(user.id, payload));
+      case "submit_sourcebase_question_answer":
+        return success(await submitSourcebaseQuestionAnswer(user.id, payload));
+      case "get_generated_asset_url":
+        return success(await getGeneratedAssetUrl(user.id, payload));
+      case "create_profile_avatar_upload_session":
+        return success(
+          await createProfileAvatarUploadSession(user.id, payload),
+        );
+      case "complete_profile_avatar_upload":
+        return success(await completeProfileAvatarUpload(user.id, payload));
+      case "submit_support_form":
+        return success(await submitSupportForm(user.id, payload));
 
       // AI Generation actions
       case "process_file_extraction":
-        console.warn(
-          "process_file_extraction is deprecated. Client-side extraction is preferred.",
-        );
         return success(await processFileExtraction(user.id, payload));
       case "create_generation_job":
         return success(await createGenerationJob(user.id, payload));
@@ -229,7 +237,7 @@ async function driveBootstrap(userId: string) {
       ...configStatus.storage,
       roots: storageRoots,
     },
-    ai: configStatus.vertex,
+    ai: configStatus.ai,
     courses,
     sections,
     files,
@@ -249,14 +257,17 @@ async function ensureStorageRoots(userId: string) {
     !existingKeys.has(root.root_key)
   );
   if (missing.length > 0) {
-    await insertStorageRoots(missing.map((root) => ({
-      owner_user_id: userId,
-      root_key: root.root_key,
-      title: root.title,
-      storage_prefix: root.storage_prefix,
-      status: "active",
-      metadata: root.metadata,
-    })));
+    await dbInsert(
+      "storage_roots",
+      missing.map((root) => ({
+        owner_user_id: userId,
+        root_key: root.root_key,
+        title: root.title,
+        storage_prefix: root.storage_prefix,
+        status: "active",
+        metadata: root.metadata,
+      })),
+    );
     await audit(userId, "ensure_storage_roots", "storage_root", null, {
       rootKeys: missing.map((root) => root.root_key),
     });
@@ -295,22 +306,6 @@ function storageRootDefinitions(userId: string) {
       metadata: { purpose: "ai_outputs" },
     },
   ];
-}
-
-async function insertStorageRoots(rows: JsonMap[]) {
-  try {
-    return await dbInsert("storage_roots", rows);
-  } catch (error) {
-    if (!(error instanceof SafeError)) throw error;
-    return await dbInsert("storage_roots", rows.map(legacyStorageRootRow));
-  }
-}
-
-function legacyStorageRootRow(row: JsonMap) {
-  const next = { ...row };
-  next[legacyStorageKey("prefix")] = next.storage_prefix;
-  delete next.storage_prefix;
-  return next;
 }
 
 async function createCourse(userId: string, payload: JsonMap) {
@@ -467,7 +462,7 @@ async function createUploadSession(userId: string, payload: JsonMap) {
     `sourcebase/users/${userId}/uploads/${year}/${month}/${sourceId}-${safeName}`;
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
   const uploadUrl = await createSignedPutUrl({
-    storage,
+    storage: storage,
     objectName,
     expiresInSeconds: 900,
   });
@@ -495,10 +490,12 @@ async function completeUpload(userId: string, payload: JsonMap) {
   const fileName = requireString(payload.fileName, "fileName");
   const contentType = requireString(payload.contentType, "contentType");
   const sizeBytes = Number(payload.sizeBytes ?? 0);
+
+  const extractedText = typeof payload.extractedText === "string" ? payload.extractedText : null;
+  const pageCount = typeof payload.pageCount === "number" ? payload.pageCount : null;
+  const extractionMetadata = isRecord(payload.extractionMetadata) ? payload.extractionMetadata : null;
+
   const fileInfo = validateUploadFile(fileName, contentType, sizeBytes);
-  const clientExtraction = clientExtractionFromPayload(payload);
-  const shouldUseClientExtraction = getClientExtractionEnabled() &&
-    clientExtraction !== null;
   assertUploadObjectName(
     userId,
     objectName,
@@ -510,7 +507,7 @@ async function completeUpload(userId: string, payload: JsonMap) {
   const storage = getObjectStorageConfig();
 
   const objectMetadata = await getObjectMetadata({
-    storage,
+    storage: storage,
     bucket: storage.bucket,
     objectName,
   });
@@ -522,7 +519,11 @@ async function completeUpload(userId: string, payload: JsonMap) {
     metadata: objectMetadata,
   });
 
-  const existingRow = await selectDriveFileByStorageObject(userId, objectName);
+  const [existingRow] = await dbSelect(
+    `drive_files?owner_user_id=eq.${userId}&storage_object_name=eq.${
+      encodeRestValue(objectName)
+    }&select=*&limit=1`,
+  );
   if (existingRow) {
     return {
       row: existingRow,
@@ -534,30 +535,9 @@ async function completeUpload(userId: string, payload: JsonMap) {
     };
   }
 
-  const completedAt = new Date().toISOString();
-  const uploadMetadata = {
-    upload: {
-      contentType: objectMetadata.contentType || fileInfo.contentType,
-      completedAt,
-      storageProvider: "s3",
-    },
-    ...(shouldUseClientExtraction
-      ? {
-        sourceText: clientExtraction.text,
-        extraction: {
-          source: "client",
-          text: clientExtraction.text,
-          textLength: clientExtraction.text.length,
-          charCount: clientExtraction.charCount,
-          wordCount: clientExtraction.wordCount,
-          pageCount: clientExtraction.pageCount ?? null,
-          extractedAt: clientExtraction.extractedAt,
-        },
-      }
-      : {}),
-  };
+  const hasClientExtraction = extractedText && extractedText.length > 0;
 
-  const [row] = await insertDriveFile([{
+  const [row] = await dbInsert("drive_files", [{
     owner_user_id: userId,
     course_id: courseId,
     section_id: sectionId,
@@ -568,54 +548,56 @@ async function completeUpload(userId: string, payload: JsonMap) {
     storage_object_name: objectName,
     mime_type: fileInfo.contentType,
     size_bytes: objectMetadata.contentLength,
-    page_count: shouldUseClientExtraction
-      ? clientExtraction.pageCount ?? null
-      : null,
-    status: "uploaded",
-    ai_status: shouldUseClientExtraction ? "ready" : "processing",
-    metadata: uploadMetadata,
+    page_count: pageCount,
+    status: hasClientExtraction ? "ready" : "uploaded",
+    ai_status: hasClientExtraction ? "ready" : "processing",
+    metadata: {
+      upload: {
+        contentType: objectMetadata.contentType || fileInfo.contentType,
+        completedAt: new Date().toISOString(),
+      },
+      ...(hasClientExtraction ? {
+        extractedText,
+        charCount: extractionMetadata?.charCount ?? extractedText!.length,
+        wordCount: extractionMetadata?.wordCount ?? extractedText!.split(/\s+/).length,
+        extractedAt: extractionMetadata?.extractedAt ?? new Date().toISOString(),
+        extractionSource: "client",
+      } : {}),
+    },
   }]);
   await audit(userId, "complete_upload", "drive_file", row.id, {
     courseId,
     sectionId,
     objectName,
-    storageProvider: "s3",
-    extractionSource: shouldUseClientExtraction ? "client" : "server",
+    clientExtraction: hasClientExtraction,
   });
 
-  if (shouldUseClientExtraction) {
-    return {
-      row,
-      objectName,
-      status: "ready",
-      nextAction: "generate",
-    };
-  }
-
-  try {
-    await processFileExtraction(userId, { fileId: row.id });
-  } catch (error) {
-    const metadata = isRecord(row.metadata) ? row.metadata : {};
-    const errorCode = error instanceof SafeError
-      ? error.code
-      : "FILE_PARSE_FAILED";
-    const errorMessage = error instanceof SafeError
-      ? error.message
-      : "Dosya metni çıkarılamadı.";
-    await dbPatch(
-      "drive_files",
-      `id=eq.${row.id}&owner_user_id=eq.${userId}`,
-      {
-        ai_status: "failed",
-        metadata: {
-          ...metadata,
-          extractionErrorCode: errorCode,
-          extractionError: errorMessage,
-          extractionFailedAt: new Date().toISOString(),
+  if (!hasClientExtraction) {
+    try {
+      await processFileExtraction(userId, { fileId: row.id });
+    } catch (error) {
+      const metadata = isRecord(row.metadata) ? row.metadata : {};
+      const errorCode = error instanceof SafeError
+        ? error.code
+        : "FILE_PARSE_FAILED";
+      const errorMessage = error instanceof SafeError
+        ? error.message
+        : "Dosya metni çıkarılamadı.";
+      await dbPatch(
+        "drive_files",
+        `id=eq.${row.id}&owner_user_id=eq.${userId}`,
+        {
+          ai_status: "failed",
+          metadata: {
+            ...metadata,
+            extractionErrorCode: errorCode,
+            extractionError: errorMessage,
+            extractionFailedAt: new Date().toISOString(),
+          },
         },
-      },
-    );
-    throw error;
+      );
+      throw error;
+    }
   }
 
   const [readyRow] = await dbSelect(
@@ -625,122 +607,9 @@ async function completeUpload(userId: string, payload: JsonMap) {
   return {
     row: readyRow ?? row,
     objectName,
-    status: "ready",
+    status: hasClientExtraction ? "ready" : "ready",
     nextAction: "generate",
   };
-}
-
-function clientExtractionFromPayload(payload: JsonMap) {
-  const text = optionalString(payload.extractedText);
-  if (!text) return null;
-
-  const metadata = isRecord(payload.extractionMetadata)
-    ? payload.extractionMetadata
-    : {};
-  const pageCount = optionalBoundedInteger(
-    payload.pageCount,
-    "pageCount",
-    1,
-    20_000,
-  );
-  const charCount = optionalBoundedInteger(
-    metadata.charCount,
-    "extractionMetadata.charCount",
-    1,
-    50_000_000,
-  ) ?? text.length;
-  const wordCount = optionalBoundedInteger(
-    metadata.wordCount,
-    "extractionMetadata.wordCount",
-    1,
-    10_000_000,
-  ) ?? text.split(/\s+/).filter((word) => word.length > 0).length;
-  const extractedAt = optionalString(metadata.extractedAt) ??
-    new Date().toISOString();
-
-  return {
-    text,
-    pageCount,
-    charCount,
-    wordCount,
-    extractedAt,
-  };
-}
-
-async function selectDriveFileByStorageObject(
-  userId: string,
-  objectName: string,
-) {
-  try {
-    const [row] = await dbSelect(
-      `drive_files?owner_user_id=eq.${userId}&storage_object_name=eq.${
-        encodeRestValue(objectName)
-      }&select=*&limit=1`,
-    );
-    return row ?? null;
-  } catch (error) {
-    if (!(error instanceof SafeError)) throw error;
-    const [row] = await dbSelect(
-      `drive_files?owner_user_id=eq.${userId}&${
-        legacyStorageKey("object_name")
-      }=eq.${encodeRestValue(objectName)}&select=*&limit=1`,
-    );
-    return row ?? null;
-  }
-}
-
-async function insertDriveFile(rows: JsonMap[]) {
-  try {
-    return await dbInsert("drive_files", rows);
-  } catch (error) {
-    if (!(error instanceof SafeError)) throw error;
-    return await dbInsert("drive_files", rows.map(legacyDriveFileStorageRow));
-  }
-}
-
-async function selectDriveFilesForStorageDelete(
-  userId: string,
-  fileIds: string[],
-) {
-  try {
-    return await dbSelect(
-      `drive_files?id=in.(${
-        fileIds.join(",")
-      })&owner_user_id=eq.${userId}&select=id,storage_bucket,storage_object_name`,
-    );
-  } catch (error) {
-    if (!(error instanceof SafeError)) throw error;
-    return await dbSelect(
-      `drive_files?id=in.(${
-        fileIds.join(",")
-      })&owner_user_id=eq.${userId}&select=id,${legacyStorageKey("bucket")},${
-        legacyStorageKey("object_name")
-      }`,
-    );
-  }
-}
-
-function legacyDriveFileStorageRow(row: JsonMap) {
-  const next = { ...row };
-  next[legacyStorageKey("bucket")] = next.storage_bucket;
-  next[legacyStorageKey("object_name")] = next.storage_object_name;
-  delete next.storage_bucket;
-  delete next.storage_object_name;
-  return next;
-}
-
-function storageBucket(row: JsonMap) {
-  return String(row.storage_bucket ?? row[legacyStorageKey("bucket")] ?? "");
-}
-
-function storageObjectName(row: JsonMap) {
-  return String(
-    row.storage_object_name ?? row[legacyStorageKey("object_name")] ?? "",
-  );
-}
-
-function legacyStorageKey(suffix: "bucket" | "object_name" | "prefix") {
-  return `${"g" + "cs"}_${suffix}`;
 }
 
 async function renameFile(userId: string, payload: JsonMap) {
@@ -784,14 +653,18 @@ async function moveFiles(userId: string, payload: JsonMap) {
 async function deleteFiles(userId: string, payload: JsonMap) {
   const fileIds = requireUuidList(payload.fileIds, "fileIds");
   await assertFilesOwned(userId, fileIds);
-  const rows = await selectDriveFilesForStorageDelete(userId, fileIds);
+  const rows = await dbSelect(
+    `drive_files?id=in.(${
+      fileIds.join(",")
+    })&owner_user_id=eq.${userId}&select=id,storage_bucket,storage_object_name`,
+  );
   const storage = safeGetStorageConfigForDelete();
   for (const row of rows) {
-    const objectName = storageObjectName(row);
-    const bucket = storageBucket(row) || storage?.bucket || "";
+    const objectName = String(row.storage_object_name ?? "");
+    const bucket = String(row.storage_bucket ?? "") || storage?.bucket || "";
     if (storage && objectName && bucket) {
       await deleteObject({
-        storage,
+        storage: storage,
         bucket,
         objectName,
       });
@@ -870,413 +743,13 @@ async function addToCollection(userId: string, payload: JsonMap) {
   return { fileIds, collectionPinnedAt: pinnedAt };
 }
 
-async function purchaseMedasiCoin(
-  user: { id: string; email?: string },
-  payload: JsonMap,
-) {
-  const productCode = requireString(
-    payload.product_code ?? payload.productCode,
-    "product_code",
+async function purchaseMedasiCoin(_userId: string, payload: JsonMap) {
+  requireString(payload.product_code, "product_code");
+  throw new SafeError(
+    "PAYMENT_UNAVAILABLE",
+    "Ödeme servisi şu anda kullanılamıyor. Kartından ücret alınmadı.",
+    503,
   );
-  const product = await loadMedasiCoinProduct(productCode);
-  const sharedProduct = await loadSharedMedasiCoinProduct(productCode);
-  const coinUnits = productCoinUnits(product);
-  if (coinUnits <= 0) {
-    throw new SafeError(
-      "PRODUCT_NOT_PURCHASABLE",
-      "Bu paket MC bakiyesi tanımlamıyor.",
-      400,
-    );
-  }
-  const priceCents = numericValue(product.price_cents) ?? 0;
-  if (priceCents <= 0) {
-    throw new SafeError(
-      "PRODUCT_PRICE_MISSING",
-      "Bu paket için canlı fiyat yapılandırılmamış.",
-      500,
-    );
-  }
-
-  const apiKey = optionalString(Deno.env.get("MEDASIPAY_API_KEY"));
-  if (!apiKey) {
-    throw new SafeError(
-      "PAYMENT_NOT_CONFIGURED",
-      "Ödeme servisi canlı yapılandırılmamış.",
-      503,
-    );
-  }
-
-  const email = user.email?.trim() ?? "";
-  if (!email) {
-    throw new SafeError(
-      "PAYMENT_EMAIL_REQUIRED",
-      "Ödeme takibi için hesap e-postası gerekli.",
-      400,
-    );
-  }
-
-  const snapshot = medasiCoinProductSnapshot(product, coinUnits);
-  const checkoutPayload = {
-    product: "sourcebase",
-    channel: paymentChannel(payload.channel),
-    accountId: user.id,
-    customerName: optionalString(payload.customerName) ?? email,
-    customerEmail: email,
-    returnUrl: paymentReturnUrl(payload.success_url ?? payload.successUrl),
-    webhookUrl: paymentWebhookUrl(),
-    currency: snapshot.currency,
-    items: [
-      {
-        sku: snapshot.code,
-        name: snapshot.title,
-        quantity: 1,
-        priceCents,
-        currency: snapshot.currency,
-        entitlementType: "one_time",
-        entitlementQuantity: snapshot.coin_amount,
-        unit: "Medasi Coin",
-        metadata: snapshot,
-      },
-    ],
-    metadata: {
-      source: "sourcebase",
-      app: "sourcebase",
-      userId: user.id,
-      userEmail: email,
-      product: snapshot,
-    },
-  };
-
-  const response = await fetch(
-    `${paymentServiceUrl()}/api/checkout-sessions`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-MedAsi-Api-Key": apiKey,
-      },
-      body: JSON.stringify(checkoutPayload),
-    },
-  );
-  const checkout = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const errorMessage = isRecord(checkout)
-      ? optionalString(checkout.error) ?? optionalString(checkout.message)
-      : undefined;
-    throw new SafeError(
-      "PAYMENT_CHECKOUT_FAILED",
-      errorMessage ?? "Ödeme oturumu oluşturulamadı.",
-      response.status,
-    );
-  }
-
-  const checkoutData = isRecord(checkout) ? checkout : {};
-  const checkoutUrl = optionalString(checkoutData.checkoutUrl) ??
-    optionalString(checkoutData.checkout_url) ??
-    optionalString(checkoutData.url);
-  return {
-    provider: "medasipay",
-    status: optionalString(checkoutData.status) ?? "pending",
-    url: checkoutUrl,
-    checkoutUrl,
-    checkout_url: checkoutUrl,
-    checkout,
-    product: snapshot,
-  };
-}
-
-async function handlePaymentEntitlementWebhook(
-  request: Request,
-  body: JsonMap,
-  rawBody: string,
-) {
-  const secret = optionalString(
-    Deno.env.get("SOURCEBASE_MEDASIPAY_WEBHOOK_SECRET") ??
-      Deno.env.get("MEDASIPAY_WEBHOOK_SECRET") ??
-      Deno.env.get("PAYMENT_WEBHOOK_SECRET"),
-  );
-  if (!secret) {
-    throw new SafeError(
-      "PAYMENT_WEBHOOK_NOT_CONFIGURED",
-      "Webhook imza anahtarı eksik.",
-      503,
-    );
-  }
-  const signature = request.headers.get("X-MedAsi-Signature") ?? "";
-  if (!(await verifyPaymentSignature(rawBody, signature, secret))) {
-    throw new SafeError(
-      "PAYMENT_SIGNATURE_INVALID",
-      "Webhook imzası geçersiz.",
-      401,
-    );
-  }
-  if (
-    optionalString(body.event) !== "payment.entitlement_granted" ||
-    optionalString(body.product)?.toLowerCase() !== "sourcebase"
-  ) {
-    throw new SafeError(
-      "PAYMENT_EVENT_UNSUPPORTED",
-      "Desteklenmeyen ödeme olayı.",
-      400,
-    );
-  }
-
-  const userId = requireUuid(body.accountId, "accountId");
-  const orderId = requireString(body.orderId, "orderId");
-  const reference = optionalString(body.reference);
-  const items = Array.isArray(body.items) ? body.items : [];
-  const firstItem = isRecord(items[0]) ? items[0] : {};
-  const productCode = requireString(
-    firstItem.sku ?? firstItem.code,
-    "product_code",
-  );
-  const product = await loadMedasiCoinProduct(productCode);
-  const sharedProduct = await loadSharedMedasiCoinProduct(productCode);
-  const coinUnits = productCoinUnits(product);
-  if (coinUnits <= 0) {
-    throw new SafeError(
-      "PRODUCT_NOT_PURCHASABLE",
-      "Bu paket MC bakiyesi tanımlamıyor.",
-      400,
-    );
-  }
-
-  const providerPaymentId = `medasipay:${orderId}`;
-  const existing = await dbSelect(
-    `purchases?provider=eq.manual&provider_payment_id=eq.${
-      encodeURIComponent(providerPaymentId)
-    }&select=id,status&limit=1`,
-  );
-  const beforeUnits = await sharedWalletBalanceUnits(userId);
-  await sharedRpc("grant_store_product", {
-    p_user_id: userId,
-    p_product_id: requireUuid(sharedProduct.id, "shared_product_id"),
-    p_provider: "manual",
-    p_provider_transaction_id: providerPaymentId,
-    p_status: "active",
-    p_raw_receipt: {
-      app_key: "sourcebase",
-      provider: "medasipay",
-      orderId,
-      reference,
-      payload: body,
-    },
-  });
-  const afterUnits = await sharedWalletBalanceUnits(userId);
-  if (existing.some((row) => row.status === "completed")) {
-    return {
-      status: "ok",
-      alreadyProcessed: true,
-      orderId,
-      balance_after: afterUnits / 100,
-    };
-  }
-
-  const productId = requireUuid(product.id, "product_id");
-  const priceCents = numericValue(product.price_cents) ?? 0;
-  const currency = optionalString(product.currency) ?? "TRY";
-  if (existing.length > 0) {
-    await dbPatch(
-      "purchases",
-      `id=eq.${existing[0].id}`,
-      {
-        status: "completed",
-        updated_at: new Date().toISOString(),
-      },
-    );
-  } else {
-    await dbInsert("purchases", [{
-      user_id: userId,
-      product_id: productId,
-      provider: "manual",
-      provider_payment_id: providerPaymentId,
-      amount_cents: priceCents,
-      currency,
-      status: "completed",
-    }]);
-  }
-
-  await dbInsert("wallet_transactions", [{
-    user_id: userId,
-    job_id: null,
-    amount_mc: coinUnits / 100,
-    amount_units: coinUnits,
-    type: "purchase",
-    reason: `medasipay_purchase:${productCode}`,
-    balance_before: beforeUnits / 100,
-    balance_after: afterUnits / 100,
-    metadata: {
-      provider: "medasipay",
-      orderId,
-      reference,
-      product: medasiCoinProductSnapshot(product, coinUnits),
-      payload: body,
-    },
-  }]);
-
-  return {
-    status: "ok",
-    orderId,
-    productCode,
-    added_mc: coinUnits / 100,
-    balance_after: afterUnits / 100,
-  };
-}
-
-async function loadMedasiCoinProduct(productCode: string) {
-  const rows = await dbSelect(
-    `products?slug=eq.${
-      encodeURIComponent(productCode)
-    }&status=eq.published&select=*&limit=1`,
-  );
-  const product = rows[0];
-  if (!product) {
-    throw new SafeError(
-      "PRODUCT_NOT_FOUND",
-      "Seçilen MC paketi bulunamadı.",
-      404,
-    );
-  }
-  return product;
-}
-
-async function loadSharedMedasiCoinProduct(productCode: string) {
-  const rows = await sharedDbSelect(
-    `store_products?code=eq.${
-      encodeURIComponent(productCode)
-    }&is_active=eq.true&select=*&limit=1`,
-  );
-  const product = rows[0];
-  if (!product || productCoinUnits(product) <= 0) {
-    throw new SafeError(
-      "SHARED_PRODUCT_NOT_FOUND",
-      "Seçilen MC paketi ortak mağazada bulunamadı.",
-      404,
-    );
-  }
-  return product;
-}
-
-function medasiCoinProductSnapshot(product: JsonMap, coinUnits: number) {
-  const metadata = isRecord(product.metadata) ? product.metadata : {};
-  return {
-    id: optionalString(product.id),
-    code: optionalString(product.slug) ??
-      optionalString(metadata.code) ??
-      optionalString(product.code) ??
-      "",
-    title: optionalString(product.title) ??
-      optionalString(metadata.title) ??
-      `${coinUnits / 100} MC Paketi`,
-    description: optionalString(product.description) ??
-      optionalString(metadata.description) ??
-      `${coinUnits / 100} MC onaylı ödeme sonrası hesabına eklenir.`,
-    price_cents: numericValue(product.price_cents) ??
-      numericValue(metadata.price_cents) ??
-      0,
-    currency: (optionalString(product.currency) ??
-      optionalString(metadata.currency) ??
-      "TRY").toUpperCase(),
-    coin_amount: coinUnits / 100,
-    amount_units: coinUnits,
-    question_amount: 0,
-    entitlement_kind: "one_time",
-    duration_days: numericValue(metadata.duration_days) ?? 365,
-  };
-}
-
-function productCoinUnits(product: JsonMap) {
-  const metadata = isRecord(product.metadata) ? product.metadata : {};
-  const coinAmount = numericValue(product.coin_amount) ??
-    numericValue(product.coins) ??
-    numericValue(product.medasicoin_amount) ??
-    numericValue(metadata.coin_amount) ??
-    numericValue(metadata.coins) ??
-    numericValue(metadata.medasicoin_amount) ??
-    0;
-  return Math.max(0, Math.round(coinAmount * 100));
-}
-
-async function sharedWalletBalanceUnits(userId: string) {
-  const profile = await sharedRpc("sync_wallet_profile", {
-    p_user_id: userId,
-  });
-  return Math.round((numericValue(profile.wallet_balance) ?? 0) * 100);
-}
-
-function paymentChannel(value: unknown) {
-  const text = optionalString(value)?.toLowerCase();
-  if (text === "ios" || text === "android" || text === "web") return text;
-  return "web";
-}
-
-function paymentReturnUrl(value: unknown) {
-  return optionalString(Deno.env.get("SOURCEBASE_PAYMENT_RETURN_URL")) ??
-    optionalString(value) ??
-    getAllowedOrigin();
-}
-
-function paymentWebhookUrl() {
-  const configured = optionalString(
-    Deno.env.get("SOURCEBASE_PAYMENT_WEBHOOK_URL"),
-  );
-  if (configured) return configured;
-  const supabaseUrl = getSupabaseUrl();
-  if (!supabaseUrl) {
-    throw new SafeError(
-      "PAYMENT_WEBHOOK_NOT_CONFIGURED",
-      "Ödeme webhook adresi yapılandırılmamış.",
-      500,
-    );
-  }
-  return `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/sourcebase`;
-}
-
-function paymentServiceUrl() {
-  const value = optionalString(Deno.env.get("MEDASIPAY_API_URL")) ??
-    optionalString(Deno.env.get("MEDASI_PAYMENT_API_URL")) ??
-    "https://odeme.medasi.com.tr";
-  const url = new URL(value);
-  if (url.protocol !== "https:" && url.hostname !== "localhost") {
-    throw new SafeError(
-      "PAYMENT_URL_INVALID",
-      "Ödeme servisi HTTPS kullanmalı.",
-      500,
-    );
-  }
-  return url.toString().replace(/\/+$/, "");
-}
-
-async function verifyPaymentSignature(
-  rawBody: string,
-  signatureHeader: string,
-  secret: string,
-) {
-  const provided = optionalString(signatureHeader)?.replace(/^sha256=/i, "") ??
-    "";
-  if (!/^[0-9a-f]{64}$/i.test(provided)) return false;
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const signed = new Uint8Array(
-    await crypto.subtle.sign(
-      "HMAC",
-      key,
-      new TextEncoder().encode(rawBody),
-    ),
-  );
-  const expected = [...signed]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-  let difference = 0;
-  for (let index = 0; index < expected.length; index += 1) {
-    difference |= expected.charCodeAt(index) ^ provided.charCodeAt(index);
-  }
-  return difference === 0;
 }
 
 async function createGeneratedOutput(userId: string, payload: JsonMap) {
@@ -1348,6 +821,220 @@ async function createGeneratedOutput(userId: string, payload: JsonMap) {
     kind,
   });
   return { row };
+}
+
+async function sourcebaseQuestionSession(userId: string, payload: JsonMap) {
+  const outputId = requireUuid(payload.outputId, "outputId");
+  const output = await loadGeneratedOutput(userId, outputId);
+  const questions = extractQlinikCompatibleQuestions(output);
+  if (questions.length === 0) {
+    throw new SafeError(
+      "QUESTION_SET_NOT_COMPATIBLE",
+      "Bu materyalden çözülebilir 5 şıklı soru seti bulunamadı.",
+      400,
+    );
+  }
+
+  await persistCandidateQuestions(userId, output, questions);
+  await audit(
+    userId,
+    "sourcebase_question_session",
+    "generated_output",
+    outputId,
+    {
+      questionCount: questions.length,
+    },
+  );
+
+  return {
+    outputId,
+    questions: questions.map(publicQuestionPrompt),
+  };
+}
+
+async function submitSourcebaseQuestionAnswer(
+  userId: string,
+  payload: JsonMap,
+) {
+  const outputId = requireUuid(payload.outputId, "outputId");
+  const questionId = requireString(payload.questionId, "questionId");
+  const selectedIndex = boundedNumber(
+    payload.selectedIndex,
+    -1,
+    0,
+    4,
+    "selectedIndex",
+  );
+  const elapsedSeconds = optionalInteger(
+    payload.elapsedSeconds,
+    0,
+    24 * 60 * 60,
+  );
+  const output = await loadGeneratedOutput(userId, outputId);
+  const question = extractQlinikCompatibleQuestions(output)
+    .find((item) => item.id === questionId);
+  if (!question) {
+    throw new SafeError(
+      "QUESTION_NOT_FOUND",
+      "Soru bulunamadı veya bu oturuma ait değil.",
+      404,
+    );
+  }
+
+  const isCorrect = selectedIndex === question.correctIndex;
+  await audit(
+    userId,
+    "submit_sourcebase_question_answer",
+    "generated_output",
+    outputId,
+    {
+      questionId,
+      selectedIndex,
+      isCorrect,
+      elapsedSeconds,
+    },
+  );
+
+  return {
+    questionId,
+    selectedIndex,
+    isCorrect,
+    correctIndex: question.correctIndex,
+    explanation: question.explanation,
+    optionRationales: question.optionRationales,
+  };
+}
+
+async function getGeneratedAssetUrl(userId: string, payload: JsonMap) {
+  const assetPath = requireString(payload.assetPath, "assetPath");
+  const outputId = optionalUuid(payload.outputId, "outputId");
+  if (outputId) {
+    await loadGeneratedOutput(userId, outputId);
+  }
+  assertUserOwnedObjectName(userId, assetPath);
+  const storage = getObjectStorageConfig();
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+  const url = await createSignedReadUrl({
+    storage: storage,
+    objectName: assetPath,
+    expiresInSeconds: 3600,
+  });
+  return {
+    url,
+    assetUrl: url,
+    objectName: assetPath,
+    bucket: storage.bucket,
+    expiresAt: expiresAt.toISOString(),
+  };
+}
+
+async function createProfileAvatarUploadSession(
+  userId: string,
+  payload: JsonMap,
+) {
+  const fileName = requireString(payload.fileName, "fileName");
+  const contentType = requireString(payload.contentType, "contentType");
+  const sizeBytes = Number(payload.sizeBytes ?? 0);
+  const fileInfo = validateAvatarUpload(fileName, contentType, sizeBytes);
+
+  await ensureStorageRoots(userId);
+  const storage = getObjectStorageConfig();
+
+  const safeName = sanitizeFileName(fileInfo.fileName);
+  const avatarId = crypto.randomUUID();
+  const objectName =
+    `sourcebase/users/${userId}/profile/${avatarId}-${safeName}`;
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+  const uploadUrl = await createSignedPutUrl({
+    storage: storage,
+    objectName,
+    expiresInSeconds: 900,
+  });
+
+  return {
+    uploadUrl,
+    objectName,
+    bucket: storage.bucket,
+    expiresAt: expiresAt.toISOString(),
+    headers: { "Content-Type": fileInfo.contentType },
+    metadata: {
+      avatarId,
+      maxSizeBytes: MAX_AVATAR_UPLOAD_BYTES,
+    },
+  };
+}
+
+async function completeProfileAvatarUpload(userId: string, payload: JsonMap) {
+  const objectName = requireString(payload.objectName, "objectName");
+  assertProfileAvatarObjectName(userId, objectName);
+  const storage = getObjectStorageConfig();
+  const metadata = await getObjectMetadata({
+    storage: storage,
+    bucket: storage.bucket,
+    objectName,
+  });
+  assertAvatarObjectMetadata(metadata);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const avatarUrl = await createSignedReadUrl({
+    storage: storage,
+    objectName,
+    expiresInSeconds: 7 * 24 * 60 * 60,
+  });
+
+  await audit(
+    userId,
+    "complete_profile_avatar_upload",
+    "profile_avatar",
+    null,
+    {
+      objectName,
+      sizeBytes: metadata.contentLength,
+      contentType: metadata.contentType,
+    },
+  );
+
+  return {
+    avatarUrl,
+    avatar_url: avatarUrl,
+    objectName,
+    bucket: storage.bucket,
+    expiresAt: expiresAt.toISOString(),
+  };
+}
+
+async function submitSupportForm(userId: string, payload: JsonMap) {
+  const topic = validateDisplayText(
+    requireString(payload.topic, "topic"),
+    "Konu",
+    120,
+  );
+  const email = normalizeEmail(requireString(payload.email, "email"));
+  const message = validateLongText(
+    requireString(payload.message, "message"),
+    "Mesaj",
+    10,
+    4_000,
+  );
+
+  const [ticket] = await dbInsert("support_tickets", [{
+    owner_user_id: userId,
+    topic,
+    email,
+    message,
+    status: "open",
+    metadata: {
+      source: "sourcebase_ios",
+      submittedAt: new Date().toISOString(),
+    },
+  }]);
+  await audit(userId, "submit_support_form", "support_ticket", ticket.id, {
+    topic,
+  });
+
+  return {
+    ticketId: ticket.id,
+    status: ticket.status ?? "open",
+  };
 }
 
 async function findGeneratedOutputByJob(
@@ -1434,6 +1121,193 @@ async function findLatestCompletedJobForOutput(
     `generated_jobs?owner_user_id=eq.${userId}&source_file_id=eq.${fileId}&job_type=eq.${jobType}&status=eq.completed&select=*&order=updated_at.desc&limit=1`,
   );
   return rows[0] ?? null;
+}
+
+async function loadGeneratedOutput(userId: string, outputId: string) {
+  const rows = await dbSelect(
+    `generated_outputs?id=eq.${outputId}&owner_user_id=eq.${userId}&select=*&limit=1`,
+  );
+  const output = rows[0];
+  if (!output) {
+    throw new SafeError(
+      "OUTPUT_NOT_FOUND",
+      "Üretilen çalışma bulunamadı veya yetkin yok.",
+      404,
+    );
+  }
+  return output;
+}
+
+function extractQlinikCompatibleQuestions(
+  output: JsonMap,
+): CompatibleQuestion[] {
+  const rawQuestions = rawQuestionItems(output);
+  return rawQuestions.map((item, index) => normalizeQuestion(item, index))
+    .filter((item): item is CompatibleQuestion => item !== null);
+}
+
+function rawQuestionItems(output: JsonMap): unknown[] {
+  const metadata = isRecord(output.metadata) ? output.metadata : {};
+  const content = metadata.content;
+  if (Array.isArray(content)) return content;
+  if (isRecord(content)) {
+    for (const key of ["questions", "items"]) {
+      const value = content[key];
+      if (Array.isArray(value)) return value;
+    }
+  }
+  if (Array.isArray(metadata.questions)) return metadata.questions;
+  return [];
+}
+
+function normalizeQuestion(
+  value: unknown,
+  index: number,
+): CompatibleQuestion | null {
+  if (!isRecord(value)) return null;
+  const text = firstText(value, ["text", "question", "stem"]);
+  const options = stringList(value.options).slice(0, 5);
+  const correctIndex = numberField(value, [
+    "correctIndex",
+    "correct_index",
+    "answerIndex",
+    "answer_index",
+    "correctOptionIndex",
+  ]);
+  const explanation = firstText(value, [
+    "explanation",
+    "rationale",
+    "solution",
+  ]);
+  if (
+    !text || options.length !== 5 || correctIndex === undefined ||
+    correctIndex < 0 || correctIndex > 4 || !explanation
+  ) {
+    return null;
+  }
+  const tags = stringList(value.tags);
+  return {
+    id: firstText(value, ["id", "questionId", "question_id"]) ||
+      `question-${index}`,
+    subject: firstText(value, ["subject"]) || "Kullanıcı Kaynağı",
+    topic: firstText(value, ["topic"]) || "SourceBase",
+    difficulty: normalizeDifficulty(firstText(value, ["difficulty"])),
+    text,
+    options,
+    correctIndex,
+    explanation,
+    optionRationales: optionRationales(value),
+    tags,
+  };
+}
+
+function publicQuestionPrompt(question: CompatibleQuestion) {
+  return {
+    id: question.id,
+    subject: question.subject,
+    topic: question.topic,
+    difficulty: question.difficulty,
+    text: question.text,
+    options: question.options,
+    tags: question.tags,
+  };
+}
+
+async function persistCandidateQuestions(
+  userId: string,
+  output: JsonMap,
+  questions: CompatibleQuestion[],
+) {
+  const rawCount = rawQuestionItems(output).length;
+  const allCompatible = rawCount > 0 && rawCount === questions.length;
+  if (!allCompatible) {
+    await audit(
+      userId,
+      "candidate_questions_skipped",
+      "generated_output",
+      output.id,
+      {
+        rawCount,
+        compatibleCount: questions.length,
+        reason: "qlinik_schema_mismatch",
+      },
+    );
+    return;
+  }
+
+  const outputId = String(output.id ?? "");
+  const sourceFileId = String(output.source_file_id ?? "");
+  if (!isUuid(outputId) || !isUuid(sourceFileId)) return;
+
+  for (const question of questions) {
+    const existing = await dbSelect(
+      `candidate_questions?generated_output_id=eq.${outputId}&question_id=eq.${
+        encodeRestValue(question.id)
+      }&select=id&limit=1`,
+    );
+    if (existing.length > 0) continue;
+    await dbInsert("candidate_questions", [{
+      owner_user_id: userId,
+      source_file_id: sourceFileId,
+      generated_output_id: outputId,
+      question_id: question.id,
+      subject: question.subject,
+      topic: question.topic,
+      difficulty: question.difficulty,
+      question_text: question.text,
+      options: question.options,
+      correct_index: question.correctIndex,
+      explanation: question.explanation,
+      option_rationales: question.optionRationales,
+      tags: question.tags,
+      status: "pending_admin_review",
+      metadata: {
+        origin: "user_material",
+        savedAt: new Date().toISOString(),
+      },
+    }]);
+  }
+}
+
+function firstText(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key]?.toString().replace(/\s+/g, " ").trim() ?? "";
+    if (value) return value;
+  }
+  return "";
+}
+
+function numberField(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    const numberValue = typeof value === "number" ? value : Number(value);
+    if (Number.isInteger(numberValue)) return numberValue;
+  }
+  return undefined;
+}
+
+function optionRationales(record: Record<string, unknown>) {
+  const direct = stringList(
+    record.optionRationales ?? record.option_rationales,
+  );
+  if (direct.length > 0) return direct.slice(0, 5);
+  const rationales = record.rationales ?? record.optionExplanations ??
+    record.option_explanations;
+  if (Array.isArray(rationales)) return stringList(rationales).slice(0, 5);
+  if (!isRecord(rationales)) return [];
+  return ["A", "B", "C", "D", "E"]
+    .map((key, index) =>
+      firstText(rationales, [key, key.toLowerCase(), String(index)])
+    )
+    .filter((item) => item.length > 0);
+}
+
+function normalizeDifficulty(raw: string) {
+  const value = raw.toLowerCase();
+  if (["easy", "medium", "hard"].includes(value)) return value;
+  if (["kolay", "temel"].includes(value)) return "easy";
+  if (["zor", "ileri", "klinik"].includes(value)) return "hard";
+  return "medium";
 }
 
 async function dbSelect(path: string): Promise<JsonMap[]> {
@@ -1528,55 +1402,6 @@ async function supabaseRest(path: string, init: RequestInit) {
   return response;
 }
 
-async function sharedDbSelect(path: string): Promise<JsonMap[]> {
-  const response = await sharedSupabaseRest(path, { method: "GET" });
-  const data = await response.json();
-  return Array.isArray(data) ? data.filter(isRecord) : [];
-}
-
-async function sharedRpc(name: string, body: JsonMap): Promise<JsonMap> {
-  const response = await sharedSupabaseRest(`rpc/${name}`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-  const data: unknown = await response.json();
-  if (typeof data === "number" || typeof data === "string") {
-    return { wallet_balance: Number(data) };
-  }
-  return isRecord(data) ? data : {};
-}
-
-async function sharedSupabaseRest(path: string, init: RequestInit) {
-  const supabaseUrl = getSupabaseUrl();
-  const serviceKey = getSupabaseServiceRoleKey();
-  if (!supabaseUrl || !serviceKey) {
-    throw new SafeError(
-      "DATABASE_NOT_CONFIGURED",
-      "Ortak MedasiCoin veritabanı yapılandırılmamış.",
-      500,
-    );
-  }
-  const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
-    ...init,
-    headers: {
-      apikey: serviceKey,
-      authorization: `Bearer ${serviceKey}`,
-      "content-type": "application/json",
-      "accept-profile": "public",
-      "content-profile": "public",
-      ...(init.headers ?? {}),
-    },
-  });
-  if (!response.ok) {
-    throw new SafeError(
-      "DATABASE_ERROR",
-      "Ortak MedasiCoin verisi işlenemedi.",
-      500,
-    );
-  }
-  return response;
-}
-
 function success(data: unknown) {
   return json({ ok: true, data });
 }
@@ -1606,11 +1431,6 @@ function requireString(value: unknown, name: string) {
 function optionalString(value: unknown) {
   const text = value?.toString().trim() ?? "";
   return text.length === 0 ? undefined : text;
-}
-
-function numericValue(value: unknown) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : undefined;
 }
 
 function stringList(value: unknown) {
@@ -1696,20 +1516,39 @@ function boundedNumber(
   return numberValue;
 }
 
-function optionalBoundedInteger(
-  value: unknown,
-  name: string,
-  min: number,
-  max: number,
-) {
+function optionalInteger(value: unknown, min: number, max: number) {
   if (value === undefined || value === null || value === "") return undefined;
   const numberValue = Number(value);
   if (
     !Number.isInteger(numberValue) || numberValue < min || numberValue > max
   ) {
-    throw new SafeError("INVALID_PAYLOAD", `${name} geçersiz.`, 400);
+    throw new SafeError("INVALID_PAYLOAD", "Süre bilgisi geçersiz.", 400);
   }
   return numberValue;
+}
+
+function validateLongText(
+  text: string,
+  name: string,
+  minLength: number,
+  maxLength: number,
+) {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length < minLength) {
+    throw new SafeError("INVALID_PAYLOAD", `${name} çok kısa.`, 400);
+  }
+  if (normalized.length > maxLength) {
+    throw new SafeError("INVALID_PAYLOAD", `${name} çok uzun.`, 400);
+  }
+  return normalized;
+}
+
+function normalizeEmail(value: string) {
+  const email = value.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    throw new SafeError("INVALID_PAYLOAD", "E-posta adresi geçersiz.", 400);
+  }
+  return email;
 }
 
 function validateUploadFile(
@@ -1770,6 +1609,44 @@ function validateUploadFile(
   return { fileName, contentType, fileType: normalized.type };
 }
 
+function validateAvatarUpload(
+  rawFileName: string,
+  rawContentType: string,
+  sizeBytes: number,
+) {
+  const fileName = rawFileName.replace(/\s+/g, " ").trim();
+  const contentType = rawContentType.toLowerCase().split(";")[0].trim();
+  const allowed = new Set(["image/jpeg", "image/png", "image/webp"]);
+  if (
+    !fileName || fileName.length > 180 || /[\\/]/.test(fileName) ||
+    /[\x00-\x1F\x7F]/.test(fileName)
+  ) {
+    throw new SafeError(
+      "INVALID_FILE_NAME",
+      "Profil fotoğrafı adı geçersiz.",
+      400,
+    );
+  }
+  if (
+    !Number.isFinite(sizeBytes) || sizeBytes <= 0 ||
+    sizeBytes > MAX_AVATAR_UPLOAD_BYTES
+  ) {
+    throw new SafeError(
+      "INVALID_FILE_SIZE",
+      "Profil fotoğrafı en fazla 5 MB olabilir.",
+      400,
+    );
+  }
+  if (!allowed.has(contentType)) {
+    throw new SafeError(
+      "FILE_TYPE_UNSUPPORTED",
+      "Profil fotoğrafı JPEG, PNG veya WEBP olmalı.",
+      400,
+    );
+  }
+  return { fileName, contentType };
+}
+
 function isAllowedMimeForFileType(fileType: string, contentType: string) {
   const normalized = normalizeSourceFileType({
     fileName: `source.${fileType}`,
@@ -1778,6 +1655,63 @@ function isAllowedMimeForFileType(fileType: string, contentType: string) {
   return normalized.type === fileType ||
     normalized.extensionType === fileType && normalized.isGenericMime ||
     normalized.extensionType === fileType && normalized.mismatch;
+}
+
+function assertUserOwnedObjectName(userId: string, objectName: string) {
+  if (
+    !objectName.startsWith(`sourcebase/users/${userId}/`) ||
+    objectName.includes("..")
+  ) {
+    throw new SafeError("FORBIDDEN_OBJECT", "Dosya yolu yetkili değil.", 403);
+  }
+}
+
+function assertProfileAvatarObjectName(userId: string, objectName: string) {
+  const prefix = `sourcebase/users/${userId}/profile/`;
+  if (!objectName.startsWith(prefix)) {
+    throw new SafeError(
+      "FORBIDDEN_OBJECT",
+      "Profil fotoğrafı yolu yetkili değil.",
+      403,
+    );
+  }
+  const rest = objectName.slice(prefix.length);
+  const uuidLike =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const avatarId = rest.slice(0, 36);
+  const separator = rest.slice(36, 37);
+  const fileName = rest.slice(37);
+  if (
+    !uuidLike.test(avatarId) ||
+    separator !== "-" ||
+    !fileName ||
+    fileName.includes("..")
+  ) {
+    throw new SafeError(
+      "FORBIDDEN_OBJECT",
+      "Profil fotoğrafı yolu doğrulanamadı.",
+      403,
+    );
+  }
+}
+
+function assertAvatarObjectMetadata(metadata: StorageObjectMetadata) {
+  const allowed = new Set(["image/jpeg", "image/png", "image/webp"]);
+  const contentType = metadata.contentType.toLowerCase().split(";")[0].trim();
+  if (!allowed.has(contentType)) {
+    throw new SafeError(
+      "UPLOAD_INVALID",
+      "Profil fotoğrafı doğrulanamadı.",
+      400,
+    );
+  }
+  if (metadata.contentLength > MAX_AVATAR_UPLOAD_BYTES) {
+    throw new SafeError(
+      "INVALID_FILE_SIZE",
+      "Profil fotoğrafı en fazla 5 MB olabilir.",
+      400,
+    );
+  }
 }
 
 function assertCompletedUploadMatches(input: {
