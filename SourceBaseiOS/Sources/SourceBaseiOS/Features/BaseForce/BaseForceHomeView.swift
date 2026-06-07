@@ -14,12 +14,7 @@ struct BaseForceHomeView: View {
     }
 
     private var latestGenerations: [(file: DriveFile, output: GeneratedOutput)] {
-        workspaceStore.allFiles
-            .flatMap { file in
-                file.generated.prefix(1).map { output in (file: file, output: output) }
-            }
-            .prefix(3)
-            .map { $0 }
+        Array(workspaceStore.latestGeneratedPairs.prefix(3))
     }
 
     private var activeBaseForceJobs: Int {
@@ -35,25 +30,31 @@ struct BaseForceHomeView: View {
                     SBLoadingState(
                         icon: "bolt.fill",
                         title: "BaseForce yükleniyor",
-                        message: "Kaynaklar ve üretimler hazırlanıyor..."
+                        message: "Kaynaklar ve üretimler hazırlanıyor...",
+                        context: .baseForce
                     )
                 } else if let error = errorMessage {
                     SBErrorState(
                         title: "BaseForce yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
-                        onAction: { Task { await loadWorkspace() } }
+                        actionLabel: "Tekrar dene",
+                        onAction: { Task { await loadWorkspace() } },
+                        context: .baseForce
                     )
                 } else {
                     heroSection.sbEntrance(0)
-                    factoriesSection.sbEntrance(1)
+                    quickContinueSection.sbEntrance(1)
+                    momentumSection.sbEntrance(2)
+                    primaryFactoriesSection.sbEntrance(3)
+                    secondaryFactoriesSection.sbEntrance(4)
+                    recentGenerationsSection.sbEntrance(5)
                 }
             }
             .padding(SBSpacing.lg)
             .sbFloatingTabContentPadding()
             .sbReadableWidth(1180)
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .cool)
         .navigationTitle("BaseForce")
         .sbOpaqueNavBar()
         .task {
@@ -76,18 +77,29 @@ struct BaseForceHomeView: View {
     private var heroSection: some View {
         SBSignatureHero(
             eyebrow: "Çalışma setleri",
-            title: "Bugün nasıl çalışacaksın?",
-            message: readyFiles.isEmpty ? "Önce Drive'dan metni çıkarılmış bir kaynak seç." : "\(readyFiles.count) kaynak hazır. Ezber, test veya son tekrar seç.",
+            title: "Hazır kaynakla hemen başla",
+            message: readyFiles.isEmpty ? "Önce Drive'dan hazır bir kaynak seç." : "\(readyFiles.count) kaynak hazır. Önce kaynağını seç, sonra üretim türünü aç.",
             icon: "bolt.fill",
-            tint: SBColors.blue
+            tint: SBColors.blue,
+            mode: .action
         ) {
-            SBButton(
-                "Kaynak seç",
-                icon: "folder",
-                variant: .primary,
-                size: .medium,
-                action: { router.navigate(to: .sourcePicker) }
-            )
+            HStack(spacing: SBSpacing.sm) {
+                SBButton(
+                    "Kaynak seç",
+                    icon: "folder",
+                    variant: .primary,
+                    size: .medium,
+                    fullWidth: true,
+                    action: { openSourcePicker() }
+                )
+                SBButton(
+                    "Kuyruğu gör",
+                    icon: "clock",
+                    variant: .secondary,
+                    size: .medium,
+                    action: { router.navigate(to: .queue(surface: .baseForce)) }
+                )
+            }
         } footer: {
             SBMetricRibbon(items: [
                 .init(icon: "square.stack.3d.up", value: "\(readyFiles.count)", label: "hazır", tint: SBColors.green),
@@ -96,62 +108,108 @@ struct BaseForceHomeView: View {
         }
     }
 
-    // MARK: - Factories Section
+    private var quickContinueSection: some View {
+        Group {
+            if let entry = workspaceStore.quickContinueOutput {
+                SBQuickContinueSurface(
+                    eyebrow: "Kaldığın yer",
+                    title: entry.output.title,
+                    message: "Son ürettiğin çıktıya tek dokunuşla geri dön.",
+                    metadata: "\(entry.file.courseTitle) • \(entry.output.updatedLabel)",
+                    actionLabel: "Çıktıyı aç",
+                    icon: outputIcon(entry.output.kind),
+                    tint: outputColor(entry.output.kind)
+                ) {
+                    router.navigate(to: .studyOutput(outputId: entry.output.id))
+                }
+            } else if let file = workspaceStore.quickContinueReadyFile {
+                SBQuickContinueSurface(
+                    eyebrow: "Kaldığın yer",
+                    title: file.title,
+                    message: "Hazır kaynak seçili. Üretim modunu seçip hemen başlayabilirsin.",
+                    metadata: "\(file.courseTitle) • \(file.updatedLabel)",
+                    actionLabel: "Bu kaynakla üret",
+                    icon: "doc.text",
+                    tint: SBColors.cyan
+                ) {
+                    openSourcePicker(with: file)
+                }
+            }
+        }
+    }
 
-    private var factoriesSection: some View {
+    private var momentumSection: some View {
+        SBWorkspaceMomentumRibbon(
+            readyCount: readyFiles.count,
+            outputCount: workspaceStore.totalGeneratedOutputCount,
+            focusTitle: workspaceStore.momentumFocusTitle
+        )
+    }
+
+    private var primaryFactoriesSection: some View {
         VStack(alignment: .leading, spacing: SBSpacing.md) {
-            sectionHeader(title: "Araçlar", action: nil) {}
+            SBSectionHeader(title: "Hemen üret", action: readyFiles.isEmpty ? nil : "Kaynağı değiştir") {
+                openSourcePicker()
+            }
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 154), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
                 factoryTile(
                     icon: "rectangle.on.rectangle",
                     title: "Flashcard",
-                    subtitle: "Ezber ve aktif hatırlama",
+                    subtitle: "Hızlı tekrar kartları hazırla",
                     color: SBColors.blue
                 ) {
-                    router.navigate(to: .flashcardFactory)
+                    openFactory(.flashcardFactory)
                 }
 
                 factoryTile(
                     icon: "questionmark.circle",
                     title: "Soru",
-                    subtitle: "5 şıklı çözüm pratiği",
-                    color: SBColors.green
+                    subtitle: "Klinik soru pratiğine geç",
+                    color: SBColors.cyan
                 ) {
-                    router.navigate(to: .questionFactory)
+                    openFactory(.questionFactory)
                 }
 
                 factoryTile(
                     icon: "doc.text",
                     title: "Son tekrar",
-                    subtitle: "Komite öncesi hızlı tarama",
+                    subtitle: "Kısa ve net özet al",
                     color: SBColors.purple
                 ) {
-                    router.navigate(to: .summaryFactory)
+                    openFactory(.summaryFactory)
                 }
+            }
+        }
+    }
 
+    private var secondaryFactoriesSection: some View {
+        VStack(alignment: .leading, spacing: SBSpacing.md) {
+            SBSectionHeader(title: "Diğer araçlar")
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 154), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
                 factoryTile(
                     icon: "arrow.triangle.branch",
                     title: "Akış",
-                    subtitle: "Tanı, tedavi, algoritma",
+                    subtitle: "Karar akışını sadeleştir",
                     color: SBColors.orange
                 ) {
-                    router.navigate(to: .algorithmFactory)
+                    openFactory(.algorithmFactory)
                 }
 
                 factoryTile(
                     icon: "tablecells",
                     title: "Tablo",
-                    subtitle: "Benzer konuları ayır",
-                    color: SBColors.cyan
+                    subtitle: "Konuları yan yana kıyasla",
+                    color: SBColors.purple
                 ) {
-                    router.navigate(to: .comparisonFactory)
+                    openFactory(.comparisonFactory)
                 }
 
                 factoryTile(
                     icon: "clock",
                     title: "Kuyruk",
-                    subtitle: activeBaseForceJobs == 0 ? "Hazırlananları izle" : "\(activeBaseForceJobs) çıktı hazırlanıyor",
+                    subtitle: activeBaseForceJobs == 0 ? "Hazırlananları takip et" : "\(activeBaseForceJobs) çıktı hazırlanıyor",
                     color: SBColors.blue
                 ) {
                     router.navigate(to: .queue(surface: .baseForce))
@@ -173,7 +231,7 @@ struct BaseForceHomeView: View {
                     SBIconTile(icon: icon, tint: color, size: 42, radius: 12)
                     Spacer()
                     Image(systemName: "chevron.right")
-                        .sbScaledFont(size: 13, weight: .bold)
+                        .sbScaledFont(size: 13, weight: .semibold)
                         .foregroundStyle(SBColors.softText)
                         .accessibilityHidden(true)
                 }
@@ -197,50 +255,11 @@ struct BaseForceHomeView: View {
         .accessibilityHint("Aracı aç")
     }
 
-    // MARK: - Recent Sources Section
-
-    private var recentSourcesSection: some View {
-        VStack(alignment: .leading, spacing: SBSpacing.md) {
-            sectionHeader(title: "Son Kaynaklar", action: "Tümünü Gör") {
-                router.navigate(to: .sourcePicker)
-            }
-
-            SBCard(padding: 0, radius: 16) {
-                if readyFiles.isEmpty {
-                    SBEmptyState(
-                        icon: "folder.badge.plus",
-                        title: "Henüz üretime hazır kaynak yok",
-                        message: "BaseForce çıktısı üretmek için önce Drive'a metin içeren PDF, PPTX, DOCX, PPT veya DOC yükle.",
-                        badges: ["PDF", "PPTX", "Hazır kaynak"],
-                        actionLabel: "Kaynak seç",
-                        onAction: { router.navigate(to: .sourcePicker) }
-                    )
-                } else {
-                    VStack(spacing: SBSpacing.md) {
-                        ForEach(Array(readyFiles.prefix(3)), id: \.id) { file in
-                            SBFileCard(
-                                title: file.title,
-                                kind: SBFileKind.from(file.kind),
-                                status: SBStatus.from(file.status),
-                                sizeLabel: file.sizeLabel,
-                                courseTitle: file.courseTitle,
-                                updatedLabel: file.updatedLabel
-                            ) {
-                                router.navigate(to: .sourcePicker)
-                            }
-                        }
-                    }
-                    .padding(SBSpacing.md)
-                }
-            }
-        }
-    }
-
     // MARK: - Recent Generations Section
 
     private var recentGenerationsSection: some View {
         VStack(alignment: .leading, spacing: SBSpacing.md) {
-            sectionHeader(title: "Son Üretimler", action: "Tümünü Gör") {
+            SBSectionHeader(title: "Son üretimler", action: "Tümünü gör") {
                 router.navigate(to: .queue(surface: .baseForce))
             }
 
@@ -251,7 +270,8 @@ struct BaseForceHomeView: View {
                     message: "Bir kaynak seçip üretim modlarından birini başlattığında sonuçların burada görünür.",
                     badges: ["Flashcard", "Soru", "Özet"],
                     actionLabel: "Üretime başla",
-                    onAction: { router.navigate(to: .sourcePicker) }
+                    onAction: { openSourcePicker() },
+                    context: .baseForce
                 )
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: SBSpacing.md)], spacing: SBSpacing.md) {
@@ -305,7 +325,7 @@ struct BaseForceHomeView: View {
 
                 HStack(spacing: SBSpacing.sm) {
                     SBButton(
-                        "Detayı aç",
+                        "Çıktıyı aç",
                         icon: "arrow.up.right.square",
                         variant: .primary,
                         size: .small,
@@ -326,30 +346,6 @@ struct BaseForceHomeView: View {
                             }
                         }
                     )
-                }
-            }
-        }
-    }
-
-    // MARK: - Section Header
-
-    private func sectionHeader(title: String, action: String?, onAction: @escaping () -> Void) -> some View {
-        HStack {
-            Text(title)
-                .font(SBTypography.titleMedium)
-                .foregroundStyle(SBColors.navy)
-
-            Spacer()
-
-            if let action {
-                Button(action: onAction) {
-                    HStack(spacing: 4) {
-                        Text(action)
-                            .font(SBTypography.labelSmall)
-                        Image(systemName: "chevron.right")
-                            .sbScaledFont(size: 12, weight: .semibold)
-                    }
-                    .foregroundStyle(SBColors.blue)
                 }
             }
         }
@@ -377,14 +373,12 @@ struct BaseForceHomeView: View {
         switch kind {
         case .flashcard: return SBColors.blue
         case .question: return SBColors.questionTint
-        case .summary, .examMorningSummary: return SBColors.purple
+        case .summary, .examMorningSummary, .comparison, .table, .mindMap: return SBColors.purple
         case .algorithm: return SBColors.orange
-        case .comparison, .table: return SBColors.blue
         case .clinicalScenario: return SBColors.orange
         case .learningPlan: return SBColors.green
         case .podcast: return SBColors.red
         case .infographic: return SBColors.cyan
-        case .mindMap: return SBColors.purple
         }
     }
 
@@ -401,6 +395,24 @@ struct BaseForceHomeView: View {
         case .podcast: return "Podcast"
         case .infographic: return "İnfografik"
         case .mindMap: return "Zihin Haritası"
+        }
+    }
+
+    private func openSourcePicker(with file: DriveFile) {
+        workspaceStore.setSelectedSources([file.id])
+        workspaceStore.selectFile(file)
+        router.beginSourceSelection(from: .baseForce, destination: .baseForceHome)
+    }
+
+    private func openSourcePicker() {
+        router.beginSourceSelection(from: .baseForce, destination: .baseForceHome)
+    }
+
+    private func openFactory(_ route: AppRoute) {
+        if workspaceStore.selectedReadyFiles.isEmpty {
+            router.beginSourceSelection(from: .baseForce, destination: .route(route))
+        } else {
+            router.navigate(to: route)
         }
     }
 

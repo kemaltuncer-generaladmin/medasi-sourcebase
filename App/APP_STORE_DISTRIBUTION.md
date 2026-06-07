@@ -9,7 +9,7 @@ Run these before upload:
 ```sh
 swift test --package-path SourceBaseBackend
 swift test --package-path SourceBaseiOS
-xcodebuild -project App/SourceBase.xcodeproj -scheme SourceBase -configuration Release -destination 'generic/platform=iOS' archive -archivePath App/build/SourceBase-1.0.0-45.xcarchive
+xcodebuild -project App/SourceBase.xcodeproj -scheme SourceBase -configuration Release -destination 'generic/platform=iOS' archive -archivePath App/build/SourceBase-1.0.0-49.xcarchive
 ```
 
 ## Export / Upload
@@ -22,7 +22,7 @@ The export options are configured for App Store Connect upload, automatic signin
 
 - Bundle ID: `tr.com.medasi.sourcebase`
 - Version: `1.0.0`
-- Build: `45`
+- Build: `49`
 - Privacy manifest: `App/SourceBase/PrivacyInfo.xcprivacy`
 - Entitlements: `App/SourceBase/SourceBase.entitlements`
 - Encryption declaration: `ITSAppUsesNonExemptEncryption = false`

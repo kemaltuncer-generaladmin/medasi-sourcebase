@@ -72,7 +72,7 @@ struct ComparisonFactoryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SBSpacing.lg) {
+            VStack(alignment: .leading, spacing: BaseForceFactoryStyle.screenSpacing) {
                 if isLoading {
                     SBLoadingState(
                         icon: "tablecells",
@@ -83,7 +83,7 @@ struct ComparisonFactoryView: View {
                     SBErrorState(
                         title: "Yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await loadWorkspace() } }
                     )
                 } else {
@@ -97,11 +97,11 @@ struct ComparisonFactoryView: View {
                     }
                 }
             }
-            .padding(SBSpacing.lg)
+            .padding(BaseForceFactoryStyle.pagePadding)
             .sbFloatingTabContentPadding()
             .sbReadableWidth(760)
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .cool)
         .navigationTitle("Karşılaştırma Tablosu")
         .task {
             await loadWorkspace()
@@ -116,7 +116,8 @@ struct ComparisonFactoryView: View {
             title: "Neyi ayıralım?",
             message: "Benzer kavramları kısa tabloya çevir.",
             icon: "tablecells.fill",
-            tint: SBColors.cyan
+            tint: SBColors.cyan,
+            size: .compact
         ) {
             EmptyView()
         } footer: {
@@ -131,92 +132,83 @@ struct ComparisonFactoryView: View {
     // MARK: - Sources Panel
 
     private var sourcesPanel: some View {
-        SBCard(radius: 16) {
-            VStack(alignment: .leading, spacing: SBSpacing.md) {
-                HStack(spacing: SBSpacing.md) {
-                    ZStack {
-                        Circle()
-                            .fill(SBColors.selectedBlue)
-                            .frame(width: 40, height: 40)
+        BaseForceFactoryStyle.panel {
+            HStack(spacing: SBSpacing.md) {
+                SBIconTile(
+                    icon: "doc.text.magnifyingglass",
+                    tint: SBColors.blue,
+                    size: BaseForceFactoryStyle.iconTileSize,
+                    radius: BaseForceFactoryStyle.iconTileRadius
+                )
 
-                        Image(systemName: "doc.text.magnifyingglass")
-                            .sbScaledFont(size: 18)
-                            .foregroundStyle(SBColors.blue)
-                    }
-
-                    Text("Kaynak (\(selectedFiles.count))")
-                        .font(SBTypography.titleSmall)
-                        .foregroundStyle(SBColors.navy)
-                }
-
-                if selectedFiles.isEmpty {
-                    sourceRequiredCard
-                } else {
-                    ForEach(selectedFiles, id: \.id) { file in
-                        sourceLine(file: file)
-                    }
-                }
-
-                ForEach(blockedFiles, id: \.id) { file in
-                    blockedNotice(file: file)
-                }
-
-                addSourceButton
+                Text("Kaynak (\(selectedFiles.count))")
+                    .font(SBTypography.titleSmall)
+                    .foregroundStyle(SBColors.navy)
             }
+
+            if selectedFiles.isEmpty {
+                sourceRequiredCard
+            } else {
+                ForEach(selectedFiles, id: \.id) { file in
+                    sourceLine(file: file)
+                }
+            }
+
+            ForEach(blockedFiles, id: \.id) { file in
+                blockedNotice(file: file)
+            }
+
+            addSourceButton
         }
     }
 
     private var sourceRequiredCard: some View {
-        SBCard(radius: 14, borderColor: SBColors.blue.opacity(0.2)) {
-            VStack(alignment: .leading, spacing: SBSpacing.md) {
-                HStack(spacing: SBSpacing.md) {
-                    ZStack {
-                        Circle()
-                            .fill(SBColors.selectedBlue)
-                            .frame(width: 40, height: 40)
+        BaseForceFactoryStyle.sourceRequiredPanel {
+            HStack(spacing: SBSpacing.md) {
+                SBIconTile(
+                    icon: "doc.text.magnifyingglass",
+                    tint: SBColors.blue,
+                    size: BaseForceFactoryStyle.iconTileSize,
+                    radius: BaseForceFactoryStyle.iconTileRadius
+                )
 
-                        Image(systemName: "doc.text.magnifyingglass")
-                            .sbScaledFont(size: 18)
-                            .foregroundStyle(SBColors.blue)
-                    }
+                Text("Önce bir kaynak seç")
+                    .font(SBTypography.titleSmall)
+                    .foregroundStyle(SBColors.navy)
+            }
 
-                    Text("Önce bir kaynak seç")
-                        .font(SBTypography.titleSmall)
-                        .foregroundStyle(SBColors.navy)
-                }
+            Text("Hazır bir kaynak seç.")
+                .font(SBTypography.bodySmall)
+                .foregroundStyle(SBColors.muted)
 
-                Text("Hazır bir kaynak seç.")
-                    .font(SBTypography.bodySmall)
-                    .foregroundStyle(SBColors.muted)
-
-                FlowLayout(spacing: SBSpacing.xs) {
-                    tagChip(label: "Hazır kaynak", color: SBColors.blue)
-                    tagChip(label: "PDF / PPT(X) / DOC(X)", color: SBColors.purple)
-                }
+            FlowLayout(spacing: SBSpacing.xs) {
+                tagChip(label: "Hazır kaynak", color: SBColors.blue)
+                tagChip(label: "PDF / PPT(X) / DOC(X)", color: SBColors.purple)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Önce karşılaştırılacak hazır kaynakları seç. Alttaki kaynak seç düğmesini kullan.")
     }
 
     private func sourceLine(file: DriveFile) -> some View {
-        HStack(spacing: SBSpacing.md) {
-            SBFileKindBadge(kind: SBFileKind.from(file.kind), compact: true)
+        BaseForceFactoryStyle.nestedPanel {
+            HStack(spacing: SBSpacing.md) {
+                SBFileKindBadge(kind: SBFileKind.from(file.kind), compact: true)
 
-            VStack(alignment: .leading, spacing: SBSpacing.xs) {
-                Text(file.title)
-                    .font(SBTypography.labelSmall)
-                    .foregroundStyle(SBColors.navy)
-                    .lineLimit(2)
+                VStack(alignment: .leading, spacing: SBSpacing.xs) {
+                    Text(file.title)
+                        .font(SBTypography.labelSmall)
+                        .foregroundStyle(SBColors.navy)
+                        .lineLimit(2)
 
-                Text("\(file.sizeLabel) • Hazır")
-                    .font(SBTypography.caption)
-                    .foregroundStyle(SBColors.muted)
+                    Text("\(file.sizeLabel) • Hazır")
+                        .font(SBTypography.caption)
+                        .foregroundStyle(SBColors.muted)
+                }
+
+                Spacer()
             }
-
-            Spacer()
         }
-        .padding(SBSpacing.sm)
-        .background(SBColors.field.opacity(0.82))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private func blockedNotice(file: DriveFile) -> some View {
@@ -233,23 +225,20 @@ struct ComparisonFactoryView: View {
         .padding(SBSpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SBColors.warningBg)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: BaseForceFactoryStyle.controlRadius))
     }
 
     private var addSourceButton: some View {
-        Button {
-            router.navigate(to: .sourcePicker)
-        } label: {
+        SBCommandCard(tint: SBColors.blue, action: {
+            openSourcePicker()
+        }) {
             HStack(spacing: SBSpacing.md) {
-                ZStack {
-                    Circle()
-                        .fill(SBColors.selectedBlue)
-                        .frame(width: 44, height: 44)
-
-                    Image(systemName: "plus")
-                        .sbScaledFont(size: 20, weight: .semibold)
-                        .foregroundStyle(SBColors.blue)
-                }
+                SBIconTile(
+                    icon: "plus",
+                    tint: SBColors.blue,
+                    size: BaseForceFactoryStyle.addIconTileSize,
+                    radius: BaseForceFactoryStyle.addIconTileRadius
+                )
 
                 VStack(alignment: .leading, spacing: SBSpacing.xs) {
                     Text("Hazır kaynak ekle")
@@ -263,7 +252,6 @@ struct ComparisonFactoryView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(PressableCardStyle())
     }
 
     private func tagChip(label: String, color: Color) -> some View {
@@ -279,32 +267,27 @@ struct ComparisonFactoryView: View {
     // MARK: - Comparison Type Panel
 
     private var comparisonTypePanel: some View {
-        SBCard(radius: 16) {
-            VStack(alignment: .leading, spacing: SBSpacing.md) {
-                HStack(spacing: SBSpacing.md) {
-                    ZStack {
-                        Circle()
-                            .fill(SBColors.selectedBlue)
-                            .frame(width: 40, height: 40)
+        BaseForceFactoryStyle.panel {
+            HStack(spacing: SBSpacing.md) {
+                SBIconTile(
+                    icon: "arrow.left.arrow.right",
+                    tint: SBColors.blue,
+                    size: BaseForceFactoryStyle.iconTileSize,
+                    radius: BaseForceFactoryStyle.iconTileRadius
+                )
 
-                        Image(systemName: "arrow.left.arrow.right")
-                            .sbScaledFont(size: 18)
-                            .foregroundStyle(SBColors.blue)
-                    }
+                Text("Tip")
+                    .font(SBTypography.titleSmall)
+                    .foregroundStyle(SBColors.navy)
+            }
 
-                    Text("Tip")
-                        .font(SBTypography.titleSmall)
-                        .foregroundStyle(SBColors.navy)
-                }
-
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
-                    ForEach(ComparisonType.allCases, id: \.self) { type in
-                        segmentButton(
-                            label: type.rawValue,
-                            isSelected: comparisonType == type
-                        ) {
-                            comparisonType = type
-                        }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
+                ForEach(ComparisonType.allCases, id: \.self) { type in
+                    segmentButton(
+                        label: type.rawValue,
+                        isSelected: comparisonType == type
+                    ) {
+                        comparisonType = type
                     }
                 }
             }
@@ -314,58 +297,56 @@ struct ComparisonFactoryView: View {
     // MARK: - Table Settings Panel
 
     private var tableSettingsPanel: some View {
-        SBCard(radius: 16) {
-            VStack(alignment: .leading, spacing: SBSpacing.lg) {
-                // Table Format
-                VStack(alignment: .leading, spacing: SBSpacing.sm) {
-                    Text("Format")
-                        .font(SBTypography.labelSmall)
-                        .foregroundStyle(SBColors.navy)
+        BaseForceFactoryStyle.panel(spacing: BaseForceFactoryStyle.settingsSpacing) {
+            // Table Format
+            VStack(alignment: .leading, spacing: SBSpacing.sm) {
+                Text("Format")
+                    .font(SBTypography.labelSmall)
+                    .foregroundStyle(SBColors.navy)
 
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
-                        ForEach(TableFormat.allCases, id: \.self) { format in
-                            segmentButton(
-                                label: format.rawValue,
-                                isSelected: tableFormat == format
-                            ) {
-                                tableFormat = format
-                            }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
+                    ForEach(TableFormat.allCases, id: \.self) { format in
+                        segmentButton(
+                            label: format.rawValue,
+                            isSelected: tableFormat == format
+                        ) {
+                            tableFormat = format
                         }
                     }
                 }
+            }
 
-                // Detail Level
-                VStack(alignment: .leading, spacing: SBSpacing.sm) {
-                    Text("Detay")
-                        .font(SBTypography.labelSmall)
-                        .foregroundStyle(SBColors.navy)
+            // Detail Level
+            VStack(alignment: .leading, spacing: SBSpacing.sm) {
+                Text("Detay")
+                    .font(SBTypography.labelSmall)
+                    .foregroundStyle(SBColors.navy)
 
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
-                        ForEach(DetailLevel.allCases, id: \.self) { level in
-                            segmentButton(
-                                label: level.rawValue,
-                                isSelected: detailLevel == level
-                            ) {
-                                detailLevel = level
-                            }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
+                    ForEach(DetailLevel.allCases, id: \.self) { level in
+                        segmentButton(
+                            label: level.rawValue,
+                            isSelected: detailLevel == level
+                        ) {
+                            detailLevel = level
                         }
                     }
                 }
+            }
 
-                // Quality Tier
-                VStack(alignment: .leading, spacing: SBSpacing.sm) {
-                    Text("Kalite")
-                        .font(SBTypography.labelSmall)
-                        .foregroundStyle(SBColors.navy)
+            // Quality Tier
+            VStack(alignment: .leading, spacing: SBSpacing.sm) {
+                Text("Kalite")
+                    .font(SBTypography.labelSmall)
+                    .foregroundStyle(SBColors.navy)
 
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
-                        ForEach(QualityTier.allCases, id: \.self) { tier in
-                            segmentButton(
-                                label: tier.rawValue,
-                                isSelected: qualityTier == tier
-                            ) {
-                                qualityTier = tier
-                            }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
+                    ForEach(QualityTier.allCases, id: \.self) { tier in
+                        segmentButton(
+                            label: tier.rawValue,
+                            isSelected: qualityTier == tier
+                        ) {
+                            qualityTier = tier
                         }
                     }
                 }
@@ -383,9 +364,9 @@ struct ComparisonFactoryView: View {
                 .padding(.vertical, SBSpacing.md)
                 .padding(.horizontal, SBSpacing.sm)
                 .background(isSelected ? SBColors.blue : SBColors.white)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .clipShape(RoundedRectangle(cornerRadius: BaseForceFactoryStyle.controlRadius))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: BaseForceFactoryStyle.controlRadius)
                         .stroke(isSelected ? SBColors.blue : SBColors.softLine, lineWidth: 1)
                 )
         }
@@ -397,28 +378,30 @@ struct ComparisonFactoryView: View {
 
     private var generateButton: some View {
         SBButton(
-            canGenerate ? "Tabloyu hazırla • \(costLabel)" : "Kaynak seç",
-            icon: canGenerate ? "tablecells" : "folder",
+            "Tabloyu hazırla • \(costLabel)",
+            icon: "tablecells",
             variant: .primary,
             size: .large,
             isLoading: isGenerating,
+            isDisabled: !canGenerate,
             fullWidth: true,
-            action: {
-                if canGenerate {
-                    generate()
-                } else {
-                    router.navigate(to: .sourcePicker)
-                }
-            }
+            action: generate
         )
-        .accessibilityLabel(canGenerate ? "Karşılaştırma tablosu oluştur" : "Kaynak seç")
-        .accessibilityHint(canGenerate ? "Seçili hazır kaynakla tablo üretimini başlatır" : "Kaynak seçme ekranını açar")
+        .accessibilityLabel("Karşılaştırma tablosu oluştur")
+        .accessibilityHint(canGenerate ? "Seçili hazır kaynakla tablo üretimini başlatır" : "Önce hazır kaynak seçmelisin")
     }
 
     // MARK: - Source Required Notice
 
     private var sourceRequiredNotice: some View {
-        sourceRequiredCard
+        SBButton(
+            "Karşılaştırılacak kaynakları seç",
+            icon: "folder",
+            variant: .secondary,
+            size: .medium,
+            fullWidth: true,
+            action: openSourcePicker
+        )
     }
 
     // MARK: - Helpers
@@ -481,6 +464,9 @@ struct ComparisonFactoryView: View {
         await workspaceStore.loadWorkspace()
         errorMessage = workspaceStore.errorMessage
         isLoading = false
+    }
+    private func openSourcePicker() {
+        router.beginSourceSelection(from: .baseForce, destination: .route(.comparisonFactory))
     }
 }
 

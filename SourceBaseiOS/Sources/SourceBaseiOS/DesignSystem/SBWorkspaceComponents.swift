@@ -85,22 +85,22 @@ public struct SBTopBar: View {
 
             HStack(spacing: SBSpacing.xs) {
                 if let onSearch {
-                    topButton(icon: "magnifyingglass", action: onSearch)
+                    topButton(icon: "magnifyingglass", label: "Ara", action: onSearch)
                 }
                 if let onNotifications {
-                    topButton(icon: "bell", action: onNotifications)
+                    topButton(icon: "bell", label: "Bildirimler", action: onNotifications)
                 }
             }
         }
         .accessibilityElement(children: .contain)
     }
 
-    private func topButton(icon: String, action: @escaping () -> Void) -> some View {
+    private func topButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
                 .sbScaledFont(size: 18, weight: .semibold)
                 .foregroundStyle(SBColors.navy)
-                .frame(width: 40, height: 40)
+                .frame(width: 44, height: 44)
                 .background(SBColors.white)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(
@@ -109,6 +109,7 @@ public struct SBTopBar: View {
                 )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 }
 
@@ -213,7 +214,7 @@ public struct SBActionTile: View {
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .sbScaledFont(size: 13, weight: .bold)
+                    .sbScaledFont(size: 13, weight: .semibold)
                     .foregroundStyle(SBColors.softText)
             }
         }
@@ -362,7 +363,113 @@ public struct SBGenerationCard: View {
         case .summary, .examMorningSummary, .mindMap: return SBColors.purple
         case .algorithm, .podcast, .clinicalScenario: return SBColors.orange
         case .learningPlan: return SBColors.green
-        case .comparison, .table: return SBColors.green
+        case .comparison, .table: return SBColors.purple
+        }
+    }
+}
+
+public struct SBQuickContinueSurface: View {
+    let eyebrow: String
+    let title: String
+    let message: String
+    let metadata: String
+    let actionLabel: String
+    let icon: String
+    let tint: Color
+    let action: () -> Void
+
+    public init(
+        eyebrow: String,
+        title: String,
+        message: String,
+        metadata: String,
+        actionLabel: String,
+        icon: String,
+        tint: Color = SBColors.blue,
+        action: @escaping () -> Void
+    ) {
+        self.eyebrow = eyebrow
+        self.title = title
+        self.message = message
+        self.metadata = metadata
+        self.actionLabel = actionLabel
+        self.icon = icon
+        self.tint = tint
+        self.action = action
+    }
+
+    public var body: some View {
+        SBCommandCard(tint: tint, action: action) {
+            VStack(alignment: .leading, spacing: SBSpacing.md) {
+                HStack(alignment: .top, spacing: SBSpacing.md) {
+                    SBIconTile(icon: icon, tint: tint, size: 46, radius: 14)
+
+                    VStack(alignment: .leading, spacing: SBSpacing.xs) {
+                        Text(eyebrow)
+                            .font(SBTypography.labelSmall)
+                            .foregroundStyle(tint)
+                            .textCase(.uppercase)
+
+                        Text(title)
+                            .font(SBTypography.titleSmall)
+                            .foregroundStyle(SBColors.navy)
+                            .lineLimit(2)
+
+                        Text(message)
+                            .font(SBTypography.bodySmall)
+                            .foregroundStyle(SBColors.muted)
+                            .lineLimit(2)
+                    }
+
+                    Spacer(minLength: SBSpacing.sm)
+                }
+
+                HStack(spacing: SBSpacing.sm) {
+                    Text(metadata)
+                        .font(SBTypography.caption)
+                        .foregroundStyle(SBColors.muted)
+                        .lineLimit(1)
+
+                    Spacer(minLength: SBSpacing.sm)
+
+                    HStack(spacing: 4) {
+                        Text(actionLabel)
+                            .font(SBTypography.labelSmall)
+                        Image(systemName: "arrow.right")
+                            .sbScaledFont(size: 12, weight: .semibold)
+                    }
+                    .foregroundStyle(tint)
+                }
+            }
+        }
+        .sbBreathing()
+    }
+}
+
+public struct SBWorkspaceMomentumRibbon: View {
+    let readyCount: Int
+    let outputCount: Int
+    let focusTitle: String
+
+    public init(readyCount: Int, outputCount: Int, focusTitle: String) {
+        self.readyCount = readyCount
+        self.outputCount = outputCount
+        self.focusTitle = focusTitle
+    }
+
+    public var body: some View {
+        SBCard(padding: SBSpacing.md, radius: 18, backgroundColor: SBColors.white, borderColor: SBColors.softLine) {
+            VStack(alignment: .leading, spacing: SBSpacing.md) {
+                Text("Bugünkü momentum")
+                    .font(SBTypography.titleMedium)
+                    .foregroundStyle(SBColors.navy)
+
+                SBMetricRibbon(items: [
+                    .init(icon: "checkmark.seal", value: "\(readyCount)", label: "hazır kaynak", tint: SBColors.green),
+                    .init(icon: "sparkles.rectangle.stack", value: "\(outputCount)", label: "üretilen çıktı", tint: SBColors.purple),
+                    .init(icon: "stethoscope", value: focusTitle, label: "odak konu", tint: SBColors.cyan)
+                ])
+            }
         }
     }
 }

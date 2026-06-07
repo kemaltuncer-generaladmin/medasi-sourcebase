@@ -98,11 +98,19 @@ public struct SBTappableCard<Content: View>: View {
 }
 
 struct PressableCardStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .opacity(configuration.isPressed ? 0.92 : 1)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+            .opacity(configuration.isPressed ? 0.90 : 1)
+            .scaleEffect(!reduceMotion && configuration.isPressed ? 0.975 : 1)
+            .shadow(
+                color: SBColors.navy.opacity(configuration.isPressed ? 0.03 : 0),
+                radius: configuration.isPressed ? 2 : 0,
+                x: 0,
+                y: configuration.isPressed ? 1 : 0
+            )
+            .animation(reduceMotion ? nil : SBMotion.pressSpring, value: configuration.isPressed)
     }
 }
 
@@ -126,6 +134,7 @@ struct PressableCardStyle: ButtonStyle {
                     .foregroundStyle(SBColors.navy)
                 Spacer()
                 Image(systemName: "chevron.right")
+                    .sbScaledFont(size: 12, weight: .semibold)
                     .foregroundStyle(SBColors.softText)
             }
         }

@@ -9,6 +9,7 @@ private struct WorkspaceStoreError: Error {
 public enum SBUploadPhase: String, Sendable {
     case idle
     case selecting
+    case extracting
     case uploading
     case completing
     case success
@@ -18,6 +19,7 @@ public enum SBUploadPhase: String, Sendable {
         switch self {
         case .idle: return "Yükleme beklemede."
         case .selecting: return "Dosya seçiliyor..."
+        case .extracting: return "Metin çıkarılıyor..."
         case .uploading: return "Dosya güvenli şekilde yükleniyor."
         case .completing: return "Kaynak Drive alanına ekleniyor."
         case .success: return "Dosya Drive alanına eklendi."
@@ -106,6 +108,41 @@ public final class SourceBaseWorkspaceStore {
 
     public var selectedReadyFiles: [DriveFile] {
         readyFiles.filter { selectedSourceIds.contains($0.id) }
+    }
+
+    public var totalGeneratedOutputCount: Int {
+        allFiles.reduce(into: 0) { result, file in
+            result += file.generated.count
+        }
+    }
+
+    public var latestGeneratedPairs: [(file: DriveFile, output: GeneratedOutput)] {
+        allFiles.compactMap { file in
+            file.generated.first.map { output in
+                (file: file, output: output)
+            }
+        }
+    }
+
+    public var quickContinueOutput: (file: DriveFile, output: GeneratedOutput)? {
+        latestGeneratedPairs.first
+    }
+
+    public var quickContinueReadyFile: DriveFile? {
+        if let selectedSource = readyFiles.first(where: { selectedSourceIds.contains($0.id) }) {
+            return selectedSource
+        }
+        if let selectedFile = file(id: selectedFileId), isReadyForGeneration(selectedFile) {
+            return selectedFile
+        }
+        return readyFiles.first
+    }
+
+    public var momentumFocusTitle: String {
+        quickContinueOutput?.file.courseTitle
+            ?? quickContinueReadyFile?.courseTitle
+            ?? workspace.primaryCourse?.title
+            ?? "Hazır kaynak bekleniyor"
     }
 
     public func loadWorkspace(force: Bool = false) async {
@@ -400,6 +437,21 @@ public final class SourceBaseWorkspaceStore {
         isBusy = true
         uploadPhase = .selecting
         do {
+            uploadPhase = .extracting
+            toast(uploadPhase.message)
+
+            var extractedText: String? = nil
+            var pageCount: Int? = nil
+            var extractionMetadata: ExtractionMetadata? = nil
+
+            if let fileURL = file.fileURL {
+                let extractor = DocumentExtractor.shared
+                let result = try await extractor.extract(from: fileURL, fileType: file.contentType)
+                extractedText = result.text
+                pageCount = result.pageCount
+                extractionMetadata = result.metadata
+            }
+
             uploadPhase = .uploading
             toast(uploadPhase.message)
             let draft = DriveUploadDraft(
@@ -419,7 +471,10 @@ public final class SourceBaseWorkspaceStore {
                 courseId: destination.courseId,
                 sectionId: destination.sectionId,
                 courseTitle: destination.courseTitle,
-                sectionTitle: destination.sectionTitle
+                sectionTitle: destination.sectionTitle,
+                extractedText: extractedText,
+                pageCount: pageCount,
+                extractionMetadata: extractionMetadata
             )
             selectedCourseId = destination.courseId
             selectedSectionId = destination.sectionId

@@ -51,7 +51,7 @@ struct DriveMoveSheet: View {
                     }
 
                     SBButton(
-                        "Taşı",
+                        "Seçili bölüme taşı",
                         icon: "folder.badge.gearshape",
                         variant: .primary,
                         size: .large,
@@ -68,7 +68,7 @@ struct DriveMoveSheet: View {
                 }
                 .padding(SBSpacing.lg)
             }
-            .sbPageBackground()
+            .sbPageBackground(tone: .warm)
             .navigationTitle("Taşı")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

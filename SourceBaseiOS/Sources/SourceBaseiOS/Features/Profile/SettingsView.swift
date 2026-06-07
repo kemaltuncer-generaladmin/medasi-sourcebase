@@ -238,7 +238,7 @@ struct SettingsView: View {
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .sbScaledFont(size: 13, weight: .bold)
+                    .sbScaledFont(size: 13, weight: .semibold)
                     .foregroundStyle(SBColors.softText)
             }
             .contentShape(Rectangle())

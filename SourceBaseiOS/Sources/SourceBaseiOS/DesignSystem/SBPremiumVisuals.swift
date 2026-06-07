@@ -1,5 +1,17 @@
 import SwiftUI
 
+public enum SBHeroMode {
+    case action
+    case progress
+    case selection
+}
+
+/// Hero size controls padding and icon scale.
+public enum SBHeroSize {
+    case full      // Default — larger padding, bigger icon
+    case compact   // Reduced vertical space, smaller icon — for secondary screens
+}
+
 public struct SBPageHeader: View {
     let title: String
     let subtitle: String
@@ -56,7 +68,7 @@ public struct SBPageHeader: View {
             Image(systemName: icon)
                 .sbScaledFont(size: 18, weight: .semibold)
                 .foregroundStyle(SBColors.navy)
-                .frame(width: 42, height: 42)
+                .frame(width: 44, height: 44)
                 .background(SBColors.white)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(
@@ -74,7 +86,12 @@ public struct SBPageHeader: View {
         case "magnifyingglass": return "Ara"
         case "bell": return "Bildirimler"
         case "plus": return "Ekle"
-        default: return "Aksiyon"
+        case "questionmark.circle": return "Yardım"
+        case "xmark": return "Kapat"
+        case "play.fill": return "Oynat"
+        case "pause.fill": return "Duraklat"
+        case "ellipsis": return "Diğer işlemler"
+        default: return "Diğer işlem"
         }
     }
 }
@@ -84,6 +101,7 @@ public struct SBGradientHero<Actions: View, Footer: View>: View {
     let title: String
     let message: String
     let tint: Color
+    let size: SBHeroSize
     let actions: () -> Actions
     let footer: () -> Footer
 
@@ -92,6 +110,7 @@ public struct SBGradientHero<Actions: View, Footer: View>: View {
         title: String,
         message: String,
         tint: Color = SBColors.blue,
+        size: SBHeroSize = .full,
         @ViewBuilder actions: @escaping () -> Actions,
         @ViewBuilder footer: @escaping () -> Footer
     ) {
@@ -99,30 +118,36 @@ public struct SBGradientHero<Actions: View, Footer: View>: View {
         self.title = title
         self.message = message
         self.tint = tint
+        self.size = size
         self.actions = actions
         self.footer = footer
     }
 
+    private var iconSize: CGFloat { size == .compact ? 42 : 54 }
+    private var iconRadius: CGFloat { size == .compact ? 12 : 16 }
+    private var iconFont: CGFloat { size == .compact ? 18 : 24 }
+    private var padding: CGFloat { size == .compact ? SBSpacing.lg : SBSpacing.xl }
+
     public var body: some View {
-        VStack(alignment: .leading, spacing: SBSpacing.lg) {
+        VStack(alignment: .leading, spacing: size == .compact ? SBSpacing.md : SBSpacing.lg) {
             HStack(alignment: .top, spacing: SBSpacing.md) {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: iconRadius)
                     .fill(tint.opacity(0.12))
-                    .frame(width: 54, height: 54)
+                    .frame(width: iconSize, height: iconSize)
                     .overlay(
                         Image(systemName: icon)
-                            .sbScaledFont(size: 24, weight: .semibold)
+                            .sbScaledFont(size: iconFont, weight: .semibold)
                             .foregroundStyle(tint)
                     )
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: size == .compact ? 4 : 8) {
                     Text(title)
-                        .font(SBTypography.heading2)
+                        .font(size == .compact ? SBTypography.heading3 : SBTypography.heading2)
                         .foregroundStyle(SBColors.navy)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text(message)
-                        .font(SBTypography.bodyMedium)
+                        .font(size == .compact ? SBTypography.bodySmall : SBTypography.bodyMedium)
                         .foregroundStyle(SBColors.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -131,7 +156,7 @@ public struct SBGradientHero<Actions: View, Footer: View>: View {
             actions()
             footer()
         }
-        .padding(SBSpacing.xl)
+        .padding(padding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             LinearGradient(
@@ -143,12 +168,12 @@ public struct SBGradientHero<Actions: View, Footer: View>: View {
                 endPoint: .bottomTrailing
             )
         )
-        .clipShape(RoundedRectangle(cornerRadius: 26))
+        .clipShape(RoundedRectangle(cornerRadius: size == .compact ? 20 : 26))
         .overlay(
-            RoundedRectangle(cornerRadius: 26)
+            RoundedRectangle(cornerRadius: size == .compact ? 20 : 26)
                 .stroke(SBColors.softLine, lineWidth: 1)
         )
-        .shadow(color: tint.opacity(0.10), radius: 24, x: 0, y: 14)
+        .shadow(color: tint.opacity(0.10), radius: size == .compact ? 14 : 24, x: 0, y: size == .compact ? 8 : 14)
     }
 }
 
@@ -158,6 +183,8 @@ public struct SBSignatureHero<Actions: View, Footer: View>: View {
     let message: String
     let icon: String
     let tint: Color
+    let mode: SBHeroMode
+    let size: SBHeroSize
     let actions: () -> Actions
     let footer: () -> Footer
 
@@ -170,6 +197,8 @@ public struct SBSignatureHero<Actions: View, Footer: View>: View {
         message: String,
         icon: String,
         tint: Color = SBColors.blue,
+        mode: SBHeroMode = .progress,
+        size: SBHeroSize = .full,
         @ViewBuilder actions: @escaping () -> Actions,
         @ViewBuilder footer: @escaping () -> Footer
     ) {
@@ -178,18 +207,25 @@ public struct SBSignatureHero<Actions: View, Footer: View>: View {
         self.message = message
         self.icon = icon
         self.tint = tint
+        self.mode = mode
+        self.size = size
         self.actions = actions
         self.footer = footer
     }
 
+    private var iconTileSize: CGFloat { size == .compact ? 44 : 58 }
+    private var iconTileRadius: CGFloat { size == .compact ? 13 : 17 }
+    private var cornerRadius: CGFloat { size == .compact ? 18 : 24 }
+    private var padding: CGFloat { size == .compact ? SBSpacing.lg : SBSpacing.xl }
+
     public var body: some View {
-        VStack(alignment: .leading, spacing: SBSpacing.lg) {
+        VStack(alignment: .leading, spacing: size == .compact ? SBSpacing.md : SBSpacing.lg) {
             HStack(alignment: .top, spacing: SBSpacing.md) {
-                SBIconTile(icon: icon, tint: tint, size: 58, radius: 17)
+                SBIconTile(icon: icon, tint: tint, size: iconTileSize, radius: iconTileRadius)
                     .scaleEffect(isLive && !reduceMotion ? 1.025 : 1)
                     .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: isLive)
 
-                VStack(alignment: .leading, spacing: 7) {
+                VStack(alignment: .leading, spacing: size == .compact ? 4 : 7) {
                     Text(eyebrow)
                         .font(SBTypography.labelSmall)
                         .foregroundStyle(tint)
@@ -197,12 +233,12 @@ public struct SBSignatureHero<Actions: View, Footer: View>: View {
                         .tracking(0.4)
 
                     Text(title)
-                        .font(SBTypography.heading2)
+                        .font(size == .compact ? SBTypography.heading3 : SBTypography.heading2)
                         .foregroundStyle(SBColors.navy)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text(message)
-                        .font(SBTypography.bodyMedium)
+                        .font(size == .compact ? SBTypography.bodySmall : SBTypography.bodyMedium)
                         .foregroundStyle(SBColors.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -211,12 +247,12 @@ public struct SBSignatureHero<Actions: View, Footer: View>: View {
             actions()
             footer()
         }
-        .padding(SBSpacing.xl)
+        .padding(padding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(heroBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .stroke(
                     LinearGradient(
                         colors: [SBColors.white.opacity(0.96), tint.opacity(0.20), SBColors.softLine],
@@ -226,33 +262,58 @@ public struct SBSignatureHero<Actions: View, Footer: View>: View {
                     lineWidth: 1
                 )
         )
-        .shadow(color: tint.opacity(0.14), radius: 28, x: 0, y: 16)
+        .shadow(color: tint.opacity(0.14), radius: size == .compact ? 16 : 28, x: 0, y: size == .compact ? 8 : 16)
         .shadow(color: SBColors.navy.opacity(0.05), radius: 4, x: 0, y: 2)
         .onAppear { isLive = true }
     }
 
     private var heroBackground: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    tint.opacity(0.13),
-                    SBColors.white,
-                    SBColors.field.opacity(0.75)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            switch mode {
+            case .action:
+                LinearGradient(
+                    colors: [
+                        tint.opacity(0.08),
+                        SBColors.white,
+                        SBColors.field.opacity(0.52)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            case .progress:
+                LinearGradient(
+                    colors: [
+                        tint.opacity(0.12),
+                        SBColors.white,
+                        SBColors.field.opacity(0.75)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            case .selection:
+                LinearGradient(
+                    colors: [
+                        tint.opacity(0.06),
+                        SBColors.field.opacity(0.92),
+                        SBColors.white
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
 
-            Canvas { context, size in
-                var path = Path()
-                let spacing: CGFloat = 28
-                var x: CGFloat = -size.height
-                while x < size.width + size.height {
-                    path.move(to: CGPoint(x: x, y: size.height))
-                    path.addLine(to: CGPoint(x: x + size.height, y: 0))
-                    x += spacing
+            if mode != .action {
+                Canvas { context, size in
+                    var path = Path()
+                    let spacing: CGFloat = 28
+                    var x: CGFloat = -size.height
+                    while x < size.width + size.height {
+                        path.move(to: CGPoint(x: x, y: size.height))
+                        path.addLine(to: CGPoint(x: x + size.height, y: 0))
+                        x += spacing
+                    }
+                    context.stroke(path, with: .color(tint.opacity(mode == .progress ? 0.055 : 0.035)), lineWidth: 1)
                 }
-                context.stroke(path, with: .color(tint.opacity(0.055)), lineWidth: 1)
             }
 
             LinearGradient(

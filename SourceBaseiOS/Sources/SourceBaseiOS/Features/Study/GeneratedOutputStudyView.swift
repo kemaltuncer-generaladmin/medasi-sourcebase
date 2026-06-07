@@ -37,7 +37,7 @@ struct GeneratedOutputStudyView: View {
                 .padding(SBSpacing.lg)
             }
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .study)
         .navigationTitle(output?.kind.titleLabel ?? "Çalışma")
         .task {
             await workspaceStore.loadWorkspace()
@@ -101,7 +101,7 @@ private struct FlashcardStudySurface: View {
             VStack(alignment: .leading, spacing: SBSpacing.lg) {
                 studyHeader(
                     title: output.title,
-                    subtitle: totalCount == 0 ? "Kartlar bekleniyor" : "\(knownCount) / \(totalCount) öğrenildi • \(deck.count) kaldı",
+                    subtitle: totalCount == 0 ? "Kartlar bekleniyor" : "\(knownCount) öğrenildi • \(deck.count) kart kaldı",
                     icon: "rectangle.on.rectangle",
                     tint: SBColors.blue
                 )
@@ -144,9 +144,13 @@ private struct FlashcardStudySurface: View {
                         }
                     }
                     .buttonStyle(PressableCardStyle())
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(flipped ? "Flashcard cevabı" : "Flashcard sorusu")
+                    .accessibilityValue(flipped ? current.back : current.front)
+                    .accessibilityHint("Kartı çevirmek için çift dokun")
 
                     HStack(spacing: SBSpacing.sm) {
-                        SBButton("Tekrar", icon: "arrow.counterclockwise", variant: .secondary, fullWidth: true) {
+                        SBButton("Tekrar gör", icon: "arrow.counterclockwise", variant: .secondary, fullWidth: true) {
                             requeue()
                         }
                         SBButton("Biliyorum", icon: "checkmark", fullWidth: true) {
@@ -159,7 +163,7 @@ private struct FlashcardStudySurface: View {
                         title: "Seti tamamladın",
                         message: "\(totalCount) kartın hepsini öğrendin olarak işaretledin. Tazelemek için baştan başlayabilirsin.",
                         badges: ["Flashcard"],
-                        actionLabel: "Baştan Başla",
+                        actionLabel: "Baştan başla",
                         onAction: { resetDeck() }
                     )
                 } else {
@@ -236,7 +240,7 @@ private struct QuestionStudySurface: View {
             VStack(alignment: .leading, spacing: SBSpacing.lg) {
                 studyHeader(
                     title: output.title,
-                    subtitle: isLoadingSession ? "Soru oturumu hazırlanıyor" : "\(index + 1) / \(max(questions.count, 1)) soru",
+                    subtitle: isLoadingSession ? "Soru oturumu hazırlanıyor" : "Soru \(index + 1) / \(max(questions.count, 1))",
                     icon: "questionmark.circle",
                     tint: SBColors.cyan
                 )
@@ -251,7 +255,7 @@ private struct QuestionStudySurface: View {
                     SBErrorState(
                         title: "Soru oturumu açılamadı",
                         message: errorMessage,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await loadSession() } }
                     )
                 } else if let question = current {
@@ -317,13 +321,26 @@ private struct QuestionStudySurface: View {
         let isSelected = selectedIndex == optionIndex || feedback?.selectedIndex == optionIndex
         let isCorrect = isAnswered && feedback?.correctIndex == optionIndex
         let isWrongSelection = isAnswered && isSelected && feedback?.isCorrect == false
+        let optionLetter = String(UnicodeScalar(65 + optionIndex)!)
+        let accessibilityValue: String = {
+            if isCorrect {
+                return "\(option), doğru cevap"
+            }
+            if isWrongSelection {
+                return "\(option), seçildi ve yanlış"
+            }
+            if isSelected {
+                return "\(option), seçili"
+            }
+            return option
+        }()
 
         return Button {
             guard !isAnswered else { return }
             selectedIndex = optionIndex
         } label: {
             HStack(alignment: .top, spacing: SBSpacing.md) {
-                Text(String(UnicodeScalar(65 + optionIndex)!))
+                Text(optionLetter)
                     .font(SBTypography.labelMedium)
                     .foregroundStyle(isCorrect || isWrongSelection ? .white : SBColors.blue)
                     .frame(width: 30, height: 30)
@@ -347,6 +364,10 @@ private struct QuestionStudySurface: View {
         }
         .buttonStyle(PressableCardStyle())
         .disabled(isSubmitting)
+        .accessibilityLabel("\(optionLetter) seçeneği")
+        .accessibilityValue(accessibilityValue)
+        .accessibilityHint(isAnswered ? "Bu soru cevaplandı" : "Seçmek için çift dokun")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func resultCard(feedback: SBQuestionAnswerFeedback) -> some View {
@@ -1145,6 +1166,9 @@ private struct PodcastStudySurface: View {
                                     .clipShape(Circle())
                             }
                             .disabled(content.audioURL == nil)
+                            .accessibilityLabel(content.audioURL == nil ? "Sesli anlatım hazır değil" : (isPlaying ? "Sesli anlatımı duraklat" : "Sesli anlatımı oynat"))
+                            .accessibilityValue(isPlaying ? "Oynatılıyor" : "Duraklatıldı")
+                            .accessibilityHint(content.audioURL == nil ? "Aşağıdaki anlatım metnini okuyabilirsin" : "Podcast oynatımını değiştirir")
 
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(content.audioURL == nil ? "Sesli anlatım hazır değil" : "Sesli anlatım hazır")

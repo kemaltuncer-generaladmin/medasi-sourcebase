@@ -5,7 +5,7 @@ public enum SBButtonSize {
 
     var height: CGFloat {
         switch self {
-        case .small: return 40
+        case .small: return 44
         case .medium: return 48
         case .large: return 56
         }
@@ -46,6 +46,7 @@ public struct SBButton: View {
     let variant: SBButtonVariant
     let size: SBButtonSize
     let isLoading: Bool
+    let isDisabled: Bool
     let fullWidth: Bool
     let action: () -> Void
 
@@ -55,6 +56,7 @@ public struct SBButton: View {
         variant: SBButtonVariant = .primary,
         size: SBButtonSize = .medium,
         isLoading: Bool = false,
+        isDisabled: Bool = false,
         fullWidth: Bool = false,
         action: @escaping () -> Void
     ) {
@@ -63,6 +65,7 @@ public struct SBButton: View {
         self.variant = variant
         self.size = size
         self.isLoading = isLoading
+        self.isDisabled = isDisabled
         self.fullWidth = fullWidth
         self.action = action
     }
@@ -90,7 +93,8 @@ public struct SBButton: View {
             .padding(.horizontal, size.horizontalPadding)
         }
         .buttonStyle(SBButtonStyle(variant: variant, isLoading: isLoading))
-        .disabled(isLoading)
+        .disabled(isLoading || isDisabled)
+        .accessibilityAddTraits(variant == .primary ? .isButton : [])
     }
 }
 
@@ -104,17 +108,27 @@ struct SBButtonStyle: ButtonStyle {
         configuration.label
             .foregroundStyle(foregroundColor)
             .background(background)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .shadow(
-                color: variant == .primary ? SBColors.blue.opacity(configuration.isPressed ? 0.14 : 0.22) : .clear,
-                radius: configuration.isPressed ? 5 : 10,
+                color: variant == .primary ? SBColors.blue.opacity(configuration.isPressed ? 0.08 : 0.22) : .clear,
+                radius: configuration.isPressed ? 4 : 10,
                 x: 0,
-                y: configuration.isPressed ? 2 : 6
+                y: configuration.isPressed ? 1 : 6
             )
-            .scaleEffect(!reduceMotion && configuration.isPressed ? 0.97 : 1)
-            .opacity(configuration.isPressed ? 0.92 : 1)
+            .scaleEffect(!reduceMotion && configuration.isPressed ? 0.96 : 1)
+            .opacity(configuration.isPressed ? 0.88 : 1)
+            .brightness(configuration.isPressed ? -0.02 : 0)
             .opacity(isLoading || !isEnabled ? 0.62 : 1)
             .animation(reduceMotion ? nil : SBMotion.pressSpring, value: configuration.isPressed)
+    }
+
+    private var cornerRadius: CGFloat {
+        switch variant {
+        case .primary, .secondary:
+            return 12
+        case .text:
+            return 10
+        }
     }
 
     private var foregroundColor: Color {
@@ -135,7 +149,7 @@ struct SBButtonStyle: ButtonStyle {
                 SBColors.softLine
             }
         case .secondary:
-            Color.clear
+            SBColors.blue.opacity(isEnabled ? 0.06 : 0.02)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(isEnabled ? SBColors.blue : SBColors.softLine, lineWidth: 1.5)
@@ -148,8 +162,8 @@ struct SBButtonStyle: ButtonStyle {
 
 #Preview {
     VStack(spacing: 16) {
-        SBButton("Giriş Yap", icon: "arrow.right", variant: .primary, size: .large, fullWidth: true) {}
-        SBButton("Kayıt Ol", variant: .secondary, size: .medium) {}
+        SBButton("Giriş yap", icon: "arrow.right", variant: .primary, size: .large, fullWidth: true) {}
+        SBButton("Kayıt ol", variant: .secondary, size: .medium) {}
         SBButton("Şifremi Unuttum", variant: .text, size: .small) {}
         SBButton("Yükleniyor...", variant: .primary, isLoading: true) {}
     }

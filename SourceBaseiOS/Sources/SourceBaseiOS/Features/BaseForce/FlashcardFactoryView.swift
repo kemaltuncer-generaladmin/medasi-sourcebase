@@ -72,7 +72,7 @@ struct FlashcardFactoryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SBSpacing.lg) {
+            VStack(alignment: .leading, spacing: BaseForceFactoryStyle.screenSpacing) {
                 if isLoading {
                     SBLoadingState(
                         icon: "rectangle.on.rectangle",
@@ -83,7 +83,7 @@ struct FlashcardFactoryView: View {
                     SBErrorState(
                         title: "Yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await loadWorkspace() } }
                     )
                 } else {
@@ -96,11 +96,11 @@ struct FlashcardFactoryView: View {
                     }
                 }
             }
-            .padding(SBSpacing.lg)
+            .padding(BaseForceFactoryStyle.pagePadding)
             .sbFloatingTabContentPadding()
             .sbReadableWidth(760)
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .cool)
         .navigationTitle("Flashcard")
         .task {
             await loadWorkspace()
@@ -115,7 +115,9 @@ struct FlashcardFactoryView: View {
             title: "Ezber kartlarını hazırla",
             message: "Tanım, mekanizma ve sık karıştırılan noktaları kısa karta çevir.",
             icon: "rectangle.on.rectangle",
-            tint: SBColors.blue
+            tint: SBColors.blue,
+            mode: .selection,
+            size: .compact
         ) {
             EmptyView()
         } footer: {
@@ -130,58 +132,65 @@ struct FlashcardFactoryView: View {
     // MARK: - Sources Panel
 
     private var sourcesPanel: some View {
-        SBCard(radius: 16) {
-            VStack(alignment: .leading, spacing: SBSpacing.md) {
-                HStack(spacing: SBSpacing.md) {
-                    SBIconTile(icon: "doc.text", tint: SBColors.blue, size: 42, radius: 12)
+        BaseForceFactoryStyle.panel {
+            HStack(spacing: SBSpacing.md) {
+                SBIconTile(
+                    icon: "doc.text",
+                    tint: SBColors.blue,
+                    size: BaseForceFactoryStyle.iconTileSize,
+                    radius: BaseForceFactoryStyle.iconTileRadius
+                )
 
-                    Text("Kaynak")
-                        .font(SBTypography.titleSmall)
-                        .foregroundStyle(SBColors.navy)
-                }
+                Text("Hazır bir kaynak seç; kartları birkaç saniyede hazırlayalım.")
+                    .font(SBTypography.titleSmall)
+                    .foregroundStyle(SBColors.navy)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
-                if selectedSources.isEmpty {
-                    sourceRequiredCard
-                } else {
-                    ForEach(Array(selectedSources), id: \.self) { sourceId in
-                        if let file = workspaceStore.file(id: sourceId) {
-                            selectedSourceCard(file: file)
-                        }
+            if selectedSources.isEmpty {
+                sourceRequiredCard
+            } else {
+                ForEach(Array(selectedSources), id: \.self) { sourceId in
+                    if let file = workspaceStore.file(id: sourceId) {
+                        selectedSourceCard(file: file)
                     }
                 }
-
-                addSourceButton
             }
+
+            addSourceButton
         }
     }
 
     private var sourceRequiredCard: some View {
-        SBCommandCard(tint: SBColors.blue, action: {
-            router.navigate(to: .sourcePicker)
-        }) {
-            VStack(alignment: .leading, spacing: SBSpacing.md) {
-                HStack(spacing: SBSpacing.md) {
-                    SBIconTile(icon: "doc.text.magnifyingglass", tint: SBColors.blue, size: 42, radius: 12)
+        BaseForceFactoryStyle.sourceRequiredPanel {
+            HStack(spacing: SBSpacing.md) {
+                SBIconTile(
+                    icon: "doc.text.magnifyingglass",
+                    tint: SBColors.blue,
+                    size: BaseForceFactoryStyle.iconTileSize,
+                    radius: BaseForceFactoryStyle.iconTileRadius
+                )
 
-                    Text("Önce bir kaynak seç")
-                        .font(SBTypography.titleSmall)
-                        .foregroundStyle(SBColors.navy)
-                }
+                Text("Hazır bir kaynak seç")
+                    .font(SBTypography.titleSmall)
+                    .foregroundStyle(SBColors.navy)
+            }
 
-                Text("Hazır bir kaynak seç.")
-                    .font(SBTypography.bodySmall)
-                    .foregroundStyle(SBColors.muted)
+            Text("Kart üretimine seçili kaynakla hemen geç.")
+                .font(SBTypography.bodySmall)
+                .foregroundStyle(SBColors.muted)
 
-                FlowLayout(spacing: SBSpacing.xs) {
-                    tagChip(label: "Hazır kaynak", color: SBColors.blue)
-                    tagChip(label: "PDF / PPT(X) / DOC(X)", color: SBColors.purple)
-                }
+            FlowLayout(spacing: SBSpacing.xs) {
+                tagChip(label: "Hazır kaynak", color: SBColors.blue)
+                tagChip(label: "PDF / PPT(X) / DOC(X)", color: SBColors.purple)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Önce hazır bir kaynak seç. Alttaki Hazır kaynak seç düğmesini kullan.")
     }
 
     private func selectedSourceCard(file: DriveFile) -> some View {
-        SBCard(radius: 14) {
+        BaseForceFactoryStyle.nestedPanel {
             HStack(spacing: SBSpacing.md) {
                 SBFileKindBadge(kind: SBFileKind.from(file.kind), compact: true)
 
@@ -201,7 +210,7 @@ struct FlashcardFactoryView: View {
                 Spacer()
 
                 Button {
-                    router.navigate(to: .sourcePicker)
+                    openSourcePicker()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .sbScaledFont(size: 18)
@@ -214,10 +223,15 @@ struct FlashcardFactoryView: View {
 
     private var addSourceButton: some View {
         SBCommandCard(tint: SBColors.blue, action: {
-            router.navigate(to: .sourcePicker)
+            openSourcePicker()
         }) {
                 HStack(spacing: SBSpacing.md) {
-                    SBIconTile(icon: "plus", tint: SBColors.blue, size: 44, radius: 13)
+                    SBIconTile(
+                        icon: "plus",
+                        tint: SBColors.blue,
+                        size: BaseForceFactoryStyle.addIconTileSize,
+                        radius: BaseForceFactoryStyle.addIconTileRadius
+                    )
 
                     VStack(alignment: .leading, spacing: SBSpacing.xs) {
                         Text("Hazır kaynak ekle")
@@ -235,88 +249,91 @@ struct FlashcardFactoryView: View {
     // MARK: - Settings Panel
 
     private var settingsPanel: some View {
-        SBCard(radius: 16) {
-            VStack(alignment: .leading, spacing: SBSpacing.lg) {
-                HStack(spacing: SBSpacing.md) {
-                    SBIconTile(icon: "slider.horizontal.3", tint: SBColors.blue, size: 42, radius: 12)
+        BaseForceFactoryStyle.panel(spacing: BaseForceFactoryStyle.settingsSpacing) {
+            HStack(spacing: SBSpacing.md) {
+                SBIconTile(
+                    icon: "slider.horizontal.3",
+                    tint: SBColors.blue,
+                    size: BaseForceFactoryStyle.iconTileSize,
+                    radius: BaseForceFactoryStyle.iconTileRadius
+                )
 
-                    Text("Ayarlar")
-                        .font(SBTypography.titleSmall)
-                        .foregroundStyle(SBColors.navy)
-                }
+                Text("Ayarlar")
+                    .font(SBTypography.titleSmall)
+                    .foregroundStyle(SBColors.navy)
+            }
 
-                // Card Style
-                VStack(alignment: .leading, spacing: SBSpacing.sm) {
-                    Text("Stil")
-                        .font(SBTypography.labelSmall)
-                        .foregroundStyle(SBColors.navy)
+            // Card Style
+            VStack(alignment: .leading, spacing: SBSpacing.sm) {
+                Text("Stil")
+                    .font(SBTypography.labelSmall)
+                    .foregroundStyle(SBColors.navy)
 
-                    HStack(spacing: SBSpacing.sm) {
-                        ForEach(CardStyle.allCases, id: \.self) { style in
-                            segmentButton(
-                                label: style.rawValue,
-                                icon: style.icon,
-                                isSelected: cardStyle == style
-                            ) {
-                                cardStyle = style
-                            }
+                HStack(spacing: SBSpacing.sm) {
+                    ForEach(CardStyle.allCases, id: \.self) { style in
+                        segmentButton(
+                            label: style.rawValue,
+                            icon: style.icon,
+                            isSelected: cardStyle == style
+                        ) {
+                            cardStyle = style
                         }
                     }
                 }
+            }
 
-                // Card Count
-                VStack(alignment: .leading, spacing: SBSpacing.sm) {
-                    Text("Sayı")
-                        .font(SBTypography.labelSmall)
-                        .foregroundStyle(SBColors.navy)
+            // Card Count
+            VStack(alignment: .leading, spacing: SBSpacing.sm) {
+                Text("Sayı")
+                    .font(SBTypography.labelSmall)
+                    .foregroundStyle(SBColors.navy)
 
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 54), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
-                        ForEach(allowedCardCounts, id: \.self) { count in
-                            Button {
-                                cardCount = count
-                            } label: {
-                                Text("\(count)")
-                                    .font(SBTypography.labelSmall)
-                                    .foregroundStyle(cardCount == count ? .white : SBColors.navy)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, SBSpacing.sm)
-                                    .background(cardCount == count ? SBColors.blue : SBColors.white)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .stroke(cardCount == count ? SBColors.blue : SBColors.softLine, lineWidth: 1)
-                                    )
-                            }
-                            .accessibilityLabel("\(count) kart")
-                            .accessibilityValue(cardCount == count ? "Seçili" : "Seçili değil")
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 54), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
+                    ForEach(allowedCardCounts, id: \.self) { count in
+                        Button {
+                            cardCount = count
+                        } label: {
+                            Text("\(count)")
+                                .font(SBTypography.labelSmall)
+                                .foregroundStyle(cardCount == count ? .white : SBColors.navy)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, SBSpacing.sm)
+                                .background(cardCount == count ? SBColors.blue : SBColors.white)
+                                .clipShape(RoundedRectangle(cornerRadius: BaseForceFactoryStyle.controlRadius))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: BaseForceFactoryStyle.controlRadius)
+                                        .stroke(cardCount == count ? SBColors.blue : SBColors.softLine, lineWidth: 1)
+                                )
+                        }
+                        .accessibilityLabel("\(count) kart")
+                        .accessibilityValue(cardCount == count ? "Seçili" : "Seçili değil")
+                    }
+                }
+            }
+
+            // Difficulty
+            VStack(alignment: .leading, spacing: SBSpacing.sm) {
+                Text("Zorluk")
+                    .font(SBTypography.labelSmall)
+                    .foregroundStyle(SBColors.navy)
+
+                HStack(spacing: SBSpacing.sm) {
+                    ForEach(Difficulty.allCases, id: \.self) { diff in
+                        difficultyChip(
+                            label: diff.rawValue,
+                            color: diff.color,
+                            isSelected: difficulty == diff
+                        ) {
+                            difficulty = diff
                         }
                     }
                 }
+            }
 
-                // Difficulty
-                VStack(alignment: .leading, spacing: SBSpacing.sm) {
-                    Text("Zorluk")
-                        .font(SBTypography.labelSmall)
-                        .foregroundStyle(SBColors.navy)
-
-                    HStack(spacing: SBSpacing.sm) {
-                        ForEach(Difficulty.allCases, id: \.self) { diff in
-                            difficultyChip(
-                                label: diff.rawValue,
-                                color: diff.color,
-                                isSelected: difficulty == diff
-                            ) {
-                                difficulty = diff
-                            }
-                        }
-                    }
-                }
-
-                // Toggles
-                VStack(spacing: SBSpacing.sm) {
-                    toggleRow(label: "Kavram çıkar", isOn: $extractKeyConcepts)
-                    toggleRow(label: "İpucu ekle", isOn: $addHints)
-                }
+            // Toggles
+            VStack(spacing: SBSpacing.sm) {
+                toggleRow(label: "Kavram çıkar", isOn: $extractKeyConcepts)
+                toggleRow(label: "İpucu ekle", isOn: $addHints)
             }
         }
     }
@@ -334,9 +351,9 @@ struct FlashcardFactoryView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, SBSpacing.md)
             .background(isSelected ? SBColors.blue : SBColors.white)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: BaseForceFactoryStyle.controlRadius))
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: BaseForceFactoryStyle.controlRadius)
                     .stroke(isSelected ? SBColors.blue : SBColors.softLine, lineWidth: 1)
                 )
         }
@@ -352,9 +369,9 @@ struct FlashcardFactoryView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, SBSpacing.sm)
                 .background(isSelected ? color : Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: BaseForceFactoryStyle.chipRadius))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: BaseForceFactoryStyle.chipRadius)
                         .stroke(color, lineWidth: 1.5)
                 )
         }
@@ -385,28 +402,30 @@ struct FlashcardFactoryView: View {
 
     private var generateButton: some View {
         SBButton(
-            canGenerate ? "Kartları hazırla • \(costLabel)" : "Kaynak seç",
-            icon: canGenerate ? "bolt.fill" : "folder",
+            "Kartları birkaç saniyede hazırla • \(costLabel)",
+            icon: "bolt.fill",
             variant: .primary,
             size: .large,
             isLoading: isGenerating,
+            isDisabled: !canGenerate,
             fullWidth: true,
-            action: {
-                if canGenerate {
-                    generate()
-                } else {
-                    router.navigate(to: .sourcePicker)
-                }
-            }
+            action: generate
         )
-        .accessibilityLabel(canGenerate ? "Flashcard seti oluştur" : "Kaynak seç")
-        .accessibilityHint(canGenerate ? "Seçili hazır kaynakla flashcard üretimini başlatır" : "Kaynak seçme ekranını açar")
+        .accessibilityLabel("Flashcard seti oluştur")
+        .accessibilityHint(canGenerate ? "Seçili hazır kaynakla flashcard üretimini başlatır" : "Önce hazır bir kaynak seçmelisin")
     }
 
     // MARK: - Source Required Notice
 
     private var sourceRequiredNotice: some View {
-        sourceRequiredCard
+        SBButton(
+            "Hazır kaynak seç",
+            icon: "folder",
+            variant: .secondary,
+            size: .medium,
+            fullWidth: true,
+            action: openSourcePicker
+        )
     }
 
     // MARK: - Helpers
@@ -458,6 +477,9 @@ struct FlashcardFactoryView: View {
         await workspaceStore.loadWorkspace()
         errorMessage = workspaceStore.errorMessage
         isLoading = false
+    }
+    private func openSourcePicker() {
+        router.beginSourceSelection(from: .baseForce, destination: .route(.flashcardFactory))
     }
 }
 

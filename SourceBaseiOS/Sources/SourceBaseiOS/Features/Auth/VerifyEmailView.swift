@@ -91,6 +91,7 @@ struct VerifyEmailView: View {
                 otpField(index: index)
             }
         }
+        .frame(maxWidth: .infinity)
     }
 
     private func otpField(index: Int) -> some View {
@@ -102,7 +103,7 @@ struct VerifyEmailView: View {
             .keyboardType(.numberPad)
             .textContentType(.oneTimeCode)
             #endif
-            .frame(width: 48, height: 56)
+            .frame(minWidth: 40, maxWidth: .infinity, minHeight: 56, maxHeight: 56)
             .background(SBColors.white.opacity(0.96))
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(

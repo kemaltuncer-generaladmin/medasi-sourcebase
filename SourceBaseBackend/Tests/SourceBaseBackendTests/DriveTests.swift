@@ -66,19 +66,19 @@ final class DriveTests: XCTestCase {
         XCTAssertEqual(error.status, 400)
     }
 
-    func testGCSUploadSessionUsable() {
-        let session = GCSUploadSession(
-            uploadURL: "https://storage.googleapis.com/upload",
-            objectName: "files/test.pdf",
-            bucket: "my-bucket",
+    func testStorageUploadSessionUsable() {
+        let session = StorageUploadSession(
+            uploadURL: "https://storage.medasi.com.tr/medasistorage/sourcebase/users/user-1/uploads/2026/06/source-1-test.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256",
+            objectName: "sourcebase/users/user-1/uploads/2026/06/source-1-test.pdf",
+            bucket: "medasistorage",
             headers: [:],
             expiresAt: Date().addingTimeInterval(300)
         )
         XCTAssertTrue(session.isUsable)
     }
 
-    func testGCSUploadSessionNotUsable() {
-        let session = GCSUploadSession(
+    func testStorageUploadSessionNotUsable() {
+        let session = StorageUploadSession(
             uploadURL: "",
             objectName: "",
             bucket: "",
@@ -88,46 +88,82 @@ final class DriveTests: XCTestCase {
         XCTAssertFalse(session.isUsable)
     }
 
-    func testGCSUploadSessionNearExpiryNotUsable() {
-        let session = GCSUploadSession(
-            uploadURL: "https://storage.googleapis.com/upload",
-            objectName: "files/test.pdf",
-            bucket: "my-bucket",
+    func testStorageUploadSessionNearExpiryNotUsable() {
+        let session = StorageUploadSession(
+            uploadURL: "https://storage.medasi.com.tr/medasistorage/sourcebase/users/user-1/uploads/2026/06/source-1-test.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256",
+            objectName: "sourcebase/users/user-1/uploads/2026/06/source-1-test.pdf",
+            bucket: "medasistorage",
             headers: [:],
             expiresAt: Date().addingTimeInterval(10)
         )
         XCTAssertFalse(session.isUsable)
     }
 
-    func testGCSUploadSessionDecodesFractionalSecondExpiry() throws {
+    func testCompleteUploadPayloadIncludesClientExtractionContract() {
+        let extractedAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let payload = DriveAPI.completeUploadPayload(
+            objectName: "sourcebase/users/user-1/uploads/2026/06/source-1-test.pdf",
+            courseId: "course-1",
+            sectionId: "section-1",
+            fileName: "test.pdf",
+            contentType: "application/pdf",
+            sizeBytes: 2_048,
+            extractedText: "Sayfa 1\nKlinik kaynak metni",
+            pageCount: 12,
+            extractionMetadata: ExtractionMetadata(
+                charCount: 27,
+                wordCount: 5,
+                extractedAt: extractedAt
+            )
+        )
+
+        XCTAssertEqual(string(payload["extractedText"]), "Sayfa 1\nKlinik kaynak metni")
+        guard case .integer(let pageCount) = payload["pageCount"] else {
+            return XCTFail("pageCount must be sent as an integer.")
+        }
+        XCTAssertEqual(pageCount, 12)
+        guard case .object(let metadata) = payload["extractionMetadata"] else {
+            return XCTFail("extractionMetadata must be sent as an object.")
+        }
+        guard case .integer(let charCount) = metadata["charCount"],
+              case .integer(let wordCount) = metadata["wordCount"] else {
+            return XCTFail("Client extraction counts must be JSON integers.")
+        }
+        XCTAssertEqual(charCount, 27)
+        XCTAssertEqual(wordCount, 5)
+        XCTAssertEqual(string(metadata["extractedAt"]), ISO8601DateFormatter().string(from: extractedAt))
+        XCTAssertEqual(string(payload["ocr_required_when_sparse"]), "true")
+    }
+
+    func testStorageUploadSessionDecodesFractionalSecondExpiry() throws {
         // Deno's `new Date().toISOString()` always includes milliseconds.
         let future = ISO8601DateFormatter()
         future.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let expiry = future.string(from: Date().addingTimeInterval(300))
 
         let json = try JSONSerialization.data(withJSONObject: [
-            "uploadUrl": "https://storage.googleapis.com/upload",
-            "objectName": "files/test.pdf",
-            "bucket": "my-bucket",
+            "uploadUrl": "https://storage.medasi.com.tr/medasistorage/sourcebase/users/user-1/uploads/2026/06/source-1-test.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256",
+            "objectName": "sourcebase/users/user-1/uploads/2026/06/source-1-test.pdf",
+            "bucket": "medasistorage",
             "headers": [:],
             "expiresAt": expiry
         ])
 
-        let session = try JSONDecoder().decode(GCSUploadSession.self, from: json)
+        let session = try JSONDecoder().decode(StorageUploadSession.self, from: json)
         XCTAssertTrue(session.isUsable, "Fractional-second ISO8601 expiry must parse, not fall back to distantPast.")
     }
 
-    func testGCSUploadSessionDecodesNumericEpochExpiry() throws {
+    func testStorageUploadSessionDecodesNumericEpochExpiry() throws {
         let epoch = Date().addingTimeInterval(300).timeIntervalSince1970
         let json = try JSONSerialization.data(withJSONObject: [
-            "uploadUrl": "https://storage.googleapis.com/upload",
-            "objectName": "files/test.pdf",
-            "bucket": "my-bucket",
+            "uploadUrl": "https://storage.medasi.com.tr/medasistorage/sourcebase/users/user-1/uploads/2026/06/source-1-test.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256",
+            "objectName": "sourcebase/users/user-1/uploads/2026/06/source-1-test.pdf",
+            "bucket": "medasistorage",
             "headers": [:],
             "expiresAt": epoch
         ])
 
-        let session = try JSONDecoder().decode(GCSUploadSession.self, from: json)
+        let session = try JSONDecoder().decode(StorageUploadSession.self, from: json)
         XCTAssertTrue(session.isUsable)
     }
 
@@ -264,11 +300,11 @@ final class DriveTests: XCTestCase {
         XCTAssertEqual(string(standard["quality_tier"]), "standard")
         XCTAssertEqual(string(standard["imageModelPolicy"]), "gpt-image-1.5")
         XCTAssertEqual(string(standard["openai_image_model"]), "gpt-image-1.5")
-        XCTAssertEqual(string(standard["imageQuality"]), "medium")
+        XCTAssertEqual(string(standard["imageQuality"]), "standard")
         XCTAssertEqual(string(premium["qualityTier"]), "premium")
         XCTAssertEqual(string(premium["image_model_policy"]), "gpt-image-2")
         XCTAssertEqual(string(premium["gpt_image_model"]), "gpt-image-2")
-        XCTAssertEqual(string(premium["imageQuality"]), "high")
+        XCTAssertEqual(string(premium["imageQuality"]), "premium")
         XCTAssertEqual(string(premium["assetFallbackPolicy"]), "structured_text_blocks_when_image_unavailable")
     }
 

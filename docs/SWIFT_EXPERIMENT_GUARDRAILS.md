@@ -133,7 +133,7 @@ Yasak:
 
 ```txt
 service_role key
-GCS private key
+storage provider private key
 Vertex private key
 OpenAI/Anthropic key
 private token

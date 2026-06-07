@@ -21,9 +21,40 @@ struct StoreView: View {
 
     // Restore state
     @State private var isRestoring = false
+    @State private var restoreNotice: StoreNotice?
 
     private var storeKit: SBStoreKitManager { SBStoreKitManager.shared }
     private var router: AppRouter { appState.router }
+
+    private enum StoreNotice {
+        case success(String)
+        case error(String)
+
+        var message: String {
+            switch self {
+            case .success(let message), .error(let message):
+                return message
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .success:
+                return "checkmark.circle"
+            case .error:
+                return "exclamationmark.triangle"
+            }
+        }
+
+        var tint: Color {
+            switch self {
+            case .success:
+                return SBColors.green
+            case .error:
+                return SBColors.red
+            }
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -44,7 +75,7 @@ struct StoreView: View {
                     SBErrorState(
                         title: "Paketler yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await loadStoreData() } }
                     )
                 } else {
@@ -191,6 +222,7 @@ struct StoreView: View {
         let skProduct = storeKit.product(id: package.appStoreProductId)
         let priceDisplay = skProduct?.displayPrice ?? package.priceLabel
         let isBestValue = package.coin >= 200
+        let purchaseLabel = "\(package.coin) MC satın al"
 
         return SBCard(radius: 16) {
             VStack(alignment: .leading, spacing: SBSpacing.md) {
@@ -249,7 +281,7 @@ struct StoreView: View {
                 }
 
                 SBButton(
-                    isBuying ? "İşleniyor..." : "Satın Al",
+                    isBuying ? "İşleniyor..." : purchaseLabel,
                     icon: "bag",
                     variant: .primary,
                     size: .medium,
@@ -258,6 +290,9 @@ struct StoreView: View {
                     action: { Task { await startPurchase(package: package) } }
                 )
                 .disabled(storeKit.isPurchasing)
+                .accessibilityLabel(isBuying ? "\(package.title) paketi için satın alma işleniyor" : "\(package.title) paketini \(priceDisplay) karşılığında satın al")
+                .accessibilityValue("\(package.coin) MC")
+                .accessibilityHint("Ödeme App Store üzerinden onaylanır")
                 .padding(.top, 4)
             }
         }
@@ -267,27 +302,33 @@ struct StoreView: View {
     // MARK: - Restore Section
 
     private var restoreSection: some View {
-        Button {
-            Task { await restorePurchases() }
-        } label: {
-            HStack(spacing: SBSpacing.sm) {
-                if isRestoring {
-                    ProgressView().progressViewStyle(CircularProgressViewStyle(tint: SBColors.blue))
-                        .scaleEffect(0.8)
-                } else {
-                    Image(systemName: "arrow.counterclockwise")
-                        .sbScaledFont(size: 14, weight: .semibold)
-                        .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: SBSpacing.sm) {
+            Button {
+                Task { await restorePurchases() }
+            } label: {
+                HStack(spacing: SBSpacing.sm) {
+                    if isRestoring {
+                        ProgressView().progressViewStyle(CircularProgressViewStyle(tint: SBColors.blue))
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "arrow.counterclockwise")
+                            .sbScaledFont(size: 14, weight: .semibold)
+                            .accessibilityHidden(true)
+                    }
+                    Text(isRestoring ? "Geri yükleniyor..." : "Satın almalarımı geri yükle")
+                        .font(SBTypography.labelSmall)
                 }
-                Text(isRestoring ? "Geri yükleniyor..." : "Satın Almalarımı Geri Yükle")
-                    .font(SBTypography.labelSmall)
+                .foregroundStyle(SBColors.blue)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, SBSpacing.md)
             }
-            .foregroundStyle(SBColors.blue)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, SBSpacing.md)
+            .disabled(isRestoring)
+            .accessibilityLabel("Satın almalarımı geri yükle")
+
+            if let restoreNotice {
+                paymentNotice(icon: restoreNotice.icon, color: restoreNotice.tint, message: restoreNotice.message)
+            }
         }
-        .disabled(isRestoring)
-        .accessibilityLabel("Satın almalarımı geri yükle")
     }
 
     // MARK: - Helper Views
@@ -491,12 +532,18 @@ struct StoreView: View {
 
     private func restorePurchases() async {
         isRestoring = true
+        restoreNotice = nil
         defer { isRestoring = false }
         do {
             try await storeKit.restore()
             await fetchWallet()
+            restoreNotice = .success("App Store eşitlemesi tamamlandı. Varsa bekleyen satın almalar bakiyene yansıtıldı.")
         } catch {
-            // AppStore.sync() failing is non-fatal; user may not have previous purchases
+            restoreNotice = .error(
+                error.localizedDescription.isEmpty
+                    ? "Satın almalar geri yüklenemedi. Biraz sonra tekrar deneyebilirsin."
+                    : error.localizedDescription
+            )
         }
     }
 }

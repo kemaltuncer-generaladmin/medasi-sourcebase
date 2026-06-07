@@ -4,10 +4,12 @@ import SourceBaseBackend
 struct SourceLabHomeView: View {
     @Environment(AppState.self) private var appState
     @Environment(SourceBaseWorkspaceStore.self) private var workspaceStore
+    @AppStorage("sourceLab.lastQuickTool") private var lastQuickToolRawValue = SourceLabQuickTool.clinical.rawValue
     @State private var isLoading = false
     @State private var errorMessage: String?
 
     private var router: AppRouter { appState.router }
+    private var quickTool: SourceLabQuickTool { SourceLabQuickTool(rawValue: lastQuickToolRawValue) ?? .clinical }
     private var selectedSources: Set<String> { workspaceStore.selectedSourceIds }
     private var readyCount: Int { workspaceStore.allFiles.filter { workspaceStore.isReadyForGeneration($0) }.count }
     private var activeSourceLabJobs: Int {
@@ -29,7 +31,7 @@ struct SourceLabHomeView: View {
                     SBErrorState(
                         title: "Yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await loadWorkspace() } }
                     )
                 } else {
@@ -68,7 +70,7 @@ struct SourceLabHomeView: View {
                 router.navigate(to: .search)
             } label: {
                 Image(systemName: "magnifyingglass")
-                    .sbScaledFont(size: 20)
+                    .sbScaledFont(size: 20, weight: .semibold)
                     .foregroundStyle(SBColors.navy)
                     .frame(width: 40, height: 40)
             }
@@ -87,8 +89,8 @@ struct SourceLabHomeView: View {
         ) {
             HStack(spacing: SBSpacing.sm) {
                 SBButton(
-                    selectedSources.isEmpty ? "Kaynak seç" : "Devam et",
-                    icon: selectedSources.isEmpty ? "plus" : "arrow.right",
+                    selectedSources.isEmpty ? "Kaynak seç" : quickTool.ctaLabel,
+                    icon: selectedSources.isEmpty ? "plus" : quickTool.icon,
                     variant: .primary,
                     size: .medium,
                     fullWidth: true,
@@ -96,10 +98,11 @@ struct SourceLabHomeView: View {
                         if selectedSources.isEmpty {
                             router.navigate(to: .sourcePicker)
                         } else {
-                            router.navigate(to: .clinical)
+                            router.navigate(to: quickTool.route)
                         }
                     }
                 )
+                .accessibilityHint(selectedSources.isEmpty ? "Hazır kaynak seçme ekranını açar" : "\(quickTool.title) aracını açar")
                 SBButton(
                     "Kuyruk",
                     icon: "clock",
@@ -141,7 +144,7 @@ struct SourceLabHomeView: View {
                     subtitle: "7 dakikalık kritik tarama.",
                     color: SBColors.orange
                 ) {
-                    router.navigate(to: .examMorning)
+                    openTool(.examMorning)
                 }
 
                 toolCard(
@@ -150,7 +153,7 @@ struct SourceLabHomeView: View {
                     subtitle: "Ayırıcı tanı ve karar pratiği.",
                     color: SBColors.purple
                 ) {
-                    router.navigate(to: .clinical)
+                    openTool(.clinical)
                 }
 
                 toolCard(
@@ -159,7 +162,7 @@ struct SourceLabHomeView: View {
                     subtitle: "Bugün, 72 saat ve 7 gün.",
                     color: SBColors.green
                 ) {
-                    router.navigate(to: .plan)
+                    openTool(.plan)
                 }
 
                 toolCard(
@@ -168,7 +171,7 @@ struct SourceLabHomeView: View {
                     subtitle: "Yolda dinlenecek tekrar.",
                     color: SBColors.purple
                 ) {
-                    router.navigate(to: .podcast)
+                    openTool(.podcast)
                 }
 
                 toolCard(
@@ -177,7 +180,7 @@ struct SourceLabHomeView: View {
                     subtitle: "Tek bakışlık görsel hafıza.",
                     color: SBColors.cyan
                 ) {
-                    router.navigate(to: .infographic)
+                    openTool(.infographic)
                 }
 
                 toolCard(
@@ -186,7 +189,7 @@ struct SourceLabHomeView: View {
                     subtitle: "Kavram ilişkilerini ayır.",
                     color: SBColors.blue
                 ) {
-                    router.navigate(to: .mindMap)
+                    openTool(.mindMap)
                 }
             }
         }
@@ -223,6 +226,11 @@ struct SourceLabHomeView: View {
 
     // MARK: - Helpers
 
+    private func openTool(_ tool: SourceLabQuickTool) {
+        lastQuickToolRawValue = tool.rawValue
+        router.navigate(to: tool.route)
+    }
+
     private func loadWorkspace() async {
         isLoading = !workspaceStore.hasLoadedWorkspace
         errorMessage = nil
@@ -237,6 +245,59 @@ struct SourceLabHomeView: View {
             return true
         case .completed, .failed:
             return false
+        }
+    }
+
+    private enum SourceLabQuickTool: String {
+        case examMorning
+        case clinical
+        case plan
+        case podcast
+        case infographic
+        case mindMap
+
+        var title: String {
+            switch self {
+            case .examMorning: return "Sınav Sabahı"
+            case .clinical: return "Klinik Senaryo"
+            case .plan: return "Öğrenme Planı"
+            case .podcast: return "Podcast"
+            case .infographic: return "İnfografik"
+            case .mindMap: return "Zihin Haritası"
+            }
+        }
+
+        var ctaLabel: String {
+            switch self {
+            case .examMorning: return "Sınav Sabahı oluştur"
+            case .clinical: return "Klinik Senaryo oluştur"
+            case .plan: return "Öğrenme Planı oluştur"
+            case .podcast: return "Podcast oluştur"
+            case .infographic: return "İnfografik oluştur"
+            case .mindMap: return "Zihin Haritası oluştur"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .examMorning: return "bolt"
+            case .clinical: return "cross.case"
+            case .plan: return "checklist"
+            case .podcast: return "mic"
+            case .infographic: return "chart.bar.doc.horizontal"
+            case .mindMap: return "point.3.connected.trianglepath.dotted"
+            }
+        }
+
+        var route: AppRoute {
+            switch self {
+            case .examMorning: return .examMorning
+            case .clinical: return .clinical
+            case .plan: return .plan
+            case .podcast: return .podcast
+            case .infographic: return .infographic
+            case .mindMap: return .mindMap
+            }
         }
     }
 }

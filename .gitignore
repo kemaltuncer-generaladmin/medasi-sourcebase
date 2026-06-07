@@ -17,6 +17,8 @@ build/
 # Build / dependency artifacts
 Pods/
 Carthage/Build/
+__pycache__/
+*.py[cod]
 
 # Auto-generated entries
 # Dependencies
@@ -49,7 +51,9 @@ Thumbs.db
 *.tmp
 *.temp
 .cache/
+.artifacts/
+.verdent-artifacts/
+.verdent-sourcebase-sim.png
 
 # Sensitive files (auto-detected)
 .xcodebuildmcp
-

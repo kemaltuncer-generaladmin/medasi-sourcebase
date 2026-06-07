@@ -1,0 +1,12 @@
+[
+  {
+    "AllowedOrigins": [
+      "https://sourcebase.medasi.com.tr",
+      "http://localhost:8088"
+    ],
+    "AllowedMethods": ["PUT", "GET", "HEAD", "DELETE"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["Content-Type", "Content-Length", "ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]

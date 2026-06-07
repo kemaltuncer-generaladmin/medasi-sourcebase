@@ -1,5 +1,38 @@
 import SwiftUI
 
+/// Context variants provide branded, context-specific empty states
+/// while sharing the same structural DNA.
+public enum SBEmptyStateContext {
+    case generic
+    case drive
+    case baseForce
+    case generationWaiting
+    case sourceMissing
+    case completedSuccess
+
+    var tint: Color {
+        switch self {
+        case .generic: return SBColors.blue
+        case .drive: return SBColors.blue
+        case .baseForce: return SBColors.cyan
+        case .generationWaiting: return SBColors.purple
+        case .sourceMissing: return SBColors.warning
+        case .completedSuccess: return SBColors.green
+        }
+    }
+
+    var motivationLine: String? {
+        switch self {
+        case .drive: return "Her yüklenen kaynak seni bir adım öne taşır."
+        case .baseForce: return "Doğru kaynak, doğru çıktıya giden ilk adım."
+        case .generationWaiting: return "Biraz sabır, kaliteli sonuç geliyor."
+        case .completedSuccess: return "Harika iş. Şimdi çalışmaya geçebilirsin."
+        case .sourceMissing: return "Uygun bir kaynak seçince devam edebilirsin."
+        case .generic: return nil
+        }
+    }
+}
+
 public struct SBEmptyState: View {
     let icon: String
     let title: String
@@ -9,6 +42,7 @@ public struct SBEmptyState: View {
     let onAction: (() -> Void)?
     let secondaryLabel: String?
     let onSecondaryAction: (() -> Void)?
+    let context: SBEmptyStateContext
 
     public init(
         icon: String = "folder",
@@ -18,7 +52,8 @@ public struct SBEmptyState: View {
         actionLabel: String? = nil,
         onAction: (() -> Void)? = nil,
         secondaryLabel: String? = nil,
-        onSecondaryAction: (() -> Void)? = nil
+        onSecondaryAction: (() -> Void)? = nil,
+        context: SBEmptyStateContext = .generic
     ) {
         self.icon = icon
         self.title = title
@@ -28,6 +63,7 @@ public struct SBEmptyState: View {
         self.onAction = onAction
         self.secondaryLabel = secondaryLabel
         self.onSecondaryAction = onSecondaryAction
+        self.context = context
     }
 
     public var body: some View {
@@ -36,11 +72,11 @@ public struct SBEmptyState: View {
                 // Icon
                 ZStack {
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(SBColors.selectedBlue)
+                        .fill(context.tint.opacity(0.12))
                         .frame(width: 56, height: 56)
                     Image(systemName: icon)
                         .sbScaledFont(size: 26, weight: .medium)
-                        .foregroundStyle(SBColors.blue)
+                        .foregroundStyle(context.tint)
                 }
 
                 // Title
@@ -55,16 +91,24 @@ public struct SBEmptyState: View {
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
 
+                // Motivation line
+                if let motivation = context.motivationLine {
+                    Text(motivation)
+                        .font(SBTypography.caption)
+                        .foregroundStyle(context.tint.opacity(0.82))
+                        .italic()
+                }
+
                 // Badges
                 if !badges.isEmpty {
                     FlowLayout(spacing: SBSpacing.sm) {
                         ForEach(badges, id: \.self) { badge in
                             Text(badge)
                                 .font(SBTypography.labelSmall)
-                                .foregroundStyle(SBColors.blue)
+                                .foregroundStyle(context.tint)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
-                                .background(SBColors.selectedBlue)
+                                .background(context.tint.opacity(0.10))
                                 .clipShape(Capsule())
                         }
                     }

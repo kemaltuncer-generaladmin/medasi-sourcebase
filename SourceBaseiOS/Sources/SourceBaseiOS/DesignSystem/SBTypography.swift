@@ -6,8 +6,8 @@ public enum SBTypography {
     public static let display2 = Font.system(.largeTitle, design: .default).weight(.heavy)
 
     // MARK: - Heading
-    public static let heading1 = Font.system(.title, design: .default).weight(.bold)
-    public static let heading2 = Font.system(.title2, design: .default).weight(.bold)
+    public static let heading1 = Font.system(size: 34, weight: .bold, design: .default)
+    public static let heading2 = Font.system(size: 24, weight: .bold, design: .default)
     public static let heading3 = Font.system(.title3, design: .default).weight(.bold)
 
     // MARK: - Title

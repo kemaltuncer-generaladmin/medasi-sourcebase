@@ -59,7 +59,7 @@ struct FolderView: View {
                     SBErrorState(
                         title: "Bölüm yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await loadSection() } }
                     )
                 } else if section == nil {
@@ -83,7 +83,7 @@ struct FolderView: View {
             .padding(SBSpacing.lg)
             .sbFloatingTabContentPadding()
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .warm)
         .navigationTitle(section?.title ?? "Bölüm")
         .sheet(isPresented: $showUploadSheet) {
             DriveUploadSheet(initialDestination: initialUploadDestination) { _ in
@@ -155,7 +155,7 @@ struct FolderView: View {
     private var actionButtons: some View {
         HStack(spacing: SBSpacing.md) {
             SBButton(
-                "Dosya Yükle",
+                "Dosya yükle",
                 icon: "plus",
                 variant: .primary,
                 size: .small,
@@ -230,7 +230,7 @@ struct FolderView: View {
                 icon: "doc.badge.plus",
                 title: "Bu bölümde henüz dosya yok",
                 message: "Yeni dosyalar yükleyerek başlayabilirsin.",
-                actionLabel: "Dosya Yükle",
+                actionLabel: "Dosya yükle",
                 onAction: { showUploadSheet = true }
             )
         } else if visibleFiles.isEmpty {
@@ -268,23 +268,28 @@ struct FolderView: View {
                         if isSelected {
                             Image(systemName: "checkmark")
                                 .sbScaledFont(size: 14, weight: .bold)
-                                .foregroundStyle(.white)
+                            .foregroundStyle(.white)
                         }
                     }
+                    .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(isSelected ? "Seçimi kaldır" : "Dosyayı seç")
+                .accessibilityValue(file.title)
 
                 SBFileKindBadge(kind: SBFileKind.from(file.kind))
 
-                VStack(alignment: .leading, spacing: SBSpacing.xs) {
-                    Text(file.title)
-                        .font(SBTypography.titleSmall)
-                        .foregroundStyle(SBColors.navy)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    router.navigate(to: .fileDetail(fileId: file.id))
+                } label: {
+                    VStack(alignment: .leading, spacing: SBSpacing.xs) {
+                        Text(file.title)
+                            .font(SBTypography.titleSmall)
+                            .foregroundStyle(SBColors.navy)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
 
-                    FlowLayout(spacing: SBSpacing.sm) {
+                        FlowLayout(spacing: SBSpacing.sm) {
                             Text(SBFileKind.from(file.kind).label)
                                 .font(SBTypography.caption)
                                 .foregroundStyle(SBFileKind.from(file.kind).color)
@@ -296,13 +301,13 @@ struct FolderView: View {
                             Text(file.pageLabel)
                                 .font(SBTypography.caption)
                                 .foregroundStyle(SBColors.muted)
+                        }
                     }
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    router.navigate(to: .fileDetail(fileId: file.id))
-                }
-                .accessibilityAddTraits(.isButton)
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(file.title) dosyasını aç")
+                .accessibilityValue("\(SBFileKind.from(file.kind).label), \(file.pageLabel)")
+                .accessibilityHint("Dosya detayını açar")
 
                 Spacer()
 

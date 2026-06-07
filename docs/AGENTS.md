@@ -95,7 +95,7 @@ Kesinlikle yasak:
 - private key yazmak
 - token yazmak
 - service role key yazmak
-- GCS key yazmak
+- storage provider key yazmak
 - Vertex service account JSON yazmak
 - API secret yazmak
 - `.env` içeriğini print etmek
@@ -115,7 +115,7 @@ SOURCEBASE_SUPABASE_ANON_KEY = <set via env or xcconfig>
 
 ```txt
 let serviceRoleKey = "eyJ..."
-let privateKey = "-----BEGIN PRIVATE KEY-----"
+let privateKey = "<private-key-pem>"
 ```
 
 ## 3.4 Büyük Refactor Yasağı

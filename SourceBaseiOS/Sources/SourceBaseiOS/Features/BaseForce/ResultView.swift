@@ -43,7 +43,7 @@ struct ResultView: View {
                     SBErrorState(
                         title: "Sonuç yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await monitorResult(force: true) } }
                     )
                 } else {
@@ -76,7 +76,7 @@ struct ResultView: View {
             .padding(SBSpacing.lg)
             .sbFloatingTabContentPadding()
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .cool)
         .navigationTitle(result?.title ?? "Üretim Sonucu")
         .sbInlineNavTitle()
         .task {
@@ -101,8 +101,8 @@ struct ResultView: View {
     private func headerHero(_ result: GenerationResult) -> some View {
         SBSignatureHero(
             eyebrow: "Sonuç",
-            title: outputKindLabel(result.kind),
-            message: result.sourceTitle,
+            title: "\(outputKindLabel(result.kind)) hazır",
+            message: "\(result.sourceTitle) kaynağından üretildi. Şimdi oku, kopyala ya da koleksiyonda aç.",
             icon: outputIcon(result.kind),
             tint: outputColor(result.kind)
         ) {
@@ -119,7 +119,7 @@ struct ResultView: View {
     // MARK: - Result Preview Card
 
     private func resultPreviewCard(_ result: GenerationResult) -> some View {
-        SBCommandCard(tint: outputColor(result.kind), action: openCollections) {
+        SBCard(radius: 18, borderColor: outputColor(result.kind).opacity(0.18)) {
             VStack(alignment: .leading, spacing: SBSpacing.md) {
                 HStack(spacing: SBSpacing.md) {
                     SBIconTile(icon: outputIcon(result.kind), tint: outputColor(result.kind), size: 46, radius: 13)
@@ -152,21 +152,13 @@ struct ResultView: View {
 
                     Spacer()
 
-                    SBButton(
-                        "Koleksiyonda aç",
-                        icon: "rectangle.stack",
-                        variant: .primary,
-                        size: .small,
-                        action: openCollections
-                    )
-
-                    SBButton(
-                        "Tekrar üret",
-                        icon: "arrow.clockwise",
-                        variant: .secondary,
-                        size: .small,
-                        action: regenerate
-                    )
+                    Text(result.mcCostLabel ?? "Kaydedildi")
+                        .font(SBTypography.labelSmall)
+                        .foregroundStyle(outputColor(result.kind))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(outputColor(result.kind).opacity(0.08))
+                        .clipShape(Capsule())
                 }
             }
         }
@@ -178,7 +170,7 @@ struct ResultView: View {
         SBCard(radius: 16) {
             VStack(spacing: SBSpacing.md) {
                 Image(systemName: "exclamationmark.triangle")
-                    .sbScaledFont(size: 32)
+                    .sbScaledFont(size: 32, weight: .semibold)
                     .foregroundStyle(SBColors.orange)
 
                 Text("Boş içerik döndü")
@@ -202,7 +194,7 @@ struct ResultView: View {
         SBCard(radius: 14) {
             VStack(spacing: SBSpacing.md) {
                 Image(systemName: "exclamationmark.triangle")
-                    .sbScaledFont(size: 28)
+                    .sbScaledFont(size: 28, weight: .semibold)
                     .foregroundStyle(SBColors.orange)
 
                 Text("Sonuç görüntülendi")
@@ -227,10 +219,10 @@ struct ResultView: View {
                 .foregroundStyle(SBColors.navy)
 
             if result != nil {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: SBSpacing.md)], spacing: SBSpacing.md) {
-                    quickAction(icon: "doc.on.doc", label: "Kopyala", color: SBColors.green, action: export)
-                    quickAction(icon: "doc.text.magnifyingglass", label: "Kaynağa dön", color: SBColors.orange, action: openSource)
-                    quickAction(icon: "arrow.triangle.2.circlepath", label: "Tekrar üret", color: SBColors.purple, action: regenerate)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: SBSpacing.md)], spacing: SBSpacing.md) {
+                    quickAction(icon: "doc.on.doc", label: "Metni kopyala", color: SBColors.green, action: export)
+                    quickAction(icon: "doc.text.magnifyingglass", label: "Kaynağı aç", color: SBColors.orange, action: openSource)
+                    quickAction(icon: "arrow.triangle.2.circlepath", label: "Aynı kaynaktan tekrar üret", color: SBColors.purple, action: regenerate)
                 }
             }
         }
@@ -256,12 +248,12 @@ struct ResultView: View {
 
     private var primaryActionButton: some View {
         SBButton(
-            "Koleksiyonda aç",
-            icon: "rectangle.stack",
+            "Çalışma görünümünde aç",
+            icon: "play.rectangle",
             variant: .primary,
             size: .large,
             fullWidth: true,
-            action: openCollections
+            action: openStudyOutput
         )
     }
 
@@ -271,7 +263,7 @@ struct ResultView: View {
         SBCard {
             VStack(spacing: SBSpacing.md) {
                 Image(systemName: "doc.text.magnifyingglass")
-                    .sbScaledFont(size: 32)
+                    .sbScaledFont(size: 32, weight: .semibold)
                     .foregroundStyle(SBColors.blue)
 
                 Text("Sonuç bekleniyor")
@@ -291,9 +283,9 @@ struct ResultView: View {
 
     private var nextStepButton: some View {
         SBButton(
-            "Tekrar üretime dön",
-            icon: "arrow.triangle.2.circlepath",
-            variant: .primary,
+            "Yeni üretim başlat",
+            icon: "bolt.fill",
+            variant: .secondary,
             size: .large,
             fullWidth: true,
             action: regenerate
@@ -362,9 +354,13 @@ struct ResultView: View {
         return "\(cleaned.prefix(177).trimmingCharacters(in: .whitespaces))..."
     }
 
-    private func openCollections() {
+    private func openStudyOutput() {
+        guard let output = findOutput() else {
+            workspaceStore.toast("Hazır çalışma çıktısı bulunamadı.")
+            return
+        }
         saveError = nil
-        router.navigate(to: .collections)
+        router.navigate(to: .studyOutput(outputId: output.id))
     }
 
     private func export() {
@@ -383,12 +379,36 @@ struct ResultView: View {
     }
 
     private func regenerate() {
-        router.pop()
+        if let result {
+            workspaceStore.setSelectedSources([result.sourceFileId])
+            if let file = workspaceStore.file(id: result.sourceFileId) {
+                workspaceStore.selectFile(file)
+            }
+        }
+        router.beginSourceSelection(from: .baseForce, destination: .route(factoryRoute))
     }
 
     private func openSource() {
         guard let result else { return }
         router.navigate(to: .fileDetail(fileId: result.sourceFileId))
+    }
+
+    private var factoryRoute: AppRoute {
+        guard let kind = result?.kind else { return .baseForce }
+        switch kind {
+        case .flashcard:
+            return .flashcardFactory
+        case .question:
+            return .questionFactory
+        case .summary, .examMorningSummary:
+            return .summaryFactory
+        case .algorithm:
+            return .algorithmFactory
+        case .comparison, .table:
+            return .comparisonFactory
+        default:
+            return .baseForce
+        }
     }
 
     private func monitorResult(force: Bool = false) async {

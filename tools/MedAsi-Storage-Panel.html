@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MedAsi Storage Panel</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101214;
+      --panel: #171b1f;
+      --line: #2a3138;
+      --text: #edf2f7;
+      --muted: #9ca7b3;
+      --accent: #44c2a8;
+      --accent-2: #7aa7ff;
+      --warn: #ffc857;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif;
+    }
+    main {
+      width: min(1120px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 44px 0;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: flex-end;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--line);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+    p { margin: 0; color: var(--muted); line-height: 1.55; }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      background: #12161a;
+      color: var(--muted);
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--warn);
+    }
+    .status.ok .dot { background: var(--accent); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 24px;
+    }
+    a.card {
+      display: block;
+      min-height: 154px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: inherit;
+      text-decoration: none;
+      border-radius: 8px;
+      transition: border-color .15s ease, transform .15s ease, background .15s ease;
+    }
+    a.card:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+      background: #1b2025;
+    }
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+    h2 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+    .tag {
+      color: var(--accent);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .url {
+      margin-top: 14px;
+      color: var(--accent-2);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+    .note {
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 14px;
+    }
+    @media (max-width: 760px) {
+      main { width: min(100% - 24px, 1120px); padding: 24px 0; }
+      header { display: block; }
+      .status { margin-top: 18px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>MedAsi Storage Panel</h1>
+        <p>Bu ekran sadece Mac uzerindeki SSH tunnel ile calisan yonetim kisayollarini acar.</p>
+      </div>
+      <div id="status" class="status"><span class="dot"></span><span>Kontrol ediliyor</span></div>
+    </header>
+
+    <section class="grid" aria-label="Uygulamalar">
+      <a class="card" href="http://127.0.0.1:18023" target="_blank" rel="noreferrer">
+        <div class="card-top"><h2>CasaOS</h2><span class="tag">Yonetim</span></div>
+        <p>Sunucu uygulamalari, disk ve temel sistem yonetimi.</p>
+        <div class="url">127.0.0.1:18023</div>
+      </a>
+      <a class="card" href="http://127.0.0.1:18024" target="_blank" rel="noreferrer">
+        <div class="card-top"><h2>FileBrowser</h2><span class="tag">Dosyalar</span></div>
+        <p>Inbox, CodeVault, Shared, Backups ve Object Storage mount erisimi.</p>
+        <div class="url">127.0.0.1:18024</div>
+      </a>
+      <a class="card" href="http://127.0.0.1:18030" target="_blank" rel="noreferrer">
+        <div class="card-top"><h2>Health Center</h2><span class="tag">Izleme</span></div>
+        <p>CX33 ve ana server servis sagligi, container durumu ve olay gecmisi.</p>
+        <div class="url">127.0.0.1:18030</div>
+      </a>
+      <a class="card" href="http://127.0.0.1:9001" target="_blank" rel="noreferrer">
+        <div class="card-top"><h2>MinIO Console</h2><span class="tag">Local S3</span></div>
+        <p>Yerel MinIO paneli. SourceBase kullanici dosyalari Hetzner Object Storage'a gider.</p>
+        <div class="url">127.0.0.1:9001</div>
+      </a>
+      <a class="card" href="https://sourcebase.medasi.com.tr" target="_blank" rel="noreferrer">
+        <div class="card-top"><h2>SourceBase</h2><span class="tag">Canli</span></div>
+        <p>Canli SourceBase uygulamasi ve yeni Object Storage upload akisi.</p>
+        <div class="url">sourcebase.medasi.com.tr</div>
+      </a>
+      <a class="card" href="https://console.hetzner.com" target="_blank" rel="noreferrer">
+        <div class="card-top"><h2>Hetzner Console</h2><span class="tag">Cloud</span></div>
+        <p>CX33, Object Storage ve proje kaynaklari.</p>
+        <div class="url">console.hetzner.com</div>
+      </a>
+    </section>
+
+    <p class="note">Paneller public IP uzerinden kapali. Oturumun tarayicida aciksa kartlar sifre sormadan gecer; sifreyi HTML veya URL icine gommedim.</p>
+  </main>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const checks = [
+      "http://127.0.0.1:18023",
+      "http://127.0.0.1:18024",
+      "http://127.0.0.1:9000/minio/health/live"
+    ];
+    Promise.allSettled(checks.map((url) => fetch(url, { mode: "no-cors", cache: "no-store" })))
+      .then((results) => {
+        const ok = results.some((result) => result.status === "fulfilled");
+        statusEl.classList.toggle("ok", ok);
+        statusEl.querySelector("span:last-child").textContent = ok ? "Tunnel acik" : "Tunnel bekleniyor";
+      });
+  </script>
+</body>
+</html>

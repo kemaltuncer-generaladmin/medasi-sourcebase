@@ -297,6 +297,7 @@ struct CentralAIView: View {
                                 .foregroundStyle(.white)
                         }
                     }
+                    .frame(width: 44, height: 44)
                 }
                 .accessibilityLabel(isSending ? "Gönderiliyor" : "Gönder")
                 .accessibilityValue(isSending ? "Mesaj gönderiliyor" : (canSendMessage ? "Hazır" : "Mesaj boş"))

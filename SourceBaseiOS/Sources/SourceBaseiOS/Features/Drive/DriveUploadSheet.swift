@@ -23,6 +23,14 @@ struct DriveUploadSheet: View {
         selectedDestination?.courseId ?? workspaceStore.selectedCourseId ?? workspaceStore.workspace.primaryCourse?.id
     }
 
+    private var canPickFile: Bool {
+        selectedDestination != nil
+    }
+
+    private var canCreateSection: Bool {
+        selectedCourseId != nil
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -42,7 +50,7 @@ struct DriveUploadSheet: View {
                 .padding(SBSpacing.lg)
                 .padding(.bottom, 96)
             }
-            .sbPageBackground()
+            .sbPageBackground(tone: .warm)
             .navigationTitle("Yükle")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -121,6 +129,7 @@ struct DriveUploadSheet: View {
                 variant: .primary,
                 size: .large,
                 isLoading: workspaceStore.isBusy,
+                isDisabled: !canPickFile,
                 fullWidth: true
             ) {
                 guard selectedDestination != nil else {
@@ -166,6 +175,7 @@ struct DriveUploadSheet: View {
                     SBButton("Bölüm ekle", icon: "folder.badge.plus", variant: .secondary, size: .small) {
                         showCreateSection = true
                     }
+                    .disabled(!canCreateSection)
                 }
             }
         }
@@ -212,6 +222,7 @@ struct DriveUploadSheet: View {
             SBButton("Bölüm ekle", icon: "folder.badge.plus", variant: .secondary, size: .small) {
                 showCreateSection = true
             }
+            .disabled(!canCreateSection)
         }
     }
 

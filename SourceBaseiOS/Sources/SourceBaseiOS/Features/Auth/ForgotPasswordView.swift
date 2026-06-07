@@ -36,7 +36,9 @@ struct ForgotPasswordView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .foregroundStyle(SBColors.muted)
+                        .frame(width: 44, height: 44)
                 }
+                .accessibilityLabel("Şifre yenilemeyi kapat")
             }
         }
         .onChange(of: session.successMessage) { _, message in

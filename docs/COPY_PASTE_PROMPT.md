@@ -23,7 +23,7 @@ Mutlak kurallar:
 - Upload logic değiştirme.
 - Generation logic değiştirme.
 - MC/refund mantığına dokunma.
-- Secret, token, private key, service role key, GCS key, Vertex key yazma.
+- Secret, token, private key, service role key, storage provider key, Vertex key yazma.
 - `.env` içeriğini print etme.
 - Yeni dependency ekleme.
 - Büyük refactor yapma.

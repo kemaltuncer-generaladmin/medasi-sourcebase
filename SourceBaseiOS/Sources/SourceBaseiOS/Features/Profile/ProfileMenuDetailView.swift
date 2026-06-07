@@ -61,7 +61,7 @@ struct ProfileMenuDetailView: View {
     @AppStorage(SBProfilePreferenceKey.generationNotifications) private var generationNotifications = true
     @AppStorage(SBProfilePreferenceKey.studyNotifications) private var studyNotifications = false
     @AppStorage(SBProfilePreferenceKey.analyticsSharing) private var analyticsSharing = false
-    @State private var message: String?
+    @State private var notice: ProfileNotice?
     @State private var showSignOutConfirmation = false
     @State private var showDeletionConfirmation = false
     @State private var isRequestingDeletion = false
@@ -73,6 +73,36 @@ struct ProfileMenuDetailView: View {
     private var router: AppRouter { appState.router }
     private var session: SessionStore { appState.session }
 
+    private enum ProfileNotice {
+        case success(String)
+        case error(String)
+
+        var message: String {
+            switch self {
+            case .success(let message), .error(let message):
+                return message
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .success:
+                return "checkmark.circle"
+            case .error:
+                return "exclamationmark.triangle"
+            }
+        }
+
+        var tint: Color {
+            switch self {
+            case .success:
+                return SBColors.green
+            case .error:
+                return SBColors.red
+            }
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SBSpacing.lg) {
@@ -81,8 +111,8 @@ struct ProfileMenuDetailView: View {
                     subtitle: destination.subtitle
                 )
 
-                if let message {
-                    SBNotice(icon: "checkmark.circle", message: message, tint: SBColors.green)
+                if let notice {
+                    SBNotice(icon: notice.icon, message: notice.message, tint: notice.tint)
                 }
 
                 detailContent
@@ -101,11 +131,11 @@ struct ProfileMenuDetailView: View {
             }
         }
         .confirmationDialog(
-            "Oturumu Kapat",
+            "Oturumu kapat",
             isPresented: $showSignOutConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Oturumu Kapat", role: .destructive) {
+            Button("Oturumu kapat", role: .destructive) {
                 Task { await appState.signOut() }
             }
             Button("Vazgeç", role: .cancel) {}
@@ -168,7 +198,7 @@ struct ProfileMenuDetailView: View {
                 requestPasswordReset()
             }
 
-            SBButton("Oturumu Kapat", icon: "door.right.to.left.open", variant: .secondary, fullWidth: true) {
+            SBButton("Oturumu kapat", icon: "door.right.to.left.open", variant: .secondary, fullWidth: true) {
                 showSignOutConfirmation = true
             }
         }
@@ -412,13 +442,21 @@ struct ProfileMenuDetailView: View {
 
     private func requestPasswordReset() {
         guard !session.email.isEmpty else {
-            message = "Şifre yenileme için hesap e-postası bulunamadı."
+            notice = .error("Şifre yenileme için hesap e-postası bulunamadı.")
             return
         }
 
+        notice = nil
+        session.clearMessages()
         Task {
             await session.sendPasswordReset(email: session.email)
-            message = session.successMessage ?? session.errorMessage ?? "Şifre yenileme isteği tamamlandı."
+            if let success = session.successMessage, !success.isEmpty {
+                notice = .success(success)
+            } else if let error = session.errorMessage, !error.isEmpty {
+                notice = .error(error)
+            } else {
+                notice = .success("Şifre yenileme bağlantısı gönderildi.")
+            }
         }
     }
 
@@ -432,7 +470,7 @@ struct ProfileMenuDetailView: View {
                 // Sign out immediately after deletion request — Apple requirement
                 await appState.signOut()
             } else {
-                message = workspaceStore.toastMessage ?? "Talep gönderilemedi. Lütfen tekrar dene."
+                notice = .error(workspaceStore.toastMessage ?? "Talep gönderilemedi. Lütfen tekrar dene.")
             }
         }
     }
@@ -450,10 +488,10 @@ struct ProfileMenuDetailView: View {
                 message: supportMessage
             )
             if ok {
-                message = "Destek formun alındı."
+                notice = .success("Destek formun alındı.")
                 supportMessage = ""
             } else {
-                message = workspaceStore.toastMessage
+                notice = .error(workspaceStore.toastMessage ?? "Destek formu gönderilemedi. Lütfen tekrar dene.")
             }
             isSubmittingSupport = false
         }
@@ -520,7 +558,7 @@ struct ProfileMenuDetailView: View {
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .sbScaledFont(size: 13, weight: .bold)
+                    .sbScaledFont(size: 13, weight: .semibold)
                     .foregroundStyle(SBColors.softText)
             }
             .contentShape(Rectangle())

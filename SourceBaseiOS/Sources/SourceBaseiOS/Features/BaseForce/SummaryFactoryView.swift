@@ -46,7 +46,7 @@ struct SummaryFactoryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SBSpacing.lg) {
+            VStack(alignment: .leading, spacing: BaseForceFactoryStyle.screenSpacing) {
                 if isLoading {
                     SBLoadingState(
                         icon: "doc.text",
@@ -57,7 +57,7 @@ struct SummaryFactoryView: View {
                     SBErrorState(
                         title: "Yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await loadWorkspace() } }
                     )
                 } else {
@@ -70,11 +70,11 @@ struct SummaryFactoryView: View {
                     }
                 }
             }
-            .padding(SBSpacing.lg)
+            .padding(BaseForceFactoryStyle.pagePadding)
             .sbFloatingTabContentPadding()
             .sbReadableWidth(760)
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .cool)
         .navigationTitle("Sınav Sabahı Özeti")
         .task {
             await loadWorkspace()
@@ -89,7 +89,8 @@ struct SummaryFactoryView: View {
             title: "Son tekrarı hazırla",
             message: "Yüksek getirili başlıkları, tabloları ve kontrol listesini tek ekrana topla.",
             icon: "doc.text.fill",
-            tint: SBColors.purple
+            tint: SBColors.purple,
+            size: .compact
         ) {
             EmptyView()
         } footer: {
@@ -104,7 +105,7 @@ struct SummaryFactoryView: View {
     // MARK: - Selected Sources
 
     private var selectedSourcesSection: some View {
-        VStack(alignment: .leading, spacing: SBSpacing.md) {
+        BaseForceFactoryStyle.panel {
             Text("Kaynak")
                 .font(SBTypography.titleSmall)
                 .foregroundStyle(SBColors.navy)
@@ -126,34 +127,31 @@ struct SummaryFactoryView: View {
     }
 
     private var sourceRequiredCard: some View {
-        SBCard(radius: 14, borderColor: SBColors.blue.opacity(0.2)) {
-            VStack(alignment: .leading, spacing: SBSpacing.md) {
-                HStack(spacing: SBSpacing.md) {
-                    ZStack {
-                        Circle()
-                            .fill(SBColors.selectedBlue)
-                            .frame(width: 40, height: 40)
+        BaseForceFactoryStyle.sourceRequiredPanel {
+            HStack(spacing: SBSpacing.md) {
+                SBIconTile(
+                    icon: "doc.text.magnifyingglass",
+                    tint: SBColors.blue,
+                    size: BaseForceFactoryStyle.iconTileSize,
+                    radius: BaseForceFactoryStyle.iconTileRadius
+                )
 
-                        Image(systemName: "doc.text.magnifyingglass")
-                            .sbScaledFont(size: 18)
-                            .foregroundStyle(SBColors.blue)
-                    }
+                Text("Önce bir kaynak seç")
+                    .font(SBTypography.titleSmall)
+                    .foregroundStyle(SBColors.navy)
+            }
 
-                    Text("Önce bir kaynak seç")
-                        .font(SBTypography.titleSmall)
-                        .foregroundStyle(SBColors.navy)
-                }
+            Text("Hazır bir kaynak seç.")
+                .font(SBTypography.bodySmall)
+                .foregroundStyle(SBColors.muted)
 
-                Text("Hazır bir kaynak seç.")
-                    .font(SBTypography.bodySmall)
-                    .foregroundStyle(SBColors.muted)
-
-                FlowLayout(spacing: SBSpacing.xs) {
-                    tagChip(label: "Hazır kaynak", color: SBColors.blue)
-                    tagChip(label: "PDF / PPT(X) / DOC(X)", color: SBColors.purple)
-                }
+            FlowLayout(spacing: SBSpacing.xs) {
+                tagChip(label: "Hazır kaynak", color: SBColors.blue)
+                tagChip(label: "PDF / PPT(X) / DOC(X)", color: SBColors.purple)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Önce hazır bir kaynak seç. Alttaki Hazır kaynak seç düğmesini kullan.")
     }
 
     private func sourceChip(file: DriveFile) -> some View {
@@ -175,16 +173,16 @@ struct SummaryFactoryView: View {
         .padding(.horizontal, SBSpacing.sm)
         .padding(.vertical, SBSpacing.xs)
         .background(SBColors.white)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: BaseForceFactoryStyle.chipRadius))
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: BaseForceFactoryStyle.chipRadius)
                 .stroke(SBColors.softLine, lineWidth: 1)
         )
     }
 
     private var addSourceChip: some View {
         Button {
-            router.navigate(to: .sourcePicker)
+            openSourcePicker()
         } label: {
             HStack(spacing: SBSpacing.xs) {
                 Image(systemName: "plus")
@@ -197,9 +195,9 @@ struct SummaryFactoryView: View {
             .padding(.horizontal, SBSpacing.md)
             .padding(.vertical, SBSpacing.sm)
             .background(SBColors.white)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: BaseForceFactoryStyle.chipRadius))
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: BaseForceFactoryStyle.chipRadius)
                     .stroke(SBColors.blue.opacity(0.3), lineWidth: 1.5)
             )
         }
@@ -218,94 +216,91 @@ struct SummaryFactoryView: View {
     // MARK: - Settings Grid
 
     private var settingsGrid: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: SBSpacing.md)], spacing: SBSpacing.md) {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 240), spacing: BaseForceFactoryStyle.panelSpacing)],
+            spacing: BaseForceFactoryStyle.panelSpacing
+        ) {
             // Length Panel
-            SBCard(radius: 16) {
-                VStack(alignment: .leading, spacing: SBSpacing.md) {
-                    HStack(spacing: SBSpacing.xs) {
-                        Image(systemName: "doc.text")
-                            .sbScaledFont(size: 14)
-                            .foregroundStyle(SBColors.blue)
+            BaseForceFactoryStyle.panel {
+                HStack(spacing: SBSpacing.xs) {
+                    Image(systemName: "doc.text")
+                        .sbScaledFont(size: 14)
+                        .foregroundStyle(SBColors.blue)
 
-                        Text("Uzunluk")
-                            .font(SBTypography.labelSmall)
-                            .foregroundStyle(SBColors.navy)
-                    }
+                    Text("Uzunluk")
+                        .font(SBTypography.labelSmall)
+                        .foregroundStyle(SBColors.navy)
+                }
 
-                    VStack(spacing: SBSpacing.sm) {
-                        ForEach(SummaryLength.allCases, id: \.self) { length in
-                            segmentButton(
-                                label: length.rawValue,
-                                isSelected: summaryLength == length
-                            ) {
-                                summaryLength = length
-                            }
+                VStack(spacing: SBSpacing.sm) {
+                    ForEach(SummaryLength.allCases, id: \.self) { length in
+                        segmentButton(
+                            label: length.rawValue,
+                            isSelected: summaryLength == length
+                        ) {
+                            summaryLength = length
                         }
                     }
                 }
             }
 
             // Focus Panel
-            SBCard(radius: 16) {
-                VStack(alignment: .leading, spacing: SBSpacing.md) {
-                    HStack(spacing: SBSpacing.xs) {
-                        Image(systemName: "target")
-                            .sbScaledFont(size: 14)
-                            .foregroundStyle(SBColors.blue)
+            BaseForceFactoryStyle.panel {
+                HStack(spacing: SBSpacing.xs) {
+                    Image(systemName: "target")
+                        .sbScaledFont(size: 14)
+                        .foregroundStyle(SBColors.blue)
 
-                        Text("Odak")
-                            .font(SBTypography.labelSmall)
-                            .foregroundStyle(SBColors.navy)
-                    }
+                    Text("Odak")
+                        .font(SBTypography.labelSmall)
+                        .foregroundStyle(SBColors.navy)
+                }
 
-                    VStack(spacing: SBSpacing.sm) {
-                        ForEach(SummaryFocus.allCases, id: \.self) { focus in
-                            segmentButton(
-                                label: focus.rawValue,
-                                isSelected: summaryFocus == focus
-                            ) {
-                                summaryFocus = focus
-                            }
+                VStack(spacing: SBSpacing.sm) {
+                    ForEach(SummaryFocus.allCases, id: \.self) { focus in
+                        segmentButton(
+                            label: focus.rawValue,
+                            isSelected: summaryFocus == focus
+                        ) {
+                            summaryFocus = focus
                         }
                     }
                 }
             }
 
             // Highlight Panel
-            SBCard(radius: 16) {
-                VStack(alignment: .leading, spacing: SBSpacing.md) {
-                    HStack(spacing: SBSpacing.xs) {
-                        Image(systemName: "highlighter")
-                            .sbScaledFont(size: 14)
-                            .foregroundStyle(SBColors.blue)
+            BaseForceFactoryStyle.panel {
+                HStack(spacing: SBSpacing.xs) {
+                    Image(systemName: "highlighter")
+                        .sbScaledFont(size: 14)
+                        .foregroundStyle(SBColors.blue)
 
-                        Text("Ekler")
-                            .font(SBTypography.labelSmall)
+                    Text("Ekler")
+                        .font(SBTypography.labelSmall)
+                        .foregroundStyle(SBColors.navy)
+                }
+
+                VStack(spacing: SBSpacing.sm) {
+                    Toggle(isOn: $markTerms) {
+                        Text("Terimleri işaretle")
+                            .font(SBTypography.bodySmall)
                             .foregroundStyle(SBColors.navy)
                     }
+                    .toggleStyle(SwitchToggleStyle(tint: SBColors.blue))
 
-                    VStack(spacing: SBSpacing.sm) {
-                        Toggle(isOn: $markTerms) {
-                            Text("Terimleri işaretle")
-                                .font(SBTypography.bodySmall)
-                                .foregroundStyle(SBColors.navy)
-                        }
-                        .toggleStyle(SwitchToggleStyle(tint: SBColors.blue))
-
-                        Toggle(isOn: $toTable) {
-                            Text("Tabloya dönüştür")
-                                .font(SBTypography.bodySmall)
-                                .foregroundStyle(SBColors.navy)
-                        }
-                        .toggleStyle(SwitchToggleStyle(tint: SBColors.blue))
-
-                        Toggle(isOn: $checklist) {
-                            Text("Kontrol listesi ekle")
-                                .font(SBTypography.bodySmall)
-                                .foregroundStyle(SBColors.navy)
-                        }
-                        .toggleStyle(SwitchToggleStyle(tint: SBColors.blue))
+                    Toggle(isOn: $toTable) {
+                        Text("Tabloya dönüştür")
+                            .font(SBTypography.bodySmall)
+                            .foregroundStyle(SBColors.navy)
                     }
+                    .toggleStyle(SwitchToggleStyle(tint: SBColors.blue))
+
+                    Toggle(isOn: $checklist) {
+                        Text("Kontrol listesi ekle")
+                            .font(SBTypography.bodySmall)
+                            .foregroundStyle(SBColors.navy)
+                    }
+                    .toggleStyle(SwitchToggleStyle(tint: SBColors.blue))
                 }
             }
         }
@@ -320,9 +315,9 @@ struct SummaryFactoryView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, SBSpacing.md)
                 .background(isSelected ? SBColors.blue : SBColors.white)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .clipShape(RoundedRectangle(cornerRadius: BaseForceFactoryStyle.controlRadius))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: BaseForceFactoryStyle.controlRadius)
                         .stroke(isSelected ? SBColors.blue : SBColors.softLine, lineWidth: 1)
                 )
         }
@@ -334,28 +329,30 @@ struct SummaryFactoryView: View {
 
     private var generateButton: some View {
         SBButton(
-            canGenerate ? "Son tekrarı hazırla • \(costLabel)" : "Kaynak seç",
-            icon: canGenerate ? "bolt.fill" : "folder",
+            "Son tekrarı hazırla • \(costLabel)",
+            icon: "bolt.fill",
             variant: .primary,
             size: .large,
             isLoading: isGenerating,
+            isDisabled: !canGenerate,
             fullWidth: true,
-            action: {
-                if canGenerate {
-                    generate()
-                } else {
-                    router.navigate(to: .sourcePicker)
-                }
-            }
+            action: generate
         )
-        .accessibilityLabel(canGenerate ? "Sınav sabahı özeti oluştur" : "Kaynak seç")
-        .accessibilityHint(canGenerate ? "Seçili hazır kaynakla özet üretimini başlatır" : "Kaynak seçme ekranını açar")
+        .accessibilityLabel("Sınav sabahı özeti oluştur")
+        .accessibilityHint(canGenerate ? "Seçili hazır kaynakla özet üretimini başlatır" : "Önce hazır bir kaynak seçmelisin")
     }
 
     // MARK: - Source Required Notice
 
     private var sourceRequiredNotice: some View {
-        sourceRequiredCard
+        SBButton(
+            "Hazır kaynak seç",
+            icon: "folder",
+            variant: .secondary,
+            size: .medium,
+            fullWidth: true,
+            action: openSourcePicker
+        )
     }
 
     // MARK: - Helpers
@@ -406,6 +403,9 @@ struct SummaryFactoryView: View {
         await workspaceStore.loadWorkspace()
         errorMessage = workspaceStore.errorMessage
         isLoading = false
+    }
+    private func openSourcePicker() {
+        router.beginSourceSelection(from: .baseForce, destination: .route(.summaryFactory))
     }
 }
 

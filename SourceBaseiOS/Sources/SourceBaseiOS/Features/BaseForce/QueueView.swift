@@ -103,7 +103,7 @@ struct QueueView: View {
                     SBErrorState(
                         title: "Yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await loadJobs() } }
                     )
                 } else {
@@ -115,7 +115,7 @@ struct QueueView: View {
             .padding(SBSpacing.lg)
             .sbFloatingTabContentPadding()
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .cool)
         .navigationTitle(surface.title)
         .task {
             await loadJobs()
@@ -134,7 +134,8 @@ struct QueueView: View {
             title: surface.title,
             message: surface.message,
             icon: surface.icon,
-            tint: surface.tint
+            tint: surface.tint,
+            size: .compact
         ) {
             EmptyView()
         } footer: {
@@ -361,11 +362,13 @@ struct QueueView: View {
                     variant: .secondary,
                     size: .small,
                     action: {
-                        if let storeJob = workspaceStore.generationJobs.first(where: { $0.id == job.id || $0.output?.jobId == job.id }) {
-                            Task {
+                        Task {
+                            if let storeJob = workspaceStore.generationJobs.first(where: { $0.id == job.id || $0.output?.jobId == job.id }) {
                                 await workspaceStore.cancelJob(storeJob)
-                                await workspaceStore.refreshGenerationQueue()
+                            } else {
+                                workspaceStore.toast("Bu iş zaten güncellenmiş; kuyruk yenileniyor.")
                             }
+                            await workspaceStore.refreshGenerationQueue()
                         }
                     }
                 )

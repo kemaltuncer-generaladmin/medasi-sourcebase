@@ -37,6 +37,42 @@ enum SBNodePalette {
 
     static let defaultSymbol = "book.closed"
     static let defaultColor = "#0A5BFF"
+
+    static func symbolLabel(for symbol: String) -> String {
+        switch symbol {
+        case "book.closed": return "Kitap simgesi"
+        case "brain.head.profile": return "Beyin simgesi"
+        case "heart.text.square": return "Kalp notu simgesi"
+        case "cross.case": return "Sağlık çantası simgesi"
+        case "stethoscope": return "Stetoskop simgesi"
+        case "lungs": return "Akciğer simgesi"
+        case "pills": return "İlaç simgesi"
+        case "flask": return "Laboratuvar simgesi"
+        case "function": return "Formül simgesi"
+        case "list.bullet.rectangle": return "Liste simgesi"
+        case "graduationcap": return "Mezuniyet simgesi"
+        case "atom": return "Atom simgesi"
+        case "waveform.path.ecg": return "EKG simgesi"
+        case "bandage": return "Bandaj simgesi"
+        case "eye": return "Göz simgesi"
+        case "folder": return "Klasör simgesi"
+        default: return "Sembol"
+        }
+    }
+
+    static func colorLabel(for hex: String) -> String {
+        switch hex.uppercased() {
+        case "#0A5BFF": return "Mavi renk"
+        case "#08C7D6": return "Turkuaz renk"
+        case "#7B3FF2": return "Mor renk"
+        case "#12AE55": return "Yeşil renk"
+        case "#FF6B13": return "Turuncu renk"
+        case "#FF3B3B": return "Kırmızı renk"
+        case "#07123F": return "Lacivert renk"
+        case "#0FA3A3": return "Cam göbeği renk"
+        default: return "Renk"
+        }
+    }
 }
 
 // MARK: - Reusable create sheet (course + section)
@@ -71,7 +107,7 @@ struct SBCreateNodeSheet: View {
                 .padding(SBSpacing.lg)
                 .sbReadableWidth(560)
             }
-            .sbPageBackground()
+            .sbPageBackground(tone: .warm)
             .navigationTitle(heading)
             .sbInlineNavTitle()
             .toolbar {
@@ -173,7 +209,8 @@ struct SBCreateNodeSheet: View {
                             )
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Sembol \(symbol)")
+                    .accessibilityLabel(SBNodePalette.symbolLabel(for: symbol))
+                    .accessibilityValue(isSelected ? "Seçili" : "Seçili değil")
                 }
             }
         }
@@ -202,9 +239,11 @@ struct SBCreateNodeSheet: View {
                                     .stroke(swatch.opacity(selectedColor == hex ? 1 : 0.2), lineWidth: 2)
                             )
                             .shadow(color: swatch.opacity(selectedColor == hex ? 0.4 : 0), radius: 5, y: 2)
+                            .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Renk \(hex)")
+                    .accessibilityLabel(SBNodePalette.colorLabel(for: hex))
+                    .accessibilityValue(selectedColor == hex ? "Seçili" : "Seçili değil")
                 }
                 Spacer()
             }

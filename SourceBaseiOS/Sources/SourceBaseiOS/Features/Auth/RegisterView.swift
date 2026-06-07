@@ -223,8 +223,10 @@ struct RegisterView: View {
                             .foregroundStyle(.white)
                     }
                 }
+                .frame(width: 44, height: 44)
             }
             .accessibilityLabel(termsAccepted ? "Koşullar kabul edildi" : "Koşulları kabul et")
+            .accessibilityValue(termsAccepted ? "Seçili" : "Seçili değil")
 
             VStack(alignment: .leading, spacing: 3) {
                 Text("Devam ederek kabul ediyorum:")
@@ -272,7 +274,7 @@ struct RegisterView: View {
     private var actionSection: some View {
         VStack(spacing: SBSpacing.md) {
             SBButton(
-                "Kayıt Ol",
+                "Kayıt ol",
                 icon: "person.badge.plus",
                 variant: .primary,
                 size: .large,
@@ -281,15 +283,6 @@ struct RegisterView: View {
                 action: signUp
             )
             .disabled(!canSubmit)
-
-            SBButton(
-                "Giriş Yap",
-                variant: .secondary,
-                size: .large,
-                fullWidth: true,
-                action: { router.pop() }
-            )
-            .disabled(session.isLoading)
         }
     }
 

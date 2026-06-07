@@ -53,7 +53,7 @@ public enum SBColors {
     public static let muted = adaptive(light: Components(0.369, 0.424, 0.557), dark: Components(0.686, 0.745, 0.855))
     public static let softText = adaptive(light: Components(0.541, 0.596, 0.706), dark: Components(0.573, 0.635, 0.753))
 
-    // MARK: - Brand Blues
+    // MARK: - Brand taxonomy
     public static let blue = color(0.039, 0.357, 1.0)
     public static let deepBlue = color(0.043, 0.251, 0.902)
     public static let sky = color(0.184, 0.482, 1.0)
@@ -65,7 +65,7 @@ public enum SBColors {
     public static let softBlue = adaptive(light: Components(0.918, 0.953, 1.0), dark: Components(0.071, 0.118, 0.220))
     public static let selectedBlue = adaptive(light: Components(0.929, 0.957, 1.0), dark: Components(0.075, 0.133, 0.251))
 
-    // MARK: - Status
+    // MARK: - Status and semantic accents
     public static let green = color(0.071, 0.682, 0.333)
     public static let greenBg = adaptive(light: Components(0.918, 0.984, 0.945), dark: Components(0.051, 0.180, 0.102))
     public static let red = color(1.0, 0.231, 0.231)
@@ -76,7 +76,11 @@ public enum SBColors {
     public static let orange = color(1.0, 0.420, 0.075)
 
     // MARK: - Semantic tints
+    public static let primaryActionTint = blue
     public static let questionTint = cyan
+    public static let summaryTint = purple
+    public static let successTint = green
+    public static let decisionTint = orange
 
     // MARK: - Gradients
     public static let primaryGradient = LinearGradient(

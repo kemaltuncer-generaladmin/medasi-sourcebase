@@ -41,7 +41,7 @@ struct SourceLabToolFlowView: View {
     }
 
     private var router: AppRouter { appState.router }
-    private var readyFile: DriveFile? { workspaceStore.selectedReadyFiles.first ?? workspaceStore.readyFiles.first }
+    private var readyFile: DriveFile? { workspaceStore.selectedReadyFiles.first }
     private var canGenerate: Bool { readyFile != nil }
     private var isInfographic: Bool { kind == .infographic }
     private var costLabel: String {
@@ -80,8 +80,8 @@ struct SourceLabToolFlowView: View {
         var imageQuality: String {
             switch self {
             case .economy: return "low"
-            case .standard: return "medium"
-            case .premium: return "high"
+            case .standard: return "standard"
+            case .premium: return "premium"
             }
         }
     }
@@ -92,7 +92,7 @@ struct SourceLabToolFlowView: View {
                 if isLoading {
                     SBLoadingState(icon: icon, title: "\(title) yükleniyor", message: "Kaynaklar hazırlanıyor...")
                 } else if let errorMessage {
-                    SBErrorState(title: "Yüklenemedi", message: errorMessage, actionLabel: "Tekrar Dene") {
+                    SBErrorState(title: "Yüklenemedi", message: errorMessage, actionLabel: "Tekrar dene") {
                         Task { await loadWorkspace() }
                     }
                 } else {
@@ -177,7 +177,7 @@ struct SourceLabToolFlowView: View {
                     SBEmptyState(
                         icon: "folder.badge.plus",
                         title: "Hazır kaynak seç",
-                        message: "Önce Drive'dan hazır bir kaynak seç.",
+                        message: "Üretime başlamadan önce kullanacağın hazır kaynağı seç.",
                         actionLabel: "Kaynak seç",
                         onAction: { router.navigate(to: .sourcePicker) }
                     )

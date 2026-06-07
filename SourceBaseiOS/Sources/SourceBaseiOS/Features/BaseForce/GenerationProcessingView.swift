@@ -15,6 +15,7 @@ struct GenerationProcessingView: View {
     @State private var progress = 0.12
     @State private var errorMessage: String?
     @State private var didStart = false
+    @State private var isComplete = false
 
     private var router: AppRouter { appState.router }
     private var kind: GeneratedKind { GeneratedKind(rawValue: kindRawValue) ?? .summary }
@@ -104,29 +105,42 @@ struct GenerationProcessingView: View {
                 hero.sbEntrance(0)
                 sourceCard.sbEntrance(1)
                 progressCard.sbEntrance(2)
+                    .sbCompletionGlow(isComplete, tint: tint(for: kind))
 
                 if let errorMessage {
                     SBErrorState(
                         title: "Üretim tamamlanamadı",
                         message: errorMessage,
-                        actionLabel: "Tekrar Dene",
-                        onAction: { restart() }
+                        actionLabel: "Tekrar dene",
+                        onAction: { restart() },
+                        context: .generation
                     )
                     SBButton("Üretim kuyruğuna dön", icon: "clock", variant: .secondary, size: .medium, fullWidth: true) {
                         router.replaceCurrent(with: .queue(surface: SourceBaseQueueSurface.surface(for: kind)))
                     }
+                } else if isComplete {
+                    SBSuccessState(
+                        icon: "checkmark.seal.fill",
+                        title: "Üretim başlatıldı",
+                        message: "Hazır olur olmaz sonuç ekranına geçebilirsin. İstersen şimdi kuyruktan takip et.",
+                        actionLabel: "Kuyruğu gör",
+                        onAction: {
+                            router.replaceCurrent(with: .queue(surface: SourceBaseQueueSurface.surface(for: kind)))
+                        },
+                        tint: tint(for: kind)
+                    )
                 } else {
                     SBNotice(
-                        icon: "checkmark.seal",
-                        message: "Hazır olduğunda sonuç ekranına geçeceksin.",
-                        tint: SBColors.blue
+                        icon: "clock.badge.checkmark",
+                        message: "Kaynak işleniyor. Sonuç hazır olduğunda kuyrukta ve koleksiyonlarda görebilirsin.",
+                        tint: tint(for: kind)
                     )
                 }
             }
             .padding(SBSpacing.lg)
             .sbFloatingTabContentPadding()
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .cool)
         .navigationTitle("Üretim")
         .task {
             await startIfNeeded()
@@ -137,7 +151,7 @@ struct GenerationProcessingView: View {
         SBSignatureHero(
             eyebrow: "Üretim",
             title: "\(label) hazırlanıyor",
-            message: mode.isEmpty ? "Kaynak işleniyor." : mode,
+            message: mode.isEmpty ? "Kaynak adım adım işleniyor." : mode,
             icon: icon(for: kind),
             tint: tint(for: kind)
         ) {
@@ -240,13 +254,15 @@ struct GenerationProcessingView: View {
             options: generationOptions
         )
 
-        progress = 0.92
+        progress = 1.0
         currentStep = max(steps.count - 1, 0)
 
-        if job != nil {
+        if let job {
             SBHaptics.success()
             await workspaceStore.refreshGenerationQueue()
-            router.replaceCurrent(with: .queue(surface: SourceBaseQueueSurface.surface(for: kind)))
+            withAnimation(SBMotion.softSpring) { isComplete = true }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            router.replaceCurrent(with: .result(jobId: job.id))
         } else if let toast = workspaceStore.toastMessage {
             errorMessage = toast
         } else {
@@ -325,6 +341,7 @@ struct GenerationProcessingView: View {
         progress = 0.12
         currentStep = 0
         didStart = false
+        isComplete = false
         Task { await startIfNeeded() }
     }
 

@@ -47,7 +47,7 @@ struct FileDetailView: View {
                     SBErrorState(
                         title: "Dosya yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await workspaceStore.refresh() } }
                     )
                 } else if let file {
@@ -73,7 +73,7 @@ struct FileDetailView: View {
             .padding(SBSpacing.lg)
             .sbFloatingTabContentPadding()
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .warm)
         .navigationTitle("Dosya Detayı")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -301,8 +301,7 @@ struct FileDetailView: View {
                             workspaceStore.setSelectedSources([file.id])
                             workspaceStore.selectFile(file)
                         }
-                        router.switchTab(to: .baseForce)
-                        router.navigate(to: .sourcePicker)
+                        router.beginSourceSelection(from: .baseForce, destination: .baseForceHome)
                     }
 
                     routeCard(
@@ -315,19 +314,19 @@ struct FileDetailView: View {
                             workspaceStore.setSelectedSources([file.id])
                             workspaceStore.selectFile(file)
                         }
-                        router.switchTab(to: .sourceLab)
+                        router.beginSourceSelection(from: .sourceLab, destination: .sourceLabHome)
                     }
                 }
 
                 // Quick generate chips
                 FlowLayout(spacing: SBSpacing.sm) {
-                    quickChip(icon: "rectangle.on.rectangle", label: "Kart", color: SBColors.blue) {
+                    quickChip(icon: "rectangle.on.rectangle", label: "Kart", accessibilityLabel: "Bu dosyadan flashcard üret", color: SBColors.blue) {
                         Task { await generate(.flashcard) }
                     }
-                    quickChip(icon: "questionmark.circle", label: "Soru", color: SBColors.questionTint) {
+                    quickChip(icon: "questionmark.circle", label: "Soru", accessibilityLabel: "Bu dosyadan soru seti üret", color: SBColors.questionTint) {
                         Task { await generate(.question) }
                     }
-                    quickChip(icon: "doc.text", label: "Özet", color: SBColors.purple) {
+                    quickChip(icon: "doc.text", label: "Özet", accessibilityLabel: "Bu dosyadan özet üret", color: SBColors.purple) {
                         Task { await generate(.summary) }
                     }
                 }
@@ -360,7 +359,7 @@ struct FileDetailView: View {
         }
     }
 
-    private func quickChip(icon: String, label: String, color: Color, action: @escaping () -> Void) -> some View {
+    private func quickChip(icon: String, label: String, accessibilityLabel: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: SBSpacing.xs) {
                 Image(systemName: icon)
@@ -380,6 +379,8 @@ struct FileDetailView: View {
                     .stroke(color.opacity(0.2), lineWidth: 1)
             )
         }
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint("Üretimi bu dosyayla başlatır")
     }
 
     // MARK: - Generated Outputs
@@ -394,7 +395,7 @@ struct FileDetailView: View {
                 Spacer()
 
                 if let file, !file.generated.isEmpty {
-                    Button("Tümünü Gör") {
+                    Button("Tümünü gör") {
                         router.navigate(to: .collections)
                     }
                     .font(SBTypography.labelSmall)

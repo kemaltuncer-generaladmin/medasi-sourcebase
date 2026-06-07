@@ -51,7 +51,7 @@ struct CollectionsView: View {
                     SBErrorState(
                         title: "Koleksiyonlar yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await loadCollections() } }
                     )
                 } else {
@@ -65,7 +65,7 @@ struct CollectionsView: View {
             .padding(SBSpacing.lg)
             .sbFloatingTabContentPadding()
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .warm)
         .navigationTitle("Koleksiyonlar")
         .task {
             await loadCollections()
@@ -216,8 +216,8 @@ struct CollectionsView: View {
                 title: "Henüz koleksiyon yok",
                 message: "Kart, soru veya özet üretince burada çalışırsın.",
                 badges: ["Kart", "Soru", "Özet"],
-                actionLabel: "Üretime başla",
-                onAction: { router.navigate(to: .sourcePicker) }
+                actionLabel: "Kaynak seçip üret",
+                onAction: { router.beginSourceSelection(from: .baseForce, destination: .baseForceHome) }
             )
         } else if filteredCollections.isEmpty {
             SBEmptyState(
@@ -284,19 +284,19 @@ struct CollectionsView: View {
                         Button {
                             generate(from: bundle.file, kind: .flashcard)
                         } label: {
-                            Label("Flashcard Üret", systemImage: "rectangle.on.rectangle")
+                            Label("Flashcard üret", systemImage: "rectangle.on.rectangle")
                         }
 
                         Button {
                             generate(from: bundle.file, kind: .question)
                         } label: {
-                            Label("Soru Üret", systemImage: "questionmark.circle")
+                            Label("Soru üret", systemImage: "questionmark.circle")
                         }
 
                         Button {
                             generate(from: bundle.file, kind: .summary)
                         } label: {
-                            Label("Özet Üret", systemImage: "doc.text")
+                            Label("Özet üret", systemImage: "doc.text")
                         }
                     } label: {
                         Image(systemName: "ellipsis")
@@ -354,7 +354,7 @@ struct CollectionsView: View {
                         HStack(spacing: SBSpacing.xs) {
                             Image(systemName: "bolt.fill")
                                 .sbScaledFont(size: 14)
-                            Text("Üret")
+                            Text("Benzer çıktı üret")
                                 .font(SBTypography.labelSmall)
                         }
                         .foregroundStyle(outputColor(bundle.previewKind))

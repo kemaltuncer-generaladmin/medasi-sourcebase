@@ -80,7 +80,7 @@ struct Triangle: Shape {
     }
 }
 
-public struct SBFileCard: View, @preconcurrency Equatable {
+public struct SBFileCard<ActionSlot: View>: View, @preconcurrency Equatable {
     let title: String
     let kind: SBFileKind
     let status: SBStatus
@@ -88,6 +88,7 @@ public struct SBFileCard: View, @preconcurrency Equatable {
     let courseTitle: String
     let updatedLabel: String
     let onTap: () -> Void
+    let actionSlot: (() -> ActionSlot)?
 
     public init(
         title: String,
@@ -96,7 +97,8 @@ public struct SBFileCard: View, @preconcurrency Equatable {
         sizeLabel: String,
         courseTitle: String,
         updatedLabel: String,
-        onTap: @escaping () -> Void
+        onTap: @escaping () -> Void,
+        @ViewBuilder actionSlot: @escaping () -> ActionSlot
     ) {
         self.title = title
         self.kind = kind
@@ -105,6 +107,7 @@ public struct SBFileCard: View, @preconcurrency Equatable {
         self.courseTitle = courseTitle
         self.updatedLabel = updatedLabel
         self.onTap = onTap
+        self.actionSlot = actionSlot
     }
 
     public var body: some View {
@@ -146,7 +149,7 @@ public struct SBFileCard: View, @preconcurrency Equatable {
                         metaPill(icon: "doc", text: sizeLabel)
                     }
 
-                    // Footer
+                    // Footer with action slot
                     ViewThatFits(in: .horizontal) {
                         HStack {
                             Text("Güncellendi: \(updatedLabel)")
@@ -155,16 +158,24 @@ public struct SBFileCard: View, @preconcurrency Equatable {
 
                             Spacer()
 
-                            openLabel
-                                .accessibilityHidden(true)
+                            if let actionSlot {
+                                actionSlot()
+                            } else {
+                                openLabel
+                                    .accessibilityHidden(true)
+                            }
                         }
 
                         VStack(alignment: .leading, spacing: SBSpacing.xs) {
                             Text("Güncellendi: \(updatedLabel)")
                                 .font(SBTypography.caption)
                                 .foregroundStyle(SBColors.softText)
-                            openLabel
-                                .accessibilityHidden(true)
+                            if let actionSlot {
+                                actionSlot()
+                            } else {
+                                openLabel
+                                    .accessibilityHidden(true)
+                            }
                         }
                     }
                 }
@@ -210,16 +221,35 @@ public struct SBFileCard: View, @preconcurrency Equatable {
     }
 
     private var openLabel: some View {
-        HStack(spacing: 4) {
-            Text("Aç")
-                .font(SBTypography.labelSmall)
-                .foregroundStyle(SBColors.blue)
+        Text("Detayı aç")
+            .font(SBTypography.labelSmall)
+            .foregroundStyle(SBColors.blue)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(SBColors.blue.opacity(0.08))
+            .clipShape(Capsule())
+    }
+}
 
-            Image(systemName: "chevron.right")
-                .sbScaledFont(size: 12, weight: .semibold)
-                .foregroundStyle(SBColors.blue)
-                .accessibilityHidden(true)
-        }
+/// Convenience init without action slot (preserves existing call sites)
+public extension SBFileCard where ActionSlot == EmptyView {
+    init(
+        title: String,
+        kind: SBFileKind,
+        status: SBStatus,
+        sizeLabel: String,
+        courseTitle: String,
+        updatedLabel: String,
+        onTap: @escaping () -> Void
+    ) {
+        self.title = title
+        self.kind = kind
+        self.status = status
+        self.sizeLabel = sizeLabel
+        self.courseTitle = courseTitle
+        self.updatedLabel = updatedLabel
+        self.onTap = onTap
+        self.actionSlot = nil
     }
 }
 

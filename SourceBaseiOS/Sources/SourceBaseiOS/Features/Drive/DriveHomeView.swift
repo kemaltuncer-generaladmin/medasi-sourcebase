@@ -31,6 +31,14 @@ struct DriveHomeView: View {
         Array(readyFiles.prefix(4))
     }
 
+    private var quickContinueOutput: (file: DriveFile, output: GeneratedOutput)? {
+        workspaceStore.quickContinueOutput
+    }
+
+    private var quickContinueFile: DriveFile? {
+        workspaceStore.quickContinueReadyFile
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SBSpacing.lg) {
@@ -44,12 +52,14 @@ struct DriveHomeView: View {
                     SBErrorState(
                         title: "Drive yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await workspaceStore.refresh() } }
                     )
                 } else {
                     headerSection.sbEntrance(0)
                     workspaceHero.sbEntrance(1)
+                    quickContinueSection.sbEntrance(2)
+                    momentumSection.sbEntrance(3)
                     if workspaceStore.uploadPhase != .idle {
                         SBNotice(
                             icon: workspaceStore.uploadPhase == .error ? "exclamationmark.triangle" : "icloud.and.arrow.up",
@@ -57,7 +67,7 @@ struct DriveHomeView: View {
                             tint: workspaceStore.uploadPhase == .error ? SBColors.red : SBColors.blue
                         )
                     }
-                    primaryWorkspaceGrid.sbEntrance(2)
+                    primaryWorkspaceGrid.sbEntrance(4)
                 }
             }
             .padding(SBSpacing.lg)
@@ -65,7 +75,7 @@ struct DriveHomeView: View {
             .frame(maxWidth: horizontalSizeClass == .regular ? 1260 : 1180, alignment: .center)
             .frame(maxWidth: .infinity)
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .warm)
         .sheet(isPresented: $showUploadSheet) {
             DriveUploadSheet(initialDestination: workspaceStore.preferredUploadDestination) { uploaded in
                 if uploaded != nil {
@@ -95,7 +105,7 @@ struct DriveHomeView: View {
     private var headerSection: some View {
         SBPageHeader(
             title: "Drive",
-            subtitle: "Ders notlarını sınava hazır kaynaklara dönüştür.",
+            subtitle: "Kaynak yükle, hazır olanı seç ve üretime geç.",
             primaryIcon: "magnifyingglass",
             onPrimary: { router.navigate(to: .search) },
             onSecondary: nil
@@ -105,19 +115,28 @@ struct DriveHomeView: View {
     private var workspaceHero: some View {
         SBSignatureHero(
             eyebrow: "Bugünkü çalışma",
-            title: "Kaynak seç, üret, çalış",
-            message: readyCount == 0 ? "\(DriveUploadService.supportedExtensionsDisplay) yükle; metin çıkınca kart, soru veya son tekrar çıkar." : "\(readyCount) kaynak hazır. Komite öncesi çalışmaya birinden başla.",
+            title: "Bugün nereden devam edelim?",
+            message: readyCount == 0 ? "\(DriveUploadService.supportedExtensionsDisplay) yükle. Hazır olduğunda tek dokunuşla BaseForce'a geç." : "\(readyCount) kaynak hazır. Hazır kaynağı seçebilir ya da yeni kaynak ekleyebilirsin.",
             icon: "folder.badge.gearshape",
-            tint: SBColors.blue
+            tint: SBColors.blue,
+            mode: .action
         ) {
             HStack(spacing: SBSpacing.sm) {
-                SBButton("Kaynak yükle", icon: "icloud.and.arrow.up", variant: .primary, size: .medium, fullWidth: true) {
-                    showUploadSheet = true
-                }
-                if readyCount > 0 {
-                    SBButton("Kaynak seç", icon: "checkmark.circle", variant: .secondary, size: .medium) {
-                        router.switchTab(to: .baseForce)
-                        router.navigate(to: .sourcePicker)
+                if let quickContinueFile {
+                    SBButton("Hazır kaynakla devam et", icon: "arrow.right.circle.fill", variant: .primary, size: .medium, fullWidth: true) {
+                        selectSourceAndOpenBaseForce(quickContinueFile)
+                    }
+                    SBButton("Yeni kaynak yükle", icon: "icloud.and.arrow.up", variant: .secondary, size: .medium) {
+                        showUploadSheet = true
+                    }
+                } else {
+                    SBButton("Yeni kaynak yükle", icon: "icloud.and.arrow.up", variant: .primary, size: .medium, fullWidth: true) {
+                        showUploadSheet = true
+                    }
+                    if processingCount > 0 {
+                        SBButton("İşlenenleri gör", icon: "clock", variant: .secondary, size: .medium) {
+                            router.navigate(to: .uploads)
+                        }
                     }
                 }
             }
@@ -128,6 +147,44 @@ struct DriveHomeView: View {
                 .init(icon: "rectangle.stack", value: "\(workspace.collections.count)", label: "koleksiyon", tint: SBColors.purple)
             ])
         }
+    }
+
+    private var quickContinueSection: some View {
+        Group {
+            if let entry = quickContinueOutput {
+                SBQuickContinueSurface(
+                    eyebrow: "Kaldığın yer",
+                    title: entry.output.title,
+                    message: "En son ürettiğin çıktıya kaldığın yerden dön.",
+                    metadata: "\(entry.file.courseTitle) • \(entry.output.updatedLabel)",
+                    actionLabel: "Çıktıyı aç",
+                    icon: outputIcon(entry.output.kind),
+                    tint: outputColor(entry.output.kind)
+                ) {
+                    router.navigate(to: .studyOutput(outputId: entry.output.id))
+                }
+            } else if let file = quickContinueFile {
+                SBQuickContinueSurface(
+                    eyebrow: "Kaldığın yer",
+                    title: file.title,
+                    message: "Hazır kaynak seçili. Tek dokunuşla üretime geçebilirsin.",
+                    metadata: "\(file.courseTitle) • \(file.updatedLabel)",
+                    actionLabel: "Bu kaynakla devam et",
+                    icon: "doc.text",
+                    tint: SBColors.cyan
+                ) {
+                    selectSourceAndOpenBaseForce(file)
+                }
+            }
+        }
+    }
+
+    private var momentumSection: some View {
+        SBWorkspaceMomentumRibbon(
+            readyCount: readyCount,
+            outputCount: workspaceStore.totalGeneratedOutputCount,
+            focusTitle: workspaceStore.momentumFocusTitle
+        )
     }
 
     // MARK: - Stats Row
@@ -147,9 +204,8 @@ struct DriveHomeView: View {
 
     private var readySourcesSection: some View {
         VStack(alignment: .leading, spacing: SBSpacing.md) {
-            sectionHeader(title: "Hazır kaynaklar", action: recentReadyFiles.isEmpty ? nil : "Kaynak seç") {
-                router.switchTab(to: .baseForce)
-                router.navigate(to: .sourcePicker)
+            SBSectionHeader(title: "Hazır kaynaklar", action: recentReadyFiles.isEmpty ? nil : "Kaynak seç") {
+                router.beginSourceSelection(from: .baseForce, destination: .baseForceHome)
             }
 
             if recentReadyFiles.isEmpty {
@@ -158,19 +214,29 @@ struct DriveHomeView: View {
                     title: processingCount > 0 ? "Kaynak işleniyor" : "Henüz hazır kaynak yok",
                     message: processingCount > 0 ? "Metin çıkınca burada seçip çalışma seti hazırlayabilirsin." : "Bir ders notu yükle. Hazır olunca buradan çalışmaya geç.",
                     badges: ["PDF", "PPTX", "DOCX"],
-                    actionLabel: processingCount > 0 ? "Yüklemeler" : "Kaynak yükle",
+                    actionLabel: processingCount > 0 ? "İşlenenleri gör" : "Kaynak yükle",
                     onAction: {
                         if processingCount > 0 {
                             router.navigate(to: .uploads)
                         } else {
                             showUploadSheet = true
                         }
-                    }
+                    },
+                    context: .drive
                 )
             } else {
                 VStack(spacing: SBSpacing.md) {
                     ForEach(recentReadyFiles) { file in
-                        readySourceCard(file: file)
+                        SBFileCard(
+                            title: file.title,
+                            kind: SBFileKind.from(file.kind),
+                            status: SBStatus.from(file.status),
+                            sizeLabel: file.sizeLabel,
+                            courseTitle: file.courseTitle,
+                            updatedLabel: file.updatedLabel
+                        ) {
+                            router.navigate(to: .fileDetail(fileId: file.id))
+                        }
                     }
                 }
             }
@@ -181,7 +247,7 @@ struct DriveHomeView: View {
 
     private var coursesSection: some View {
         VStack(alignment: .leading, spacing: SBSpacing.md) {
-            sectionHeader(
+            SBSectionHeader(
                 title: "Derslerim",
                 action: "Ders ekle"
             ) {
@@ -195,7 +261,8 @@ struct DriveHomeView: View {
                     message: "Ders oluştur, kaynakları içine at.",
                     badges: ["Ders", "Bölüm", "Kaynak"],
                     actionLabel: "Ders oluştur",
-                    onAction: { showCreateCourse = true }
+                    onAction: { showCreateCourse = true },
+                    context: .drive
                 )
             } else {
                 SBCard {
@@ -260,64 +327,9 @@ struct DriveHomeView: View {
         .padding(.vertical, SBSpacing.xs)
     }
 
-    private func readySourceCard(file: DriveFile) -> some View {
-        SBCard(radius: 16) {
-            VStack(alignment: .leading, spacing: SBSpacing.md) {
-                HStack(alignment: .top, spacing: SBSpacing.md) {
-                    SBFileKindBadge(kind: SBFileKind.from(file.kind))
-                        .accessibilityHidden(true)
-
-                    VStack(alignment: .leading, spacing: SBSpacing.xs) {
-                        Text(file.title)
-                            .font(SBTypography.titleSmall)
-                            .foregroundStyle(SBColors.navy)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        FlowLayout(spacing: SBSpacing.sm) {
-                            SBStatusBadge(status: SBStatus.from(file.status), compact: true)
-                            Text(file.courseTitle)
-                                .font(SBTypography.caption)
-                                .foregroundStyle(SBColors.muted)
-                                .lineLimit(1)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(SBColors.field.opacity(0.82))
-                                .clipShape(Capsule())
-                        }
-                    }
-
-                    Spacer()
-                }
-
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: SBSpacing.sm) {
-                        SBButton("İncele", icon: "doc.text.magnifyingglass", variant: .secondary, size: .small, fullWidth: true) {
-                            router.navigate(to: .fileDetail(fileId: file.id))
-                        }
-                        SBButton("Seç ve üret", icon: "bolt.fill", variant: .primary, size: .small, fullWidth: true) {
-                            selectSourceAndOpenBaseForce(file)
-                        }
-                    }
-
-                    VStack(spacing: SBSpacing.sm) {
-                        SBButton("Seç ve üret", icon: "bolt.fill", variant: .primary, size: .small, fullWidth: true) {
-                            selectSourceAndOpenBaseForce(file)
-                        }
-                        SBButton("İncele", icon: "doc.text.magnifyingglass", variant: .secondary, size: .small, fullWidth: true) {
-                            router.navigate(to: .fileDetail(fileId: file.id))
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Collections Section
-
     private var collectionsSection: some View {
         VStack(alignment: .leading, spacing: SBSpacing.md) {
-            sectionHeader(title: "Son koleksiyonlar", action: workspace.collections.isEmpty ? nil : "Koleksiyonlar") {
+            SBSectionHeader(title: "Son koleksiyonlar", action: workspace.collections.isEmpty ? nil : "Koleksiyonlar") {
                 router.navigate(to: .collections)
             }
 
@@ -328,7 +340,8 @@ struct DriveHomeView: View {
                     message: "Kart, soru veya özet üretince burada çalışırsın.",
                     badges: ["Flashcard", "Soru", "Özet"],
                     actionLabel: "Koleksiyonlar",
-                    onAction: { router.navigate(to: .collections) }
+                    onAction: { router.navigate(to: .collections) },
+                    context: .drive
                 )
             } else {
                 VStack(spacing: SBSpacing.md) {
@@ -400,36 +413,38 @@ struct DriveHomeView: View {
         }
     }
 
-    // MARK: - Section Header
-
-    private func sectionHeader(title: String, action: String?, onAction: @escaping () -> Void) -> some View {
-        HStack {
-            Text(title)
-                .font(SBTypography.titleMedium)
-                .foregroundStyle(SBColors.navy)
-
-            Spacer()
-
-            if let action {
-                Button(action: onAction) {
-                    HStack(spacing: 4) {
-                        Text(action)
-                            .font(SBTypography.labelSmall)
-                        Image(systemName: "chevron.right")
-                            .sbScaledFont(size: 12, weight: .semibold)
-                    }
-                    .foregroundStyle(SBColors.blue)
-                }
-            }
-        }
-    }
-
     private func selectSourceAndOpenBaseForce(_ file: DriveFile) {
         workspaceStore.setSelectedSources([file.id])
         workspaceStore.selectFile(file)
         workspaceStore.toast("Kaynak seçildi. Üretim türünü seç.")
-        router.switchTab(to: .baseForce)
-        router.navigate(to: .sourcePicker)
+        router.beginSourceSelection(from: .baseForce, destination: .baseForceHome)
+    }
+
+    private func outputIcon(_ kind: GeneratedKind) -> String {
+        switch kind {
+        case .flashcard: return "rectangle.on.rectangle"
+        case .question: return "questionmark.circle"
+        case .summary: return "doc.text"
+        case .examMorningSummary: return "alarm"
+        case .algorithm: return "arrow.triangle.branch"
+        case .comparison, .table: return "tablecells"
+        case .clinicalScenario: return "cross.case"
+        case .learningPlan: return "calendar.badge.clock"
+        case .podcast: return "headphones"
+        case .infographic: return "chart.bar"
+        case .mindMap: return "point.3.connected.trianglepath.dotted"
+        }
+    }
+
+    private func outputColor(_ kind: GeneratedKind) -> Color {
+        switch kind {
+        case .flashcard: return SBColors.blue
+        case .question, .infographic: return SBColors.cyan
+        case .summary, .examMorningSummary, .comparison, .table, .mindMap: return SBColors.purple
+        case .algorithm, .clinicalScenario: return SBColors.orange
+        case .learningPlan: return SBColors.green
+        case .podcast: return SBColors.red
+        }
     }
 
 }

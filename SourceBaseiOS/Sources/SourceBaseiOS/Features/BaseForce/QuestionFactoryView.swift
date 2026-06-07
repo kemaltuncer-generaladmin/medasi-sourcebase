@@ -57,7 +57,7 @@ struct QuestionFactoryView: View {
                     SBErrorState(
                         title: "Yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await loadWorkspace() } }
                     )
                 } else {
@@ -74,7 +74,7 @@ struct QuestionFactoryView: View {
             .sbFloatingTabContentPadding()
             .sbReadableWidth(760)
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .cool)
         .navigationTitle("Soru Çözümü")
         .task {
             await loadWorkspace()
@@ -89,7 +89,8 @@ struct QuestionFactoryView: View {
             title: "Soru setini hazırla",
             message: "Kaynağı 5 şıklı, açıklamalı sınav pratiğine çevir.",
             icon: "questionmark.circle.fill",
-            tint: SBColors.cyan
+            tint: SBColors.cyan,
+            size: .compact
         ) {
             EmptyView()
         } footer: {
@@ -127,7 +128,7 @@ struct QuestionFactoryView: View {
 
     private var sourceRequiredCard: some View {
         SBCommandCard(tint: SBColors.cyan, action: {
-            router.navigate(to: .sourcePicker)
+            openSourcePicker()
         }) {
             VStack(alignment: .leading, spacing: SBSpacing.md) {
                 HStack(spacing: SBSpacing.md) {
@@ -178,7 +179,7 @@ struct QuestionFactoryView: View {
 
     private var addSourceChip: some View {
         Button {
-            router.navigate(to: .sourcePicker)
+            openSourcePicker()
         } label: {
             HStack(spacing: SBSpacing.xs) {
                 Image(systemName: "plus")
@@ -348,28 +349,30 @@ struct QuestionFactoryView: View {
 
     private var generateButton: some View {
         SBButton(
-            canGenerate ? "Soru setini hazırla • \(costLabel)" : "Kaynak seç",
-            icon: canGenerate ? "wand.and.stars" : "folder",
+            "Soru setini hazırla • \(costLabel)",
+            icon: "wand.and.stars",
             variant: .primary,
             size: .large,
             isLoading: isGenerating,
+            isDisabled: !canGenerate,
             fullWidth: true,
-            action: {
-                if canGenerate {
-                    generate()
-                } else {
-                    router.navigate(to: .sourcePicker)
-                }
-            }
+            action: generate
         )
-        .accessibilityLabel(canGenerate ? "Soru seti oluştur" : "Kaynak seç")
-        .accessibilityHint(canGenerate ? "Seçili hazır kaynakla soru üretimini başlatır" : "Kaynak seçme ekranını açar")
+        .accessibilityLabel("Soru seti oluştur")
+        .accessibilityHint(canGenerate ? "Seçili hazır kaynakla soru üretimini başlatır" : "Önce hazır bir kaynak seçmelisin")
     }
 
     // MARK: - Source Required Notice
 
     private var sourceRequiredNotice: some View {
-        sourceRequiredCard
+        SBButton(
+            "Hazır kaynak seç",
+            icon: "folder",
+            variant: .secondary,
+            size: .medium,
+            fullWidth: true,
+            action: openSourcePicker
+        )
     }
 
     // MARK: - Helpers
@@ -421,6 +424,9 @@ struct QuestionFactoryView: View {
         await workspaceStore.loadWorkspace()
         errorMessage = workspaceStore.errorMessage
         isLoading = false
+    }
+    private func openSourcePicker() {
+        router.beginSourceSelection(from: .baseForce, destination: .route(.questionFactory))
     }
 }
 

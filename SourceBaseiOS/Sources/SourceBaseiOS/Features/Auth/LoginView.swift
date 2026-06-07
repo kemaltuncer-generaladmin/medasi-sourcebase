@@ -114,7 +114,7 @@ struct LoginView: View {
                             Image(systemName: isSecureVisible ? "eye.slash" : "eye")
                                 .sbScaledFont(size: 18, weight: .medium)
                                 .foregroundStyle(SBColors.muted)
-                                .frame(width: 32, height: 32)
+                                .frame(width: 44, height: 44)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(isSecureVisible ? "Şifreyi gizle" : "Şifreyi göster")
@@ -126,7 +126,7 @@ struct LoginView: View {
 
             VStack(spacing: SBSpacing.md) {
                 SBButton(
-                    "Giriş Yap",
+                    "Giriş yap",
                     icon: "arrow.right",
                     variant: .primary,
                     size: .large,

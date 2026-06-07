@@ -240,7 +240,7 @@ public struct DriveRepository: Sendable {
 
     // MARK: - Upload
 
-    public func createUploadSession(_ draft: DriveUploadDraft) async throws -> GCSUploadSession {
+    public func createUploadSession(_ draft: DriveUploadDraft) async throws -> StorageUploadSession {
         let session = try await api.createUploadSession(draft)
         guard session.isUsable else {
             throw RepositoryError(message: "Yükleme bağlantısı alınamadı. Tekrar deneyebilirsin.")
@@ -254,7 +254,10 @@ public struct DriveRepository: Sendable {
         courseId: String,
         sectionId: String,
         courseTitle: String,
-        sectionTitle: String
+        sectionTitle: String,
+        extractedText: String? = nil,
+        pageCount: Int? = nil,
+        extractionMetadata: ExtractionMetadata? = nil
     ) async throws -> DriveFile {
         let response = try await api.completeUpload(
             objectName: objectName,
@@ -262,7 +265,10 @@ public struct DriveRepository: Sendable {
             sectionId: sectionId,
             fileName: file.name,
             contentType: file.contentType,
-            sizeBytes: file.sizeBytes
+            sizeBytes: file.sizeBytes,
+            extractedText: extractedText,
+            pageCount: pageCount,
+            extractionMetadata: extractionMetadata
         )
         guard let row = requiredDataRow(from: response, message: "Yüklenen dosya kaydı alınamadı.") else {
             throw RepositoryError(message: "Yüklenen dosya kaydı alınamadı.")

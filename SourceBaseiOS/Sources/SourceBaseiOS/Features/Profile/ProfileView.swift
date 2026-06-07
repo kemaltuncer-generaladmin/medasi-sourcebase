@@ -14,13 +14,13 @@ struct ProfileView: View {
     @State private var showSignOutConfirm = false
     @State private var selectedAvatarItem: PhotosPickerItem?
     @State private var isUploadingAvatar = false
-    
+
     private var router: AppRouter { appState.router }
     private var session: SessionStore { appState.session }
     private var profileName: String { session.displayName }
     private var profileEmail: String { session.email }
     private var needsProfileDetails: Bool { session.needsProfileSetup }
-    
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SBSpacing.lg) {
@@ -32,7 +32,7 @@ struct ProfileView: View {
                     )
                 } else {
                     profileHeader.sbEntrance(0)
-                    
+
                     if profileLoadFailed {
                         inlineNoticeCard(
                             icon: "exclamationmark.circle",
@@ -58,10 +58,11 @@ struct ProfileView: View {
                     router.navigate(to: .search)
                 } label: {
                     Image(systemName: "magnifyingglass")
-                        .sbScaledFont(size: 18, weight: .bold)
+                        .sbScaledFont(size: 18, weight: .semibold)
                         .foregroundStyle(SBColors.navy)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                 }
+                .accessibilityLabel("Profilde ara")
             }
         }
         .refreshable {
@@ -71,11 +72,11 @@ struct ProfileView: View {
             await loadProfileData()
         }
         .confirmationDialog(
-            "Oturumu Kapat",
+            "Oturumu kapat",
             isPresented: $showSignOutConfirm,
             titleVisibility: .visible
         ) {
-            Button("Oturumu Kapat", role: .destructive) {
+            Button("Oturumu kapat", role: .destructive) {
                 Task {
                     await performSignOut()
                 }
@@ -85,9 +86,9 @@ struct ProfileView: View {
             Text("Oturumunuzu kapatmak istediğinize emin misiniz? Devam etmek için yeniden giriş yapmanız gerekecektir.")
         }
     }
-    
+
     // MARK: - Profile Header View
-    
+
     private var profileHeader: some View {
         SBCard(radius: 20, borderColor: SBColors.blue.opacity(0.12)) {
             HStack(spacing: SBSpacing.md) {
@@ -109,7 +110,7 @@ struct ProfileView: View {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .sbScaledFont(size: 10)
                                 .foregroundStyle(SBColors.purple)
-                            
+
                             Text("Profil eksik - Tamamla")
                                 .font(SBTypography.caption)
                                 .foregroundStyle(SBColors.purple)
@@ -123,7 +124,7 @@ struct ProfileView: View {
                             Image(systemName: "graduationcap")
                                 .sbScaledFont(size: 12)
                                 .foregroundStyle(SBColors.blue)
-                            
+
                             Text(profileSnapshot.faculty)
                                 .font(SBTypography.caption)
                                 .foregroundStyle(SBColors.navy)
@@ -146,7 +147,7 @@ struct ProfileView: View {
                     Image(systemName: "pencil")
                         .sbScaledFont(size: 18)
                         .foregroundStyle(SBColors.blue)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 44, height: 44)
                         .background(SBColors.selectedBlue)
                         .clipShape(Circle())
                 }
@@ -173,15 +174,15 @@ struct ProfileView: View {
         .accessibilityValue(isUploadingAvatar ? "Yükleniyor" : "Değiştirilebilir")
         .accessibilityHint("Yeni profil fotoğrafı seçer")
     }
-    
+
     // MARK: - Inline Notice
-    
+
     private func inlineNoticeCard(icon: String, message: String) -> some View {
         HStack(spacing: SBSpacing.sm) {
             Image(systemName: icon)
                 .sbScaledFont(size: 16, weight: .bold)
                 .foregroundStyle(SBColors.purple)
-            
+
             Text(message)
                 .font(SBTypography.caption)
                 .foregroundStyle(SBColors.navy)
@@ -191,21 +192,21 @@ struct ProfileView: View {
         .background(SBColors.purple.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
-    
+
     // MARK: - Wallet / Balance Panel
-    
+
     private var walletSection: some View {
         VStack(alignment: .leading, spacing: SBSpacing.sm) {
             Text("Üretim kredisi")
                 .font(SBTypography.titleMedium)
                 .foregroundStyle(SBColors.navy)
-            
+
             SBCommandCard(tint: SBColors.green, action: {
                 router.navigate(to: .store)
             }) {
                 HStack(spacing: SBSpacing.md) {
                     SBIconTile(icon: "creditcard.fill", tint: SBColors.green, size: 50, radius: 14)
-                    
+
                     VStack(alignment: .leading, spacing: 4) {
                         Text("MC üretim kredisi")
                             .font(SBTypography.labelSmall)
@@ -223,9 +224,9 @@ struct ProfileView: View {
                                 .minimumScaleFactor(0.82)
                         }
                     }
-                    
+
                     Spacer()
-                    
+
                     Image(systemName: "plus")
                         .sbScaledFont(size: 15, weight: .bold)
                         .foregroundStyle(.white)
@@ -235,17 +236,20 @@ struct ProfileView: View {
                 }
                 .padding(.vertical, 4)
             }
+            .accessibilityLabel("MC bakiyesi")
+            .accessibilityValue(profileSnapshot.walletBalance.map { "\($0.formatted(.number.precision(.fractionLength(0...2)))) MC" } ?? "Bakiye alınamadı")
+            .accessibilityHint("MC paketi satın almak için mağazayı açar")
         }
     }
-    
+
     // MARK: - App Settings Sections
-    
+
     private var settingsSection: some View {
         VStack(alignment: .leading, spacing: SBSpacing.sm) {
             Text("Ayarlar")
                 .font(SBTypography.titleMedium)
                 .foregroundStyle(SBColors.navy)
-            
+
             SBCard(radius: 16) {
                 VStack(spacing: 0) {
                     settingsRow(
@@ -266,10 +270,10 @@ struct ProfileView: View {
                     ) {
                         router.navigate(to: .profileSetup)
                     }
-                    
+
                     Divider()
                         .padding(.vertical, SBSpacing.xs)
-                    
+
                     settingsRow(
                         icon: "lock.shield",
                         title: "Güvenlik ve Şifre",
@@ -277,7 +281,7 @@ struct ProfileView: View {
                     ) {
                         router.navigate(to: .profileMenu(.security))
                     }
-                    
+
                     Divider()
                         .padding(.vertical, SBSpacing.xs)
 
@@ -313,7 +317,7 @@ struct ProfileView: View {
 
                     Divider()
                         .padding(.vertical, SBSpacing.xs)
-                    
+
                     settingsRow(
                         icon: "eye.slash",
                         title: "Gizlilik ve Destek",
@@ -321,7 +325,7 @@ struct ProfileView: View {
                     ) {
                         router.navigate(to: .profileMenu(.privacySupport))
                     }
-                    
+
                     Divider()
                         .padding(.vertical, SBSpacing.xs)
 
@@ -346,7 +350,7 @@ struct ProfileView: View {
 
                     Divider()
                         .padding(.vertical, SBSpacing.xs)
-                    
+
                     settingsRow(
                         icon: "trash",
                         title: "Hesap Silme",
@@ -358,7 +362,7 @@ struct ProfileView: View {
             }
         }
     }
-    
+
     private func settingsRow(icon: String, title: String, description: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: SBSpacing.md) {
@@ -367,15 +371,15 @@ struct ProfileView: View {
                     .foregroundStyle(SBColors.blue)
                     .frame(width: 32, height: 32)
                     .accessibilityHidden(true)
-                
+
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(SBTypography.labelSmall)
                         .foregroundStyle(SBColors.navy)
                 }
-                
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
                     .sbScaledFont(size: 14, weight: .semibold)
                     .foregroundStyle(SBColors.softText)
@@ -390,12 +394,12 @@ struct ProfileView: View {
         .accessibilityHint("Detayı açar")
         .accessibilityAddTraits(.isButton)
     }
-    
+
     // MARK: - Logout Button
-    
+
     private var logoutButton: some View {
         SBButton(
-            isSigningOut ? "Oturum Kapatılıyor..." : "Oturumu Kapat",
+            isSigningOut ? "Oturum kapatılıyor..." : "Oturumu kapat",
             icon: "door.right.to.left.open",
             variant: .secondary,
             size: .medium,
@@ -407,20 +411,20 @@ struct ProfileView: View {
         )
         .padding(.top, SBSpacing.md)
     }
-    
+
     // MARK: - Helpers
-    
+
     private func performSignOut() async {
         isSigningOut = true
         await appState.signOut()
         isSigningOut = false
     }
-    
+
     private func loadProfileData() async {
         isLoading = true
         errorMessage = nil
         profileLoadFailed = false
-        
+
         do {
             if let client = await AuthBackend.shared.getClient() {
                 guard let user = client.auth.currentUser else {
@@ -428,11 +432,11 @@ struct ProfileView: View {
                     isLoading = false
                     return
                 }
-                
+
                 // Get workspace data to feed count metrics
                 let driveRepo = DriveRepository(api: DriveAPI(client: client))
                 let workspace = try await driveRepo.loadWorkspace()
-                
+
                 let profRepo = ProfileRepository(client: client)
                 profileSnapshot = try await profRepo.loadProfile(userId: user.id.uuidString, workspace: workspace)
             } else {
@@ -440,7 +444,7 @@ struct ProfileView: View {
             }
         } catch {
             profileLoadFailed = true
-            
+
             // Generate fallback data from Session description metadata safely
             profileSnapshot = ProfileSnapshot(
                 displayName: session.displayName,
@@ -456,7 +460,7 @@ struct ProfileView: View {
                 avatarURL: session.currentUser?.userMetadata["avatar_url"]?.stringValue
             )
         }
-        
+
         isLoading = false
     }
 

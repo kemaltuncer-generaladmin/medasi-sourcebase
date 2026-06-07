@@ -47,7 +47,7 @@ struct CourseDetailView: View {
                     SBErrorState(
                         title: "Ders yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await workspaceStore.refresh() } }
                     )
                 } else if let course {
@@ -67,7 +67,7 @@ struct CourseDetailView: View {
             .padding(SBSpacing.lg)
             .sbFloatingTabContentPadding()
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .warm)
         .navigationTitle(course?.title ?? "Ders")
         .sbInlineNavTitle()
         .toolbar {
@@ -371,7 +371,7 @@ struct CourseDetailView: View {
                     icon: "doc.badge.plus",
                     title: "Bu derste henüz dosya yok",
                     message: "\(DriveUploadService.supportedExtensionsDisplay) yükleyerek başlayabilirsin.",
-                    actionLabel: "Dosya Yükle",
+                    actionLabel: "Dosya yükle",
                     onAction: {
                         showUploadSheet = true
                     }

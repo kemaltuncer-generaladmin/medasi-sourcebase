@@ -1,6 +1,18 @@
 import Foundation
 import Supabase
 
+public struct ExtractionMetadata: Sendable, Codable {
+    public let charCount: Int
+    public let wordCount: Int
+    public let extractedAt: Date
+
+    public init(charCount: Int, wordCount: Int, extractedAt: Date) {
+        self.charCount = charCount
+        self.wordCount = wordCount
+        self.extractedAt = extractedAt
+    }
+}
+
 // MARK: - Enums
 
 public enum DriveFileKind: String, Codable, Sendable, CaseIterable {
@@ -444,7 +456,7 @@ public struct DriveUploadDraft: Codable, Sendable {
     }
 }
 
-public struct GCSUploadSession: Codable, Sendable {
+public struct StorageUploadSession: Codable, Sendable {
     public let uploadURL: String
     public let objectName: String
     public let bucket: String

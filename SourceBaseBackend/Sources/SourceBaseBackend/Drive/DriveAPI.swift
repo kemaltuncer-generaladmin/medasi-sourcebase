@@ -110,14 +110,14 @@ public struct DriveAPI: Sendable {
 
     // MARK: - Upload
 
-    public func createUploadSession(_ draft: DriveUploadDraft) async throws -> GCSUploadSession {
+    public func createUploadSession(_ draft: DriveUploadDraft) async throws -> StorageUploadSession {
         let payload = Self.uploadSessionPayload(for: draft)
         let response = try await invoke("create_upload_session", payload: payload)
         guard case .object(let dataDict) = response["data"] else {
             throw DriveAPIError(message: "Upload session response is empty.", code: nil, status: nil)
         }
         let jsonData = try JSONEncoder().encode(dataDict)
-        return try JSONDecoder().decode(GCSUploadSession.self, from: jsonData)
+        return try JSONDecoder().decode(StorageUploadSession.self, from: jsonData)
     }
 
     static func uploadSessionPayload(for draft: DriveUploadDraft) -> [String: AnyJSON] {
@@ -138,8 +138,36 @@ public struct DriveAPI: Sendable {
         sectionId: String,
         fileName: String,
         contentType: String,
-        sizeBytes: Int
+        sizeBytes: Int,
+        extractedText: String? = nil,
+        pageCount: Int? = nil,
+        extractionMetadata: ExtractionMetadata? = nil
     ) async throws -> [String: AnyJSON] {
+        let payload = Self.completeUploadPayload(
+            objectName: objectName,
+            courseId: courseId,
+            sectionId: sectionId,
+            fileName: fileName,
+            contentType: contentType,
+            sizeBytes: sizeBytes,
+            extractedText: extractedText,
+            pageCount: pageCount,
+            extractionMetadata: extractionMetadata
+        )
+        return try await invoke("complete_upload", payload: payload)
+    }
+
+    static func completeUploadPayload(
+        objectName: String,
+        courseId: String,
+        sectionId: String,
+        fileName: String,
+        contentType: String,
+        sizeBytes: Int,
+        extractedText: String? = nil,
+        pageCount: Int? = nil,
+        extractionMetadata: ExtractionMetadata? = nil
+    ) -> [String: AnyJSON] {
         var payload: [String: AnyJSON] = [
             "objectName": .string(objectName),
             "courseId": .string(courseId),
@@ -148,8 +176,21 @@ public struct DriveAPI: Sendable {
             "contentType": .string(contentType),
             "sizeBytes": .integer(sizeBytes)
         ]
+        if let extractedText {
+            payload["extractedText"] = .string(extractedText)
+        }
+        if let pageCount {
+            payload["pageCount"] = .integer(pageCount)
+        }
+        if let metadata = extractionMetadata {
+            payload["extractionMetadata"] = .object([
+                "charCount": .integer(metadata.charCount),
+                "wordCount": .integer(metadata.wordCount),
+                "extractedAt": .string(ISO8601DateFormatter().string(from: metadata.extractedAt))
+            ])
+        }
         payload.merge(Self.documentProcessingPolicy(fileName: fileName, contentType: contentType)) { current, _ in current }
-        return try await invoke("complete_upload", payload: payload)
+        return payload
     }
 
     private static func documentProcessingPolicy(fileName: String, contentType: String) -> [String: AnyJSON] {
@@ -560,9 +601,9 @@ public struct DriveAPI: Sendable {
         case "economy":
             return "low"
         case "standard":
-            return "medium"
+            return "standard"
         default:
-            return "high"
+            return "premium"
         }
     }
 
@@ -1119,7 +1160,7 @@ public struct DriveAPI: Sendable {
         fileName: String,
         contentType: String,
         sizeBytes: Int
-    ) async throws -> GCSUploadSession {
+    ) async throws -> StorageUploadSession {
         let response = try await invoke(
             "create_profile_avatar_upload_session",
             payload: Self.profileAvatarUploadPayload(
@@ -1132,7 +1173,7 @@ public struct DriveAPI: Sendable {
             throw DriveAPIError(message: "Avatar upload session response is empty.", code: nil, status: nil)
         }
         let jsonData = try JSONEncoder().encode(dataDict)
-        return try JSONDecoder().decode(GCSUploadSession.self, from: jsonData)
+        return try JSONDecoder().decode(StorageUploadSession.self, from: jsonData)
     }
 
     public static func profileAvatarUploadPayload(

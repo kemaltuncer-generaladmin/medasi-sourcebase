@@ -24,6 +24,62 @@ import SourceBaseBackend
     }
 }
 
+@Test func documentExtractorReadsDOCXTextFromOfficeArchive() async throws {
+    let xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:body><w:p><w:r><w:t>Kardiyoloji kaynak metni</w:t></w:r></w:p></w:body>
+    </w:document>
+    """
+    let url = try temporaryArchiveURL(
+        name: "sourcebase-docx-\(UUID().uuidString).docx",
+        entries: [("word/document.xml", xml)]
+    )
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let result = try await DocumentExtractor.shared.extract(
+        from: url,
+        fileType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+
+    #expect(result.text.contains("Kardiyoloji kaynak metni"))
+    #expect(result.pageCount == 1)
+    #expect(result.metadata.charCount > 0)
+    #expect(result.metadata.wordCount >= 3)
+}
+
+@Test func documentExtractorReadsPPTXSlideTextFromOfficeArchive() async throws {
+    let slide1 = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Nöroloji slayt özeti</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld>
+    </p:sld>
+    """
+    let slide2 = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Refleks muayenesi</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld>
+    </p:sld>
+    """
+    let url = try temporaryArchiveURL(
+        name: "sourcebase-pptx-\(UUID().uuidString).pptx",
+        entries: [
+            ("ppt/slides/slide1.xml", slide1),
+            ("ppt/slides/slide2.xml", slide2)
+        ]
+    )
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let result = try await DocumentExtractor.shared.extract(
+        from: url,
+        fileType: "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    )
+
+    #expect(result.text.contains("Nöroloji slayt özeti"))
+    #expect(result.text.contains("Refleks muayenesi"))
+    #expect(result.pageCount == 2)
+}
+
 @Test func generatedOutputKeepsBackendContentText() async throws {
     let output = GeneratedOutput(
         id: "output-1",
@@ -213,6 +269,24 @@ import SourceBaseBackend
     )
 
     #expect(output.isReady)
+}
+
+@MainActor
+@Test func ctaContractRoutesStudyOutputAndQueueTargets() async throws {
+    let router = AppRouter.shared
+    router.reset(to: .drive)
+
+    router.beginSourceSelection(from: .baseForce, destination: .route(.studyOutput(outputId: "output-cta")))
+    router.completeSourceSelection()
+    #expect(router.selectedTab == .baseForce)
+    #expect(router.path == [.studyOutput(outputId: "output-cta")])
+
+    router.beginSourceSelection(from: .baseForce, destination: .route(.queue(surface: .baseForce)))
+    router.completeSourceSelection()
+    #expect(router.selectedTab == .baseForce)
+    #expect(router.path == [.queue(surface: .baseForce)])
+
+    router.reset(to: .drive)
 }
 
 @Test func legalLinksAreValidHTTPS() async throws {
@@ -687,6 +761,81 @@ import SourceBaseBackend
     #expect(store.selectedFileId == "file-kardiyo")
     #expect(store.selectedCourseId == "course-d")
     #expect(store.selectedSectionId == "section-k")
+}
+
+private func temporaryArchiveURL(name: String, entries: [(path: String, text: String)]) throws -> URL {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+    try makeStoredZIP(entries: entries).write(to: url, options: .atomic)
+    return url
+}
+
+private func makeStoredZIP(entries: [(path: String, text: String)]) -> Data {
+    var archive = Data()
+    var centralDirectory = Data()
+    for entry in entries {
+        let localHeaderOffset = UInt32(archive.count)
+        let nameData = Data(entry.path.utf8)
+        let fileData = Data(entry.text.utf8)
+
+        archive.appendUInt32LE(0x04034B50)
+        archive.appendUInt16LE(20)
+        archive.appendUInt16LE(0)
+        archive.appendUInt16LE(0)
+        archive.appendUInt16LE(0)
+        archive.appendUInt16LE(0)
+        archive.appendUInt32LE(0)
+        archive.appendUInt32LE(UInt32(fileData.count))
+        archive.appendUInt32LE(UInt32(fileData.count))
+        archive.appendUInt16LE(UInt16(nameData.count))
+        archive.appendUInt16LE(0)
+        archive.append(nameData)
+        archive.append(fileData)
+
+        centralDirectory.appendUInt32LE(0x02014B50)
+        centralDirectory.appendUInt16LE(20)
+        centralDirectory.appendUInt16LE(20)
+        centralDirectory.appendUInt16LE(0)
+        centralDirectory.appendUInt16LE(0)
+        centralDirectory.appendUInt16LE(0)
+        centralDirectory.appendUInt16LE(0)
+        centralDirectory.appendUInt32LE(0)
+        centralDirectory.appendUInt32LE(UInt32(fileData.count))
+        centralDirectory.appendUInt32LE(UInt32(fileData.count))
+        centralDirectory.appendUInt16LE(UInt16(nameData.count))
+        centralDirectory.appendUInt16LE(0)
+        centralDirectory.appendUInt16LE(0)
+        centralDirectory.appendUInt16LE(0)
+        centralDirectory.appendUInt16LE(0)
+        centralDirectory.appendUInt32LE(0)
+        centralDirectory.appendUInt32LE(localHeaderOffset)
+        centralDirectory.append(nameData)
+    }
+
+    let centralDirectoryOffset = UInt32(archive.count)
+    archive.append(centralDirectory)
+    archive.appendUInt32LE(0x06054B50)
+    archive.appendUInt16LE(0)
+    archive.appendUInt16LE(0)
+    archive.appendUInt16LE(UInt16(entries.count))
+    archive.appendUInt16LE(UInt16(entries.count))
+    archive.appendUInt32LE(UInt32(centralDirectory.count))
+    archive.appendUInt32LE(centralDirectoryOffset)
+    archive.appendUInt16LE(0)
+    return archive
+}
+
+private extension Data {
+    mutating func appendUInt16LE(_ value: UInt16) {
+        append(UInt8(value & 0x00FF))
+        append(UInt8((value >> 8) & 0x00FF))
+    }
+
+    mutating func appendUInt32LE(_ value: UInt32) {
+        append(UInt8(value & 0x000000FF))
+        append(UInt8((value >> 8) & 0x000000FF))
+        append(UInt8((value >> 16) & 0x000000FF))
+        append(UInt8((value >> 24) & 0x000000FF))
+    }
 }
 
 private func blockTitle(_ block: SBStudyBlock) -> String {

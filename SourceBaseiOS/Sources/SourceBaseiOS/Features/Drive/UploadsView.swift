@@ -73,7 +73,7 @@ struct UploadsView: View {
                     SBErrorState(
                         title: "Yüklemeler alınamadı",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await workspaceStore.refresh() } }
                     )
                 } else {
@@ -84,7 +84,7 @@ struct UploadsView: View {
             .padding(SBSpacing.lg)
             .sbFloatingTabContentPadding()
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .warm)
         .navigationTitle("Hazır kaynaklar")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -252,7 +252,7 @@ struct UploadsView: View {
                     .foregroundStyle(SBColors.muted)
 
                 SBButton(
-                    "Tekrar Dene",
+                    "Tekrar dene",
                     icon: "arrow.clockwise",
                     variant: .secondary,
                     size: .small,

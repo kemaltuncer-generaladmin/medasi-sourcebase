@@ -95,7 +95,7 @@ struct SearchView: View {
                     SBErrorState(
                         title: "Arama yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await workspaceStore.refresh() } }
                     )
                 } else {
@@ -112,7 +112,7 @@ struct SearchView: View {
             .padding(SBSpacing.lg)
             .sbFloatingTabContentPadding()
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .warm)
         .navigationTitle("Arama")
         .task {
             await workspaceStore.loadWorkspace()
@@ -315,7 +315,7 @@ struct SearchView: View {
                 .lineLimit(1)
 
             Image(systemName: "chevron.down")
-                .sbScaledFont(size: 10, weight: .bold)
+                .sbScaledFont(size: 10, weight: .semibold)
                 .foregroundStyle(isActive ? SBColors.blue : SBColors.softText)
         }
         .padding(.horizontal, SBSpacing.sm)

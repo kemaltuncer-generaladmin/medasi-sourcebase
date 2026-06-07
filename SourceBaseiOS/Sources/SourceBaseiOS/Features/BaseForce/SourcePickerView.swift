@@ -64,7 +64,7 @@ struct SourcePickerView: View {
                     SBErrorState(
                         title: "Kaynaklar yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await loadWorkspace() } }
                     )
                 } else {
@@ -79,7 +79,7 @@ struct SourcePickerView: View {
             .sbFloatingTabContentPadding(160)
             .sbReadableWidth(720)
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .cool)
         .navigationTitle("Kaynak Seç")
         .sbInlineNavTitle()
         .safeAreaInset(edge: .bottom) {
@@ -96,7 +96,7 @@ struct SourcePickerView: View {
         SBSignatureHero(
             eyebrow: "Ders kaynağı",
             title: "Hangi nottan çalışacaksın?",
-            message: selectedSources.isEmpty ? "Ders ve bölüme göre hazır kaynak seç. Sonra çalışma türünü aç." : "\(selectedSources.count) kaynak seçildi. Şimdi çalışma türünü seç.",
+            message: selectedSources.isEmpty ? "Hazır kaynağı seç. Sonraki ekranda üretim türünü aç." : "\(selectedSources.count) kaynak seçildi. Şimdi çalışma türünü seç.",
             icon: "doc.text.magnifyingglass",
             tint: SBColors.blue
         ) {
@@ -244,7 +244,10 @@ struct SourcePickerView: View {
                         message: "Drive'a dosya ekle, sonra buradan seç.",
                         badges: ["PDF", "PPTX", "DOCX"],
                         actionLabel: "Drive'a git",
-                        onAction: { router.switchTab(to: .drive) }
+                        onAction: {
+                            router.sourcePickerDestination = nil
+                            router.switchTab(to: .drive)
+                        }
                     )
                 } else {
                     VStack(spacing: 0) {
@@ -319,13 +322,13 @@ struct SourcePickerView: View {
 
                 if isReady {
                     VStack(alignment: .trailing, spacing: SBSpacing.xs) {
-                            Text(isSelected ? "Seçili" : "Çalış")
+                            Text(isSelected ? "Seçili" : "Seç")
                             .font(SBTypography.caption)
                             .foregroundStyle(isSelected ? SBColors.blue : SBColors.muted)
                             .lineLimit(1)
                             .fixedSize()
                         if !isSelected {
-                            Text("set hazırla")
+                            Text("üretime hazır")
                                 .font(SBTypography.caption)
                                 .foregroundStyle(SBColors.softText)
                                 .lineLimit(1)
@@ -348,6 +351,7 @@ struct SourcePickerView: View {
             .padding(SBSpacing.md)
             .opacity(isReady ? 1.0 : 0.6)
             .background(isSelected ? SBColors.selectedBlue.opacity(0.72) : Color.clear)
+            .sbSelectionDelight(isSelected)
         }
         .buttonStyle(SBPressStyle())
         .disabled(!isReady)
@@ -372,7 +376,7 @@ struct SourcePickerView: View {
                 Spacer()
 
                 SBButton(
-                    "Devam",
+                    "Çalışma türünü seç",
                     icon: "arrow.right",
                     variant: .primary,
                     size: .small,
@@ -386,7 +390,7 @@ struct SourcePickerView: View {
                 Rectangle().fill(SBColors.softLine).frame(height: 0.5)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(selectedSources.count) kaynak seçildi. Devam et.")
+            .accessibilityLabel("\(selectedSources.count) kaynak seçildi. Çalışma türünü seç.")
         }
     }
 
@@ -409,11 +413,7 @@ struct SourcePickerView: View {
         if let first = filteredFiles.first(where: { selectedSources.contains($0.id) }) {
             workspaceStore.selectFile(first)
         }
-        if router.canPop {
-            router.pop()
-        } else {
-            router.switchTab(to: .baseForce)
-        }
+        router.completeSourceSelection()
     }
 
     private func loadWorkspace() async {
@@ -482,7 +482,7 @@ struct SourcePickerView: View {
         if let first = filteredFiles.first(where: { selectedSources.contains($0.id) }) {
             return sourceContextLabel(first)
         }
-        return "Çalışma türünü seçmeye hazırsın."
+        return "Çalışma türünü seçmeye hazırsın"
     }
 
     private func filterChip(title: String, isSelected: Bool, tint: Color, action: @escaping () -> Void) -> some View {

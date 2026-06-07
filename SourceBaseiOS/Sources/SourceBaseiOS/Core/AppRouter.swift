@@ -56,6 +56,12 @@ public enum AppRoute: Hashable {
     case profileMenu(ProfileMenuDestination)
 }
 
+public enum SourcePickerDestination: Hashable {
+    case baseForceHome
+    case sourceLabHome
+    case route(AppRoute)
+}
+
 @Observable
 @MainActor
 public final class AppRouter {
@@ -63,6 +69,7 @@ public final class AppRouter {
 
     public var path: [AppRoute] = []
     public var selectedTab: AppRoute = .drive
+    public var sourcePickerDestination: SourcePickerDestination?
     public var canPop: Bool { !path.isEmpty }
 
     private init() {}
@@ -101,5 +108,87 @@ public final class AppRouter {
     public func reset(to route: AppRoute) {
         path.removeAll()
         selectedTab = route
+        sourcePickerDestination = nil
+    }
+
+    public func beginSourceSelection(from tab: AppRoute? = nil, destination: SourcePickerDestination) {
+        if let tab {
+            selectedTab = tab
+            path.removeAll()
+        }
+        sourcePickerDestination = destination
+        path.append(.sourcePicker)
+    }
+
+    public func completeSourceSelection() {
+        let destination = sourcePickerDestination
+        sourcePickerDestination = nil
+
+        switch destination {
+        case .baseForceHome:
+            switchTab(to: .baseForce)
+        case .sourceLabHome:
+            switchTab(to: .sourceLab)
+        case .route(let route):
+            let tab = rootTab(for: route)
+            selectedTab = tab
+            path.removeAll()
+            if route != tab {
+                path.append(route)
+            }
+        case .none:
+            if canPop {
+                pop()
+            } else {
+                switchTab(to: .baseForce)
+            }
+        }
+    }
+
+    private func rootTab(for route: AppRoute) -> AppRoute {
+        switch route {
+        case .drive,
+             .courseDetail,
+             .folder,
+             .fileDetail,
+             .uploads,
+             .collections,
+             .search:
+            return .drive
+        case .baseForce,
+             .sourcePicker,
+             .flashcardFactory,
+             .questionFactory,
+             .summaryFactory,
+             .algorithmFactory,
+             .comparisonFactory,
+             .queue,
+             .generationProcessing,
+             .result,
+             .studyOutput:
+            return .baseForce
+        case .sourceLab,
+             .examMorning,
+             .clinical,
+             .plan,
+             .podcast,
+             .infographic,
+             .mindMap:
+            return .sourceLab
+        case .centralAI:
+            return .centralAI
+        case .profile,
+             .store,
+             .settings,
+             .profileMenu:
+            return .profile
+        case .login,
+             .register,
+             .verifyEmail,
+             .profileSetup,
+             .forgotPassword,
+             .resetPassword:
+            return .drive
+        }
     }
 }

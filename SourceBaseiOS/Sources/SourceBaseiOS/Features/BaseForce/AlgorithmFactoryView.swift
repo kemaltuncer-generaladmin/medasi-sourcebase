@@ -131,7 +131,7 @@ struct AlgorithmFactoryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SBSpacing.lg) {
+            VStack(alignment: .leading, spacing: BaseForceFactoryStyle.screenSpacing) {
                 if isLoading {
                     SBLoadingState(
                         icon: "arrow.triangle.branch",
@@ -142,7 +142,7 @@ struct AlgorithmFactoryView: View {
                     SBErrorState(
                         title: "Yüklenemedi",
                         message: error,
-                        actionLabel: "Tekrar Dene",
+                        actionLabel: "Tekrar dene",
                         onAction: { Task { await loadWorkspace() } }
                     )
                 } else {
@@ -159,11 +159,11 @@ struct AlgorithmFactoryView: View {
                     }
                 }
             }
-            .padding(SBSpacing.lg)
+            .padding(BaseForceFactoryStyle.pagePadding)
             .sbFloatingTabContentPadding()
             .sbReadableWidth(760)
         }
-        .sbPageBackground()
+        .sbPageBackground(tone: .cool)
         .navigationTitle("Akış Şeması")
         .task {
             await loadWorkspace()
@@ -178,7 +178,8 @@ struct AlgorithmFactoryView: View {
             title: "Akış şeması üret",
             message: "Süreci karar akışına çevir.",
             icon: "arrow.triangle.branch",
-            tint: SBColors.orange
+            tint: SBColors.orange,
+            size: .compact
         ) {
             EmptyView()
         } footer: {
@@ -193,7 +194,7 @@ struct AlgorithmFactoryView: View {
     // MARK: - Selected Sources
 
     private var selectedSourcesSection: some View {
-        VStack(alignment: .leading, spacing: SBSpacing.md) {
+        BaseForceFactoryStyle.panel {
             Text("Kaynak")
                 .font(SBTypography.titleSmall)
                 .foregroundStyle(SBColors.navy)
@@ -212,35 +213,32 @@ struct AlgorithmFactoryView: View {
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Önce hazır bir kaynak seç. Alttaki Hazır kaynak seç düğmesini kullan.")
     }
 
     private var sourceRequiredCard: some View {
-        SBCard(radius: 14, borderColor: SBColors.blue.opacity(0.2)) {
-            VStack(alignment: .leading, spacing: SBSpacing.md) {
-                HStack(spacing: SBSpacing.md) {
-                    ZStack {
-                        Circle()
-                            .fill(SBColors.selectedBlue)
-                            .frame(width: 40, height: 40)
+        BaseForceFactoryStyle.sourceRequiredPanel {
+            HStack(spacing: SBSpacing.md) {
+                SBIconTile(
+                    icon: "doc.text.magnifyingglass",
+                    tint: SBColors.blue,
+                    size: BaseForceFactoryStyle.iconTileSize,
+                    radius: BaseForceFactoryStyle.iconTileRadius
+                )
 
-                        Image(systemName: "doc.text.magnifyingglass")
-                            .sbScaledFont(size: 18)
-                            .foregroundStyle(SBColors.blue)
-                    }
+                Text("Önce bir kaynak seç")
+                    .font(SBTypography.titleSmall)
+                    .foregroundStyle(SBColors.navy)
+            }
 
-                    Text("Önce bir kaynak seç")
-                        .font(SBTypography.titleSmall)
-                        .foregroundStyle(SBColors.navy)
-                }
+            Text("Hazır bir kaynak seç.")
+                .font(SBTypography.bodySmall)
+                .foregroundStyle(SBColors.muted)
 
-                Text("Hazır bir kaynak seç.")
-                    .font(SBTypography.bodySmall)
-                    .foregroundStyle(SBColors.muted)
-
-                FlowLayout(spacing: SBSpacing.xs) {
-                    tagChip(label: "Hazır kaynak", color: SBColors.blue)
-                    tagChip(label: "PDF / PPT(X) / DOC(X)", color: SBColors.purple)
-                }
+            FlowLayout(spacing: SBSpacing.xs) {
+                tagChip(label: "Hazır kaynak", color: SBColors.blue)
+                tagChip(label: "PDF / PPT(X) / DOC(X)", color: SBColors.purple)
             }
         }
     }
@@ -263,16 +261,16 @@ struct AlgorithmFactoryView: View {
         .padding(.horizontal, SBSpacing.sm)
         .padding(.vertical, SBSpacing.xs)
         .background(SBColors.white)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: BaseForceFactoryStyle.chipRadius))
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: BaseForceFactoryStyle.chipRadius)
                 .stroke(SBColors.softLine, lineWidth: 1)
         )
     }
 
     private var addSourceChip: some View {
         Button {
-            router.navigate(to: .sourcePicker)
+            openSourcePicker()
         } label: {
             HStack(spacing: SBSpacing.xs) {
                 Image(systemName: "plus")
@@ -285,9 +283,9 @@ struct AlgorithmFactoryView: View {
             .padding(.horizontal, SBSpacing.md)
             .padding(.vertical, SBSpacing.sm)
             .background(SBColors.white)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: BaseForceFactoryStyle.chipRadius))
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: BaseForceFactoryStyle.chipRadius)
                     .stroke(SBColors.blue.opacity(0.3), lineWidth: 1.5)
             )
         }
@@ -306,98 +304,96 @@ struct AlgorithmFactoryView: View {
     // MARK: - Settings Panel
 
     private var settingsPanel: some View {
-        SBCard(radius: 16) {
-            VStack(alignment: .leading, spacing: SBSpacing.lg) {
-                Text("Ayarlar")
-                    .font(SBTypography.titleMedium)
-                    .foregroundStyle(SBColors.navy)
+        BaseForceFactoryStyle.panel(spacing: BaseForceFactoryStyle.settingsSpacing) {
+            Text("Ayarlar")
+                .font(SBTypography.titleMedium)
+                .foregroundStyle(SBColors.navy)
 
-                // Algorithm Mode
-                settingsSection(label: "Şablon") {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
-                        ForEach(AlgorithmMode.allCases, id: \.self) { mode in
-                            segmentButton(
-                                label: mode.rawValue,
-                                icon: mode.icon,
-                                isSelected: algorithmMode == mode
-                            ) {
-                                algorithmMode = mode
-                            }
+            // Algorithm Mode
+            settingsSection(label: "Şablon") {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
+                    ForEach(AlgorithmMode.allCases, id: \.self) { mode in
+                        segmentButton(
+                            label: mode.rawValue,
+                            icon: mode.icon,
+                            isSelected: algorithmMode == mode
+                        ) {
+                            algorithmMode = mode
                         }
                     }
                 }
+            }
 
-                // Algorithm Type
-                settingsSection(label: "Tip") {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
-                        ForEach(AlgorithmType.allCases, id: \.self) { type in
-                            segmentButton(
-                                label: type.rawValue,
-                                icon: type.icon,
-                                isSelected: algorithmType == type
-                            ) {
-                                algorithmType = type
-                            }
+            // Algorithm Type
+            settingsSection(label: "Tip") {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
+                    ForEach(AlgorithmType.allCases, id: \.self) { type in
+                        segmentButton(
+                            label: type.rawValue,
+                            icon: type.icon,
+                            isSelected: algorithmType == type
+                        ) {
+                            algorithmType = type
                         }
                     }
                 }
+            }
 
-                // Flow Format
-                settingsSection(label: "Biçim") {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
-                        ForEach(FlowFormat.allCases, id: \.self) { format in
-                            segmentButton(
-                                label: format.rawValue,
-                                icon: format.icon,
-                                isSelected: flowFormat == format
-                            ) {
-                                flowFormat = format
-                            }
+            // Flow Format
+            settingsSection(label: "Biçim") {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
+                    ForEach(FlowFormat.allCases, id: \.self) { format in
+                        segmentButton(
+                            label: format.rawValue,
+                            icon: format.icon,
+                            isSelected: flowFormat == format
+                        ) {
+                            flowFormat = format
                         }
                     }
                 }
+            }
 
-                // Output Format
-                settingsSection(label: "Çıktı") {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
-                        ForEach(OutputFormat.allCases, id: \.self) { format in
-                            segmentButton(
-                                label: format.rawValue,
-                                icon: format.icon,
-                                isSelected: outputFormat == format
-                            ) {
-                                outputFormat = format
-                            }
+            // Output Format
+            settingsSection(label: "Çıktı") {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
+                    ForEach(OutputFormat.allCases, id: \.self) { format in
+                        segmentButton(
+                            label: format.rawValue,
+                            icon: format.icon,
+                            isSelected: outputFormat == format
+                        ) {
+                            outputFormat = format
                         }
                     }
                 }
+            }
 
-                // Detail Level
-                settingsSection(label: "Detay") {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
-                        ForEach(DetailLevel.allCases, id: \.self) { level in
-                            segmentButton(
-                                label: level.rawValue,
-                                icon: level.icon,
-                                isSelected: detailLevel == level
-                            ) {
-                                detailLevel = level
-                            }
+            // Detail Level
+            settingsSection(label: "Detay") {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
+                    ForEach(DetailLevel.allCases, id: \.self) { level in
+                        segmentButton(
+                            label: level.rawValue,
+                            icon: level.icon,
+                            isSelected: detailLevel == level
+                        ) {
+                            detailLevel = level
                         }
                     }
                 }
+            }
 
-                // Quality
-                settingsSection(label: "Kalite") {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
-                        ForEach(Quality.allCases, id: \.self) { q in
-                            segmentButton(
-                                label: q.rawValue,
-                                icon: q.icon,
-                                isSelected: quality == q
-                            ) {
-                                quality = q
-                            }
+            // Quality
+            settingsSection(label: "Kalite") {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: SBSpacing.sm)], spacing: SBSpacing.sm) {
+                    ForEach(Quality.allCases, id: \.self) { q in
+                        segmentButton(
+                            label: q.rawValue,
+                            icon: q.icon,
+                            isSelected: quality == q
+                        ) {
+                            quality = q
                         }
                     }
                 }
@@ -431,9 +427,9 @@ struct AlgorithmFactoryView: View {
             .padding(.vertical, SBSpacing.md)
             .padding(.horizontal, SBSpacing.sm)
             .background(isSelected ? SBColors.blue : SBColors.white)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: BaseForceFactoryStyle.controlRadius))
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: BaseForceFactoryStyle.controlRadius)
                     .stroke(isSelected ? SBColors.blue : SBColors.softLine, lineWidth: 1)
                 )
         }
@@ -456,28 +452,26 @@ struct AlgorithmFactoryView: View {
         .padding(SBSpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SBColors.selectedBlue)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: BaseForceFactoryStyle.controlRadius))
     }
 
     // MARK: - Toggles Section
 
     private var togglesSection: some View {
-        SBCard(radius: 16) {
-            VStack(spacing: SBSpacing.md) {
-                Toggle(isOn: $colorfulNodes) {
-                    Text("Renkli düğümler")
-                        .font(SBTypography.bodySmall)
-                        .foregroundStyle(SBColors.navy)
-                }
-                .toggleStyle(SwitchToggleStyle(tint: SBColors.blue))
-
-                Toggle(isOn: $clinicalNotes) {
-                    Text("Klinik not ekle")
-                        .font(SBTypography.bodySmall)
-                        .foregroundStyle(SBColors.navy)
-                }
-                .toggleStyle(SwitchToggleStyle(tint: SBColors.blue))
+        BaseForceFactoryStyle.panel {
+            Toggle(isOn: $colorfulNodes) {
+                Text("Renkli düğümler")
+                    .font(SBTypography.bodySmall)
+                    .foregroundStyle(SBColors.navy)
             }
+            .toggleStyle(SwitchToggleStyle(tint: SBColors.blue))
+
+            Toggle(isOn: $clinicalNotes) {
+                Text("Klinik not ekle")
+                    .font(SBTypography.bodySmall)
+                    .foregroundStyle(SBColors.navy)
+            }
+            .toggleStyle(SwitchToggleStyle(tint: SBColors.blue))
         }
     }
 
@@ -485,28 +479,30 @@ struct AlgorithmFactoryView: View {
 
     private var generateButton: some View {
         SBButton(
-            canGenerate ? "Akışı çiz • \(costLabel)" : "Kaynak seç",
-            icon: canGenerate ? "bolt.fill" : "folder",
+            "Akışı çiz • \(costLabel)",
+            icon: "bolt.fill",
             variant: .primary,
             size: .large,
             isLoading: isGenerating,
+            isDisabled: !canGenerate,
             fullWidth: true,
-            action: {
-                if canGenerate {
-                    generate()
-                } else {
-                    router.navigate(to: .sourcePicker)
-                }
-            }
+            action: generate
         )
-        .accessibilityLabel(canGenerate ? "Klinik algoritma oluştur" : "Kaynak seç")
-        .accessibilityHint(canGenerate ? "Seçili hazır kaynakla akış şeması üretimini başlatır" : "Kaynak seçme ekranını açar")
+        .accessibilityLabel("Klinik algoritma oluştur")
+        .accessibilityHint(canGenerate ? "Seçili hazır kaynakla akış şeması üretimini başlatır" : "Önce hazır bir kaynak seçmelisin")
     }
 
     // MARK: - Source Required Notice
 
     private var sourceRequiredNotice: some View {
-        sourceRequiredCard
+        SBButton(
+            "Hazır kaynak seç",
+            icon: "folder",
+            variant: .secondary,
+            size: .medium,
+            fullWidth: true,
+            action: openSourcePicker
+        )
     }
 
     // MARK: - Helpers
@@ -560,6 +556,9 @@ struct AlgorithmFactoryView: View {
         await workspaceStore.loadWorkspace()
         errorMessage = workspaceStore.errorMessage
         isLoading = false
+    }
+    private func openSourcePicker() {
+        router.beginSourceSelection(from: .baseForce, destination: .route(.algorithmFactory))
     }
 }
 

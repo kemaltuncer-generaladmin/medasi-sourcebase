@@ -24,6 +24,16 @@ upload lifecycle instead of inventing one from recent files.
 
 ## Upload Actions
 
+SourceBase user files are stored through a storage-agnostic signed PUT URL. The
+current production driver is self-hosted MinIO/S3-compatible storage:
+
+- endpoint: `https://storage.medasi.com.tr`
+- bucket: `medasistorage`
+- region: `us-east-1`
+- style: path-style (`https://storage.medasi.com.tr/medasistorage/{objectName}`)
+- uploads: `sourcebase/users/{userId}/uploads/{yyyy}/{mm}/{uuid}-{safeFileName}`
+- profile files: `sourcebase/users/{userId}/profile/{uuid}-{safeFileName}`
+
 `create_upload_session` must return:
 
 - `uploadUrl` or `upload_url`
