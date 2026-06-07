@@ -22,7 +22,7 @@ struct QueueView: View {
                 sourceFileId: job.sourceFileId,
                 sourceTitle: job.sourceTitle,
                 sourceKind: source.map { SBFileKind.from($0.kind) } ?? .pdf,
-                title: job.kind.titleLabel,
+                title: SBOutputStyle.templateName(job.kind),
                 kind: job.kind,
                 status: queueStatus(from: job.status),
                 progress: job.progress,
@@ -119,6 +119,7 @@ struct QueueView: View {
                 }
             }
             .padding(SBSpacing.lg)
+            .sbReadableWidth()
             .sbFloatingTabContentPadding()
         }
         .sbPageBackground(tone: .cool)

@@ -179,12 +179,22 @@ public final class SessionStore {
 
     // MARK: - Update Profile
 
-    public func updateProfile(faculty: String, department: String) async {
+    public func updateProfile(
+        faculty: String,
+        department: String,
+        classYear: String = "",
+        goal: String = ""
+    ) async {
         isLoading = true
         errorMessage = nil
 
         do {
-            let profile = SourceBaseProfile(faculty: faculty, department: department)
+            let profile = SourceBaseProfile(
+                faculty: faculty,
+                department: department,
+                classYear: classYear,
+                goal: goal
+            )
             let result = try await AuthBackend.shared.updateSourceBaseProfile(profile)
             if case .success = result {
                 currentUser = await AuthBackend.shared.currentUser()

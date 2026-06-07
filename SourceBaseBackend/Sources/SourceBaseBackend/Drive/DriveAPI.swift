@@ -37,7 +37,8 @@ public struct DriveAPI: Sendable {
 
     public func invoke(
         _ action: String,
-        payload: [String: AnyJSON] = [:]
+        payload: [String: AnyJSON] = [:],
+        timeoutSeconds: UInt64 = 90
     ) async throws -> [String: AnyJSON] {
         let body = AnyJSON.object([
             "action": .string(action),
@@ -45,7 +46,7 @@ public struct DriveAPI: Sendable {
         ])
 
         do {
-            let data: [String: AnyJSON] = try await withDriveAPITimeout {
+            let data: [String: AnyJSON] = try await withDriveAPITimeout(seconds: timeoutSeconds) {
                 try await client.functions.invoke(
                     "sourcebase",
                     options: FunctionInvokeOptions(body: body)
@@ -1001,7 +1002,11 @@ public struct DriveAPI: Sendable {
     }
 
     public func processGenerationJob(_ jobId: String) async throws -> [String: AnyJSON] {
-        try await invoke("process_generation_job", payload: ["jobId": .string(jobId)])
+        // The server processes generation synchronously inside this call and the
+        // edge worker stays alive up to ~5 min. Keep the connection open well past
+        // any realistic generation (text/image/podcast-TTS) so the worker is never
+        // killed for idleness mid-generation and we receive the real result.
+        try await invoke("process_generation_job", payload: ["jobId": .string(jobId)], timeoutSeconds: 320)
     }
 
     public func getGeneratedContent(_ jobId: String) async throws -> [String: AnyJSON] {

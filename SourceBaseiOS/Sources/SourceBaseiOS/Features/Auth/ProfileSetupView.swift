@@ -5,10 +5,25 @@ struct ProfileSetupView: View {
     @Environment(AppState.self) private var appState
     @State private var faculty = ""
     @State private var department = "Tıp"
+    @State private var classYear = "1. sınıf"
+    @State private var goal = "Dönem sınavları"
     @State private var localError: String?
     @FocusState private var isFacultyFocused: Bool
 
-    private let departments = ["Tıp", "Diş Hekimliği", "Hemşirelik"]
+    // SourceBase covers all health-sciences disciplines — output is specialized per field.
+    private let departments = ["Veterinerlik", "Tıp", "Diş Hekimliği", "Hemşirelik", "Ebelik"]
+    private let classYears = ["1. sınıf", "2. sınıf", "3. sınıf", "4. sınıf", "5. sınıf", "6. sınıf", "Mezun"]
+
+    /// Exam/goal options tailored to the chosen discipline.
+    private func goals(for department: String) -> [String] {
+        switch department {
+        case "Tıp": return ["Dönem sınavları", "TUS", "USMLE", "Genel tekrar"]
+        case "Diş Hekimliği": return ["Dönem sınavları", "DUS", "Genel tekrar"]
+        case "Veterinerlik": return ["Dönem sınavları", "Uzmanlık/alan sınavı", "Saha pratiği", "Genel tekrar"]
+        case "Hemşirelik", "Ebelik": return ["Dönem sınavları", "KPSS/atama", "Klinik pratik", "Genel tekrar"]
+        default: return ["Dönem sınavları", "Genel tekrar"]
+        }
+    }
 
     private var session: SessionStore { appState.session }
     private var router: AppRouter { appState.router }
@@ -38,6 +53,11 @@ struct ProfileSetupView: View {
         .onChange(of: session.isLoggedIn) { _, isLoggedIn in
             if isLoggedIn && !session.needsProfileSetup {
                 finishEditing()
+            }
+        }
+        .onChange(of: department) { _, newDept in
+            if !goals(for: newDept).contains(goal) {
+                goal = goals(for: newDept).first ?? "Genel tekrar"
             }
         }
     }
@@ -95,8 +115,43 @@ struct ProfileSetupView: View {
                 universitySuggestions
             }
 
-            // Department
-            departmentSection
+            // Department (discipline) — tailors AI terminology/scope per field
+            menuField(title: "Bölüm", icon: "graduationcap", selection: $department, options: departments)
+            // Class year — tailors AI depth
+            menuField(title: "Sınıf", icon: "calendar", selection: $classYear, options: classYears)
+            // Goal — tailors AI focus (discipline-specific)
+            menuField(title: "Hedef", icon: "target", selection: $goal, options: goals(for: department))
+
+            Text("Bölüm, sınıf ve hedefin; üretilen tüm çalışma içeriğinin terminolojisini, derinliğini ve odağını belirler.")
+                .font(SBTypography.caption)
+                .foregroundStyle(SBColors.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func menuField(title: String, icon: String, selection: Binding<String>, options: [String]) -> some View {
+        VStack(alignment: .leading, spacing: SBSpacing.sm) {
+            Text(title)
+                .font(SBTypography.labelMedium)
+                .foregroundStyle(SBColors.navy)
+            HStack(spacing: SBSpacing.md) {
+                Image(systemName: icon)
+                    .sbScaledFont(size: 18, weight: .medium)
+                    .foregroundStyle(SBColors.blue)
+                    .frame(width: 24)
+                Picker(title, selection: selection) {
+                    ForEach(options, id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(.menu)
+                .tint(SBColors.navy)
+                Spacer()
+            }
+            .padding(.horizontal, SBSpacing.lg)
+            .frame(height: 52)
+            .background(SBColors.white.opacity(0.96))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(SBColors.line, lineWidth: 1))
+            .shadow(color: SBColors.navy.opacity(0.05), radius: 8, x: 0, y: 4)
         }
     }
 
@@ -168,40 +223,6 @@ struct ProfileSetupView: View {
         .accessibilityHint("Üniversite olarak seç")
     }
 
-    // MARK: - Department
-
-    private var departmentSection: some View {
-        VStack(alignment: .leading, spacing: SBSpacing.sm) {
-                Text("Bölüm")
-                    .font(SBTypography.labelMedium)
-                    .foregroundStyle(SBColors.navy)
-
-                HStack(spacing: SBSpacing.md) {
-                    Image(systemName: "graduationcap")
-                        .sbScaledFont(size: 18, weight: .medium)
-                        .foregroundStyle(SBColors.blue)
-                        .frame(width: 24)
-
-                    Picker("Bölüm", selection: $department) {
-                        ForEach(departments, id: \.self) { dept in
-                            Text(dept).tag(dept)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .tint(SBColors.navy)
-                }
-                .padding(.horizontal, SBSpacing.lg)
-                .frame(height: 52)
-                .background(SBColors.white.opacity(0.96))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(SBColors.line, lineWidth: 1)
-                )
-                .shadow(color: SBColors.navy.opacity(0.05), radius: 8, x: 0, y: 4)
-            }
-    }
-
     // MARK: - Messages
 
     @ViewBuilder
@@ -251,6 +272,14 @@ struct ProfileSetupView: View {
                departments.contains(savedDept) {
                 department = savedDept
             }
+            if let savedYear = metadata["sourcebase_class_year"]?.stringValue,
+               classYears.contains(savedYear) {
+                classYear = savedYear
+            }
+            if let savedGoal = metadata["sourcebase_goal"]?.stringValue,
+               goals(for: department).contains(savedGoal) {
+                goal = savedGoal
+            }
         }
     }
 
@@ -266,7 +295,7 @@ struct ProfileSetupView: View {
         session.clearMessages()
 
         Task {
-            await session.updateProfile(faculty: faculty, department: department)
+            await session.updateProfile(faculty: faculty, department: department, classYear: classYear, goal: goal)
         }
     }
 

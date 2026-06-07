@@ -110,6 +110,7 @@ struct SearchView: View {
                 }
             }
             .padding(SBSpacing.lg)
+            .sbReadableWidth(1180)
             .sbFloatingTabContentPadding()
         }
         .sbPageBackground(tone: .warm)

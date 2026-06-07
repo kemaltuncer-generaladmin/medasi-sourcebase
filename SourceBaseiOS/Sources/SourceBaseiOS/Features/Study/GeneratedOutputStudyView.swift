@@ -24,6 +24,7 @@ struct GeneratedOutputStudyView: View {
                 .padding(SBSpacing.lg)
             } else if let output {
                 studySurface(for: output)
+                    .sbReadableWidth(860)
                     .safeAreaInset(edge: .bottom) {
                         medicalDisclaimer
                     }
@@ -482,15 +483,20 @@ enum SBOutputStyle {
     }
 
     static func outputColor(_ kind: GeneratedKind) -> Color {
+        // Each kind owns a distinct accent so its study template + queue card read
+        // as its own format (the 8 document kinds in particular must not blend).
         switch kind {
         case .flashcard: return SBColors.blue
-        case .question: return SBColors.cyan
-        case .summary, .examMorningSummary, .mindMap: return SBColors.purple
-        case .algorithm, .clinicalScenario: return SBColors.orange
-        case .comparison, .table: return SBColors.blue
+        case .question: return SBColors.sky
+        case .summary: return SBColors.purple
+        case .examMorningSummary: return SBColors.warning
+        case .algorithm: return SBColors.orange
+        case .comparison, .table: return SBColors.deepBlue
+        case .clinicalScenario: return SBColors.red
         case .learningPlan: return SBColors.green
         case .podcast: return SBColors.red
         case .infographic: return SBColors.cyan
+        case .mindMap: return SBColors.cyan
         }
     }
 
@@ -507,6 +513,42 @@ enum SBOutputStyle {
         case .podcast: return "Podcast"
         case .infographic: return "İnfografik"
         case .mindMap: return "Zihin Haritası"
+        }
+    }
+
+    /// Distinctive template name per kind — makes each output read as its own
+    /// purpose-built study format instead of a generic document.
+    static func templateName(_ kind: GeneratedKind) -> String {
+        switch kind {
+        case .flashcard: return "Flashcard Destesi"
+        case .question: return "Soru Bankası"
+        case .summary: return "Yüksek Getirili Özet"
+        case .examMorningSummary: return "Sınav Sabahı Kartı"
+        case .algorithm: return "Karar Algoritması"
+        case .comparison, .table: return "Kıyas Tablosu"
+        case .clinicalScenario: return "Klinik Vaka Dosyası"
+        case .learningPlan: return "Çalışma Planı"
+        case .podcast: return "Sesli Anlatım"
+        case .infographic: return "İnfografik Poster"
+        case .mindMap: return "Zihin Haritası"
+        }
+    }
+
+    /// One-line purpose shown under the header so the student knows what this
+    /// specific template is for.
+    static func templatePurpose(_ kind: GeneratedKind) -> String {
+        switch kind {
+        case .flashcard: return "Aktif hatırlama ile öğrenene kadar tekrar et."
+        case .question: return "Çeldiricili sorularla kendini sına, gerekçeleri oku."
+        case .summary: return "Kaynaktaki sınav-kritik noktaları hızlı tara."
+        case .examMorningSummary: return "Sınavdan hemen önce son tekrar için kısa kart."
+        case .algorithm: return "Karar adımlarını yukarıdan aşağı takip et."
+        case .comparison, .table: return "Konuları aynı ölçütlerle yan yana ayırt et."
+        case .clinicalScenario: return "Vakayı oku, karar noktalarında muhakeme yap."
+        case .learningPlan: return "Günlere bölünmüş plana göre çalış ve işaretle."
+        case .podcast: return "Dinleyerek tekrar et; metni de takip edebilirsin."
+        case .infographic: return "Tek bakışta taranabilir görsel özet."
+        case .mindMap: return "Merkez kavramdan dallara ilişkileri kur."
         }
     }
 
@@ -583,6 +625,7 @@ private struct StudyDocumentSurface: View {
                     tint: accent
                 )
 
+                templateIdentity
                 workspaceOverview
                 layerPicker
 
@@ -607,6 +650,38 @@ private struct StudyDocumentSurface: View {
             }
             .padding(SBSpacing.lg)
             .sbFloatingTabContentPadding()
+        }
+    }
+
+    private var templateIdentity: some View {
+        HStack(spacing: SBSpacing.md) {
+            SBIconTile(icon: SBOutputStyle.icon(for: output.kind), tint: accent, size: 40, radius: 12)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(SBOutputStyle.templateName(output.kind).uppercased())
+                    .font(SBTypography.labelSmall)
+                    .foregroundStyle(accent)
+                Text(SBOutputStyle.templatePurpose(output.kind))
+                    .font(SBTypography.caption)
+                    .foregroundStyle(SBColors.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(SBSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(accent.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(accent.opacity(0.18), lineWidth: 1)
+                )
+        )
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(accent)
+                .frame(width: 4)
+                .padding(.vertical, SBSpacing.sm)
         }
     }
 

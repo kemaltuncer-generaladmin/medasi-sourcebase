@@ -1,234 +1,148 @@
 import SwiftUI
 import SourceBaseBackend
 
+/// Pure, minimal "Derin Çalışma" home: a clean tool grid, a slim source line,
+/// and one queue entry point. No oversized hero, no metric clutter.
 struct SourceLabHomeView: View {
     @Environment(AppState.self) private var appState
     @Environment(SourceBaseWorkspaceStore.self) private var workspaceStore
-    @AppStorage("sourceLab.lastQuickTool") private var lastQuickToolRawValue = SourceLabQuickTool.clinical.rawValue
     @State private var isLoading = false
     @State private var errorMessage: String?
 
     private var router: AppRouter { appState.router }
-    private var quickTool: SourceLabQuickTool { SourceLabQuickTool(rawValue: lastQuickToolRawValue) ?? .clinical }
-    private var selectedSources: Set<String> { workspaceStore.selectedSourceIds }
-    private var readyCount: Int { workspaceStore.allFiles.filter { workspaceStore.isReadyForGeneration($0) }.count }
-    private var activeSourceLabJobs: Int {
-        workspaceStore.generationJobs.filter { job in
-            SourceBaseQueueSurface.sourceLab.includes(job.kind) && isActive(job.status)
+    private var selectedCount: Int { workspaceStore.selectedSourceIds.count }
+    private var activeJobs: Int {
+        workspaceStore.generationJobs.filter {
+            SourceBaseQueueSurface.sourceLab.includes($0.kind) && isActive($0.status)
         }.count
     }
+
+    private let tools: [Tool] = [
+        Tool(kind: .examMorningSummary, title: "Sınav Sabahı", subtitle: "Kritik tarama", icon: "bolt.fill", tint: SBColors.warning),
+        Tool(kind: .clinicalScenario, title: "Klinik Senaryo", subtitle: "Ayırıcı tanı", icon: "cross.case.fill", tint: SBColors.red),
+        Tool(kind: .learningPlan, title: "Öğrenme Planı", subtitle: "Günlere bölünmüş", icon: "calendar", tint: SBColors.green),
+        Tool(kind: .podcast, title: "Podcast", subtitle: "Sesli tekrar", icon: "headphones", tint: SBColors.purple),
+        Tool(kind: .infographic, title: "İnfografik", subtitle: "Görsel özet", icon: "chart.bar.fill", tint: SBColors.cyan),
+        Tool(kind: .mindMap, title: "Zihin Haritası", subtitle: "Kavram ilişkileri", icon: "point.3.connected.trianglepath.dotted", tint: SBColors.blue)
+    ]
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SBSpacing.lg) {
                 if isLoading {
-                    SBLoadingState(
-                        icon: "flask",
-                        title: "Derin çalışma açılıyor",
-                        message: "Araçlar hazırlanıyor..."
-                    )
+                    SBLoadingState(icon: "flask", title: "Hazırlanıyor", message: "Araçlar yükleniyor.")
                 } else if let error = errorMessage {
-                    SBErrorState(
-                        title: "Yüklenemedi",
-                        message: error,
-                        actionLabel: "Tekrar dene",
-                        onAction: { Task { await loadWorkspace() } }
-                    )
+                    SBErrorState(title: "Yüklenemedi", message: error, actionLabel: "Tekrar dene", onAction: { Task { await loadWorkspace() } })
                 } else {
-                    quickStartHero.sbEntrance(0)
-                    toolsSection.sbEntrance(1)
+                    header.sbEntrance(0)
+                    sourceLine.sbEntrance(1)
+                    grid.sbEntrance(2)
                 }
             }
             .padding(SBSpacing.lg)
+            .sbReadableWidth(720)
             .sbFloatingTabContentPadding()
-            .sbReadableWidth(1180)
         }
         .sbPageBackground()
         .sbInlineNavTitle()
-        .task {
-            await loadWorkspace()
-        }
+        .task { await loadWorkspace() }
     }
 
-    // MARK: - Header
-
-    private var headerSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: SBSpacing.xs) {
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Derin Çalışma")
                     .font(SBTypography.heading1)
                     .foregroundStyle(SBColors.navy)
-
-                Text("Klinik, plan, podcast ve görsel tekrarları başlat.")
+                Text("Bir araç seç, kaynağından üret.")
                     .font(SBTypography.bodyMedium)
                     .foregroundStyle(SBColors.muted)
             }
-
             Spacer()
-
             Button {
-                router.navigate(to: .search)
+                SBHaptics.selection()
+                router.navigate(to: .queue(surface: .sourceLab))
             } label: {
-                Image(systemName: "magnifyingglass")
-                    .sbScaledFont(size: 20, weight: .semibold)
-                    .foregroundStyle(SBColors.navy)
-                    .frame(width: 40, height: 40)
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "clock")
+                        .sbScaledFont(size: 20, weight: .semibold)
+                        .foregroundStyle(SBColors.navy)
+                        .frame(width: 44, height: 44)
+                    if activeJobs > 0 {
+                        Text("\(activeJobs)")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(minWidth: 18, minHeight: 18)
+                            .background(SBColors.orange, in: Circle())
+                            .offset(x: 2, y: -2)
+                    }
+                }
             }
+            .accessibilityLabel("Kuyruk\(activeJobs > 0 ? ", \(activeJobs) aktif" : "")")
         }
     }
 
-    // MARK: - Quick Start Hero
-
-    private var quickStartHero: some View {
-        SBSignatureHero(
-            eyebrow: "Derin çalışma",
-            title: "Derin çalışma araçları",
-            message: selectedSources.isEmpty ? "Hazır bir kaynak seç, sonra çalışma türünü aç." : "\(selectedSources.count) kaynak seçili. Derin çalışma araçlarını aç.",
-            icon: "flask.fill",
-            tint: SBColors.purple
-        ) {
+    @ViewBuilder
+    private var sourceLine: some View {
+        Button {
+            SBHaptics.selection()
+            router.navigate(to: .sourcePicker)
+        } label: {
             HStack(spacing: SBSpacing.sm) {
-                SBButton(
-                    selectedSources.isEmpty ? "Kaynak seç" : quickTool.ctaLabel,
-                    icon: selectedSources.isEmpty ? "plus" : quickTool.icon,
-                    variant: .primary,
-                    size: .medium,
-                    fullWidth: true,
-                    action: {
-                        if selectedSources.isEmpty {
-                            router.navigate(to: .sourcePicker)
-                        } else {
-                            router.navigate(to: quickTool.route)
-                        }
-                    }
-                )
-                .accessibilityHint(selectedSources.isEmpty ? "Hazır kaynak seçme ekranını açar" : "\(quickTool.title) aracını açar")
-                SBButton(
-                    "Kuyruk",
-                    icon: "clock",
-                    variant: .secondary,
-                    size: .medium,
-                    action: { router.navigate(to: .queue(surface: .sourceLab)) }
-                )
+                Image(systemName: selectedCount > 0 ? "checkmark.circle.fill" : "doc.badge.plus")
+                    .sbScaledFont(size: 16, weight: .semibold)
+                    .foregroundStyle(selectedCount > 0 ? SBColors.green : SBColors.purple)
+                Text(selectedCount > 0 ? "\(selectedCount) kaynak seçili" : "Hazır bir kaynak seç")
+                    .font(SBTypography.labelMedium)
+                    .foregroundStyle(SBColors.navy)
+                Spacer()
+                Text(selectedCount > 0 ? "Değiştir" : "Seç")
+                    .font(SBTypography.caption)
+                    .foregroundStyle(SBColors.muted)
+                Image(systemName: "chevron.right")
+                    .sbScaledFont(size: 12, weight: .semibold)
+                    .foregroundStyle(SBColors.softText)
             }
-        } footer: {
-            SBMetricRibbon(items: [
-                .init(icon: "checkmark.seal", value: "\(readyCount)", label: "hazır", tint: SBColors.green),
-                .init(icon: "sparkles", value: "\(selectedSources.count)", label: "seçili", tint: SBColors.purple),
-                .init(icon: "clock", value: "\(activeSourceLabJobs)", label: "aktif", tint: SBColors.orange)
-            ])
+            .padding(SBSpacing.md)
+            .background(SBColors.white, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(SBColors.softLine, lineWidth: 1))
         }
+        .buttonStyle(.plain)
     }
 
-    // MARK: - Tools Section
-
-    private var toolsSection: some View {
-        VStack(alignment: .leading, spacing: SBSpacing.md) {
-            Text("Araçlar")
-                .font(SBTypography.titleMedium)
-                .foregroundStyle(SBColors.navy)
-
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: SBSpacing.md)], spacing: SBSpacing.md) {
-                toolCard(
-                    icon: "clock",
-                    title: "Kuyruk",
-                    subtitle: activeSourceLabJobs == 0 ? "Başlayan çalışmaları izle." : "\(activeSourceLabJobs) çalışma hazırlanıyor.",
-                    color: SBColors.orange
-                ) {
-                    router.navigate(to: .queue(surface: .sourceLab))
-                }
-
-                toolCard(
-                    icon: "bolt",
-                    title: "Sınav Sabahı",
-                    subtitle: "7 dakikalık kritik tarama.",
-                    color: SBColors.orange
-                ) {
-                    openTool(.examMorning)
-                }
-
-                toolCard(
-                    icon: "cross.case",
-                    title: "Klinik Senaryo",
-                    subtitle: "Ayırıcı tanı ve karar pratiği.",
-                    color: SBColors.purple
-                ) {
-                    openTool(.clinical)
-                }
-
-                toolCard(
-                    icon: "checklist",
-                    title: "Öğrenme Planı",
-                    subtitle: "Bugün, 72 saat ve 7 gün.",
-                    color: SBColors.green
-                ) {
-                    openTool(.plan)
-                }
-
-                toolCard(
-                    icon: "mic",
-                    title: "Podcast",
-                    subtitle: "Yolda dinlenecek tekrar.",
-                    color: SBColors.purple
-                ) {
-                    openTool(.podcast)
-                }
-
-                toolCard(
-                    icon: "chart.bar.doc.horizontal",
-                    title: "İnfografik",
-                    subtitle: "Tek bakışlık görsel hafıza.",
-                    color: SBColors.cyan
-                ) {
-                    openTool(.infographic)
-                }
-
-                toolCard(
-                    icon: "point.3.connected.trianglepath.dotted",
-                    title: "Zihin Haritası",
-                    subtitle: "Kavram ilişkilerini ayır.",
-                    color: SBColors.blue
-                ) {
-                    openTool(.mindMap)
-                }
+    private var grid: some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: SBSpacing.md), GridItem(.flexible(), spacing: SBSpacing.md)], spacing: SBSpacing.md) {
+            ForEach(tools) { tool in
+                toolCard(tool)
             }
         }
     }
 
-    private func toolCard(icon: String, title: String, subtitle: String, color: Color, action: @escaping () -> Void) -> some View {
-        SBCommandCard(tint: color, action: action) {
-                HStack(spacing: SBSpacing.md) {
-                    SBIconTile(icon: icon, tint: color, size: 46, radius: 14)
-
-                    VStack(alignment: .leading, spacing: SBSpacing.xs) {
-                        Text(title)
-                            .font(SBTypography.titleSmall)
-                            .foregroundStyle(SBColors.navy)
-
-                        Text(subtitle)
-                            .font(SBTypography.bodySmall)
-                            .foregroundStyle(SBColors.muted)
-                            .lineLimit(2)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .sbScaledFont(size: 14, weight: .semibold)
-                        .foregroundStyle(SBColors.softText)
-                        .accessibilityHidden(true)
+    private func toolCard(_ tool: Tool) -> some View {
+        Button {
+            SBHaptics.selection()
+            router.navigate(to: tool.route)
+        } label: {
+            VStack(alignment: .leading, spacing: SBSpacing.md) {
+                SBIconTile(icon: tool.icon, tint: tool.tint, size: 46, radius: 14)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tool.title)
+                        .font(SBTypography.titleSmall)
+                        .foregroundStyle(SBColors.navy)
+                    Text(tool.subtitle)
+                        .font(SBTypography.caption)
+                        .foregroundStyle(SBColors.muted)
                 }
+            }
+            .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+            .padding(SBSpacing.md)
+            .background(SBColors.white, in: RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(tool.tint.opacity(0.16), lineWidth: 1))
         }
+        .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title). \(subtitle)")
+        .accessibilityLabel("\(tool.title). \(tool.subtitle)")
         .accessibilityHint("Aracı aç")
-    }
-
-    // MARK: - Helpers
-
-    private func openTool(_ tool: SourceLabQuickTool) {
-        lastQuickToolRawValue = tool.rawValue
-        router.navigate(to: tool.route)
     }
 
     private func loadWorkspace() async {
@@ -241,62 +155,27 @@ struct SourceLabHomeView: View {
 
     private func isActive(_ status: SBGenerationStatus) -> Bool {
         switch status {
-        case .queued, .running:
-            return true
-        case .completed, .failed:
-            return false
+        case .queued, .running: return true
+        case .completed, .failed: return false
         }
     }
 
-    private enum SourceLabQuickTool: String {
-        case examMorning
-        case clinical
-        case plan
-        case podcast
-        case infographic
-        case mindMap
-
-        var title: String {
-            switch self {
-            case .examMorning: return "Sınav Sabahı"
-            case .clinical: return "Klinik Senaryo"
-            case .plan: return "Öğrenme Planı"
-            case .podcast: return "Podcast"
-            case .infographic: return "İnfografik"
-            case .mindMap: return "Zihin Haritası"
-            }
-        }
-
-        var ctaLabel: String {
-            switch self {
-            case .examMorning: return "Sınav Sabahı oluştur"
-            case .clinical: return "Klinik Senaryo oluştur"
-            case .plan: return "Öğrenme Planı oluştur"
-            case .podcast: return "Podcast oluştur"
-            case .infographic: return "İnfografik oluştur"
-            case .mindMap: return "Zihin Haritası oluştur"
-            }
-        }
-
-        var icon: String {
-            switch self {
-            case .examMorning: return "bolt"
-            case .clinical: return "cross.case"
-            case .plan: return "checklist"
-            case .podcast: return "mic"
-            case .infographic: return "chart.bar.doc.horizontal"
-            case .mindMap: return "point.3.connected.trianglepath.dotted"
-            }
-        }
-
+    private struct Tool: Identifiable {
+        let kind: GeneratedKind
+        let title: String
+        let subtitle: String
+        let icon: String
+        let tint: Color
+        var id: String { kind.rawValue }
         var route: AppRoute {
-            switch self {
-            case .examMorning: return .examMorning
-            case .clinical: return .clinical
-            case .plan: return .plan
+            switch kind {
+            case .examMorningSummary: return .examMorning
+            case .clinicalScenario: return .clinical
+            case .learningPlan: return .plan
             case .podcast: return .podcast
             case .infographic: return .infographic
             case .mindMap: return .mindMap
+            default: return .examMorning
             }
         }
     }

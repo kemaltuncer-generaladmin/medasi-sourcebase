@@ -263,6 +263,7 @@ export type JobGenerationOptions = {
   imageModelPolicy?: string;
   aiBrief?: string;
   outputContract?: string;
+  studentContext?: string;
 };
 
 type RoutedGenerationResult<T> = GenerationResult<T> & {
@@ -674,6 +675,7 @@ export class JobProcessor {
       imageModelPolicy: options.imageModelPolicy,
       aiBrief: options.aiBrief,
       outputContract: options.outputContract,
+      studentContext: options.studentContext,
     };
     switch (jobType) {
       case "flashcard":

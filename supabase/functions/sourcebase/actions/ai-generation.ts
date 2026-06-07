@@ -517,27 +517,77 @@ export async function processGenerationJob(
     };
   }
 
-  let sourceText: string;
-  try {
-    sourceText = await sourceTextForJob(userId, job);
-  } catch (error) {
-    await processor.failJobBeforeProcessing(job, job.job_type, error);
-    throw error;
-  }
-  const processed = await processor.processJob(job, {
-    jobType: job.job_type,
-    sourceText,
-    options: generationOptionsFromJob(job.metadata),
-  });
-
-  return {
-    jobId: processed.id,
-    status: processed.status,
-    jobType: processed.job_type,
-    inputTokens: processed.input_tokens,
-    outputTokens: processed.output_tokens,
-    costEstimate: processed.cost_estimate,
+  // The full generation (text + optional image/audio) routinely exceeds the
+  // public gateway's ~60s request cap; a synchronous await returns a 504 to the
+  // client AND the edge worker is recycled when the connection drops, leaving the
+  // job stuck "processing" forever (this is why media/premium jobs never finished
+  // and infographic images never rendered). Run the work in the background via
+  // EdgeRuntime.waitUntil (worker stays alive ~5min) and return immediately so the
+  // client just polls job status. Falls back to synchronous for local/dev.
+  const runWork = async () => {
+    let sourceText: string;
+    try {
+      sourceText = await sourceTextForJob(userId, job);
+    } catch (error) {
+      await processor.failJobBeforeProcessing(job, job.job_type, error).catch(
+        () => {},
+      );
+      return;
+    }
+    try {
+      await processor.processJob(job, {
+        jobType: job.job_type,
+        sourceText,
+        options: generationOptionsFromJob(job.metadata),
+      });
+    } catch (error) {
+      await processor.failJobBeforeProcessing(job, job.job_type, error).catch(
+        () => {},
+      );
+    }
   };
+
+  const edgeWaitUntil =
+    (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } })
+      .EdgeRuntime?.waitUntil;
+  if (typeof edgeWaitUntil === "function") {
+    edgeWaitUntil(runWork());
+    return {
+      jobId: job.id,
+      status: "processing",
+      jobType: job.job_type,
+      scheduled: true,
+    };
+  }
+
+  await runWork();
+  const done = await processor.getJobStatus(userId, jobId);
+  return {
+    jobId: done.id,
+    status: done.status,
+    jobType: done.job_type,
+    inputTokens: done.input_tokens,
+    outputTokens: done.output_tokens,
+    costEstimate: done.cost_estimate,
+  };
+}
+
+// Hard cap on the source text fed to a single model call. Large/huge PDFs
+// otherwise blow the model context window (OpenAI 400 context_length_exceeded),
+// which silently failed the whole job (and meant infographic/podcast media never
+// ran). ~200K chars ≈ 55-65K tokens — safe for every routed model with ample room
+// left for the system prompt, the JSON contract, and the output budget.
+const MAX_SOURCE_CHARS = 200_000;
+
+function capSourceText(text: string): string {
+  if (text.length <= MAX_SOURCE_CHARS) return text;
+  const head = text.slice(0, MAX_SOURCE_CHARS);
+  // Cut on a sentence/line boundary when possible so we don't end mid-word.
+  const lastBreak = Math.max(head.lastIndexOf("\n"), head.lastIndexOf(". "));
+  const trimmed = lastBreak > MAX_SOURCE_CHARS * 0.6
+    ? head.slice(0, lastBreak + 1)
+    : head;
+  return `${trimmed}\n\n[Kaynak çok uzun olduğu için en yüksek getirili ilk bölümü işlendi.]`;
 }
 
 async function sourceTextForJob(userId: string, job: GenerationJob) {
@@ -547,13 +597,15 @@ async function sourceTextForJob(userId: string, job: GenerationJob) {
     : {};
   const sourceIds = sourceIdsFromValue(options.sourceIds ?? options.source_ids);
   if (sourceIds.length > 0) {
-    return await sourceTextForSourceIds(userId, sourceIds);
+    return capSourceText(await sourceTextForSourceIds(userId, sourceIds));
   }
   if (job.source_file_id) {
-    return (await extractTextFromDriveFile(userId, job.source_file_id)).text;
+    return capSourceText(
+      (await extractTextFromDriveFile(userId, job.source_file_id)).text,
+    );
   }
   const sourceText = sanitizeSourceText(metadata.sourceText?.toString() ?? "");
-  if (sourceText.trim()) return sourceText;
+  if (sourceText.trim()) return capSourceText(sourceText);
   throw new SafeError(
     "SOURCE_TEXT_REQUIRED",
     "Üretim işi için kaynak metin bulunamadı.",
@@ -712,6 +764,7 @@ function generationOptionsFromJob(
     imageModelPolicy: textOption(options.imageModelPolicy),
     aiBrief: textOption(options.aiBrief),
     outputContract: textOption(options.outputContract),
+    studentContext: textOption(options.studentContext ?? options.student_context),
   };
 }
 

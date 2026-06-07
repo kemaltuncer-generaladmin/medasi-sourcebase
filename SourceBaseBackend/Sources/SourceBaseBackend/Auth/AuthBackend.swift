@@ -186,11 +186,24 @@ public actor AuthBackend {
         var merged = currentMetadata
         merged["sourcebase_faculty"] = .string(profile.faculty)
         merged["sourcebase_department"] = .string(profile.department)
+        merged["sourcebase_class_year"] = .string(profile.classYear)
+        merged["sourcebase_goal"] = .string(profile.goal)
         merged["sourcebase_profile_completed"] = .bool(true)
         merged["sourcebase_profile_completed_at"] = .string(ISO8601DateFormatter().string(from: Date()))
 
         _ = try await auth.update(user: UserAttributes(data: merged))
         return .success("SourceBase bilgilerin tamamlandı.")
+    }
+
+    /// Current user's SourceBase profile parsed from auth metadata (for AI personalization).
+    public func currentProfile() -> SourceBaseProfile? {
+        guard let metadata = supabase?.auth.currentUser?.userMetadata else { return nil }
+        return SourceBaseProfile(
+            faculty: metadata["sourcebase_faculty"]?.stringValue ?? "",
+            department: metadata["sourcebase_department"]?.stringValue ?? "",
+            classYear: metadata["sourcebase_class_year"]?.stringValue ?? "",
+            goal: metadata["sourcebase_goal"]?.stringValue ?? ""
+        )
     }
 
     public func updateAvatarURL(_ avatarURL: String) async throws -> AuthResult {

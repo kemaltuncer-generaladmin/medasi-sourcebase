@@ -604,7 +604,7 @@ public struct DriveRepository: Sendable {
     }
 
     private func waitForGeneratedContent(jobId: String) async throws -> AnyJSON? {
-        let maxAttempts = 90 // 180s (90 x 2s) for heavy jobs; timeout still points users to Queue.
+        let maxAttempts = 150 // 300s (150 x 2s) — matches the edge worker wall-clock so podcast+TTS and large sources finish; timeout still points users to Queue.
         for _ in 0..<maxAttempts {
             let statusResponse = try await api.getJobStatus(jobId)
             let statusData = statusResponse["data"]?.dictValue
@@ -640,28 +640,24 @@ public struct DriveRepository: Sendable {
             _ = try await api.processGenerationJob(jobId)
             return
         } catch {
+            // A client-side timeout/disconnect does NOT mean the job failed: the edge
+            // worker keeps generating server-side for up to ~5 min. Only a *failed* DB
+            // status is a real failure worth retrying — never cancel a job that may
+            // still be running (cancelling is what turned recoverable jobs into the
+            // "Üretim yarıda kaldı" / cancelled state users were seeing).
             if try await generationJobCanContinue(jobId, api: api) { return }
 
-            _ = try? await api.cancelJob(jobId)
-            _ = try? await api.retryJob(jobId)
-            try await Task.sleep(nanoseconds: 1_500_000_000)
-
-            do {
-                _ = try await api.processGenerationJob(jobId)
-            } catch {
-                if try await generationJobCanContinue(jobId, api: api) { return }
-                
-                _ = try? await api.cancelJob(jobId)
+            for delay in [UInt64(1_500_000_000), UInt64(2_500_000_000)] {
                 _ = try? await api.retryJob(jobId)
-                try await Task.sleep(nanoseconds: 2_000_000_000)
-                
+                try? await Task.sleep(nanoseconds: delay)
                 do {
                     _ = try await api.processGenerationJob(jobId)
+                    return
                 } catch {
                     if try await generationJobCanContinue(jobId, api: api) { return }
-                    throw error
                 }
             }
+            throw RepositoryError(message: "Üretim tamamlanamadı. Kuyruktan tekrar deneyebilirsin.")
         }
     }
 

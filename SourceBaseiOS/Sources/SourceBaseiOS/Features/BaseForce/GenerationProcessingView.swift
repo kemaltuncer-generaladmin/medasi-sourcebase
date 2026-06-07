@@ -1,6 +1,8 @@
 import SwiftUI
 import SourceBaseBackend
 
+/// Minimal "generation started" screen: kicks off the job, shows a clean
+/// 3-second countdown, then hands the user to the queue. No verbose steps.
 struct GenerationProcessingView: View {
     let sourceFileId: String
     let kindRawValue: String
@@ -11,264 +13,128 @@ struct GenerationProcessingView: View {
 
     @Environment(AppState.self) private var appState
     @Environment(SourceBaseWorkspaceStore.self) private var workspaceStore
-    @State private var currentStep = 0
-    @State private var progress = 0.12
-    @State private var errorMessage: String?
     @State private var didStart = false
-    @State private var isComplete = false
+    @State private var countdown = 3
+    @State private var errorMessage: String?
 
     private var router: AppRouter { appState.router }
     private var kind: GeneratedKind { GeneratedKind(rawValue: kindRawValue) ?? .summary }
-    private var sourceFile: DriveFile? { workspaceStore.file(id: sourceFileId) }
+    private var accent: Color { SBOutputStyle.outputColor(kind) }
     private var contract: SourceBaseGenerationContract {
-        SourceBaseGenerationContract.contract(for: kind, mode: mode, source: sourceFile)
-    }
-
-    private var steps: [(title: String, detail: String)] {
-        let preflight = [
-            ("Kaynak kapsamı okunuyor", "Seçili dosya, ders ve bölüm bağlamıyla birlikte değerlendiriliyor."),
-            ("Eksik noktalar ayrılıyor", "Kavram boşlukları, çelişkili başlıklar ve sık karıştırılan alanlar işaretleniyor.")
-        ]
-        switch kind {
-        case .flashcard:
-            return preflight + [
-                ("Kaynak okunuyor", "Kavramlar ve tekrar için uygun cümleler ayrılıyor."),
-                ("Kart iskeleti kuruluyor", "Tanım, mekanizma ve klinik ipuçları dengeleniyor."),
-                ("Set düzenleniyor", "Kartlar kısa cevap formatında son kontrole alınıyor.")
-            ]
-        case .question:
-            return preflight + [
-                ("Kapsam seçiliyor", "Kaynağın soru üretimine uygun bölümleri taranıyor."),
-                ("Soru kökleri yazılıyor", "Klinik bağlam ve açıklamalı cevap akışı hazırlanıyor."),
-                ("Zorluk dengeleniyor", "Kolaydan zora ilerleyen set son hale getiriliyor.")
-            ]
-        case .summary:
-            return preflight + [
-                ("Yüksek getirili noktalar ayrılıyor", "Sınav sabahı okunacak kavramlar öne alınıyor."),
-                ("Özet blokları kuruluyor", "Klinik uyarılar ve tekrar maddeleri düzenleniyor."),
-                ("Son kontrol yapılıyor", "Kısa, taranabilir çıktı hazırlanıyor.")
-            ]
-        case .examMorningSummary:
-            return preflight + [
-                ("Son tekrar hedefi seçiliyor", "Kaynağın sınav sabahına uygun yüksek getirili alanları ayrılıyor."),
-                ("Kısa özet kuruluyor", "Mini tablolar, klinik ipuçları ve karıştırılan başlıklar düzenleniyor."),
-                ("Okuma akışı netleşiyor", "Çıktı hızlı taranabilir son kontrol listesine çevriliyor.")
-            ]
-        case .algorithm:
-            return preflight + [
-                ("Başlangıç noktası bulunuyor", "İlk değerlendirme ve karar girişi çıkarılıyor."),
-                ("Akış düğümleri kuruluyor", "Karar adımları mobil dikey akışa ayrılıyor."),
-                ("Çıkışlar netleşiyor", "Tedavi, takip ve ileri tetkik seçenekleri düzenleniyor.")
-            ]
-        case .comparison, .table:
-            return preflight + [
-                ("Karşılaştırma ekseni seçiliyor", "Konular aynı kriterlerle eşleştiriliyor."),
-                ("Ayırt edici alanlar yazılıyor", "Tanı, bulgu ve yaklaşım farkları ayrılıyor."),
-                ("Mobil tablo düzenleniyor", "Küçük ekranda okunacak bloklar hazırlanıyor.")
-            ]
-        case .clinicalScenario:
-            return preflight + [
-                ("Vaka omurgası kuruluyor", "Hasta özeti, yakınma ve kritik bulgular kaynaktan ayrılıyor."),
-                ("Karar noktaları yazılıyor", "Ayırıcı tanı ve klinik akıl yürütme adımları düzenleniyor."),
-                ("Geri bildirim ekleniyor", "Açıklamalar ve sık hata uyarıları son kontrole alınıyor.")
-            ]
-        case .learningPlan:
-            return preflight + [
-                ("Hedef ve süre ayrılıyor", "Kaynak, uygulanabilir çalışma bloklarına bölünüyor."),
-                ("Tekrar aralıkları kuruluyor", "Günlük görevler ve mini sınav noktaları yerleştiriliyor."),
-                ("Plan tamamlanıyor", "Son gün kontrol listesi ve tekrar önerileri ekleniyor.")
-            ]
-        case .podcast:
-            return preflight + [
-                ("Anlatım hedefi çıkarılıyor", "Konu akışı kısa giriş ve bölümlere ayrılıyor."),
-                ("Metin konuşma diline çevriliyor", "Kavramlar doğal anlatım bloklarına bölünüyor."),
-                ("Kapanış düzenleniyor", "Son tekrar ve vurgu cümleleri ekleniyor.")
-            ]
-        case .infographic:
-            return preflight + [
-                ("Ana mesaj seçiliyor", "Başlık ve tek cümlelik odak belirleniyor."),
-                ("Görsel bloklar ayrılıyor", "Bilgi alanları ve kritik notlar düzenleniyor."),
-                ("İnfografik tamamlanıyor", "Mobilde okunabilir infografik yapısı hazırlanıyor.")
-            ]
-        case .mindMap:
-            return preflight + [
-                ("Merkez kavram bulunuyor", "Kaynağın ana konusu harita merkezine alınıyor."),
-                ("Ana dallar kuruluyor", "İlişkili başlıklar kart tabanlı dallara ayrılıyor."),
-                ("Bağlantılar ekleniyor", "Karıştırılan noktalar ve klinik ilişkiler bağlanıyor.")
-            ]
-        }
+        SourceBaseGenerationContract.contract(for: kind, mode: mode, source: workspaceStore.file(id: sourceFileId))
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: SBSpacing.lg) {
-                hero.sbEntrance(0)
-                sourceCard.sbEntrance(1)
-                progressCard.sbEntrance(2)
-                    .sbCompletionGlow(isComplete, tint: SBOutputStyle.outputColor(kind))
-
-                if let errorMessage {
-                    SBErrorState(
-                        title: "Üretim tamamlanamadı",
-                        message: errorMessage,
-                        actionLabel: "Tekrar dene",
-                        onAction: { restart() },
-                        context: .generation
-                    )
-                    SBButton("Üretim kuyruğuna dön", icon: "clock", variant: .secondary, size: .medium, fullWidth: true) {
-                        router.replaceCurrent(with: .queue(surface: SourceBaseQueueSurface.surface(for: kind)))
-                    }
-                } else if isComplete {
-                    SBSuccessState(
-                        icon: "checkmark.seal.fill",
-                        title: "Üretim başladı",
-                        message: "Çalışman kuyruğa eklendi. Hazır olunca buradan açabilirsin.",
-                        actionLabel: "Kuyruğu gör",
-                        onAction: {
-                            router.replaceCurrent(with: .queue(surface: SourceBaseQueueSurface.surface(for: kind)))
-                        },
-                        tint: SBOutputStyle.outputColor(kind)
-                    )
-                } else {
-                    SBNotice(
-                        icon: "clock.badge.checkmark",
-                        message: "Üretim başladı. Çalışmanı Kuyruk ekranında takip edebilirsin.",
-                        tint: SBOutputStyle.outputColor(kind)
-                    )
-                }
+        VStack(spacing: SBSpacing.xl) {
+            Spacer()
+            if let errorMessage {
+                errorState(errorMessage)
+            } else {
+                startedState
             }
-            .padding(SBSpacing.lg)
-            .sbFloatingTabContentPadding()
+            Spacer()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(SBSpacing.xl)
+        .sbReadableWidth(540)
         .sbPageBackground(tone: .cool)
-        .navigationTitle("Üretim")
-        .task {
-            await startIfNeeded()
-        }
+        .navigationBarBackButtonHidden(errorMessage == nil)
+        .task { await startIfNeeded() }
     }
 
-    private var hero: some View {
-        SBSignatureHero(
-            eyebrow: "Üretim",
-            title: "\(label) başlıyor",
-            message: mode.isEmpty ? "Üretim kuyruğa ekleniyor." : mode,
-            icon: SBOutputStyle.outputIcon(kind),
-            tint: SBOutputStyle.outputColor(kind)
-        ) {
-            EmptyView()
-        } footer: {
-            SBMetricRibbon(items: [
-                .init(icon: "doc.text", value: sourceFile?.kind.rawValue.uppercased() ?? "Kaynak", label: "format", tint: SBOutputStyle.outputColor(kind)),
-                .init(icon: "list.bullet.rectangle", value: label, label: "tür", tint: SBColors.purple),
-                .init(icon: "clock", value: "\(Int(progress * 100))%", label: "ilerleme", tint: SBColors.green)
-            ])
-        }
-    }
+    // MARK: - Started
 
-    private var sourceCard: some View {
-        SBCard(radius: 16) {
-            HStack(spacing: SBSpacing.md) {
-                SBFileKindBadge(kind: SBFileKind.from(sourceFile?.kind ?? .pdf), compact: true)
+    private var startedState: some View {
+        VStack(spacing: SBSpacing.lg) {
+            ZStack {
+                Circle()
+                    .fill(accent.opacity(0.12))
+                    .frame(width: 132, height: 132)
+                Circle()
+                    .stroke(accent.opacity(0.25), lineWidth: 3)
+                    .frame(width: 132, height: 132)
+                Text("\(countdown)")
+                    .font(.system(size: 56, weight: .bold, design: .rounded))
+                    .foregroundStyle(accent)
+                    .contentTransition(.numericText(countsDown: true))
+                    .id(countdown)
+            }
+            .sbCompletionGlow(true, tint: accent)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(sourceFile?.title ?? "Drive kaynağı")
-                        .font(SBTypography.labelMedium)
-                        .foregroundStyle(SBColors.navy)
-                        .lineLimit(2)
-                    Text(sourceFile.map { "\($0.courseTitle) • \($0.sectionTitle) • \($0.sizeLabel)" } ?? "Kaynak bilgisi yükleniyor")
-                        .font(SBTypography.caption)
-                        .foregroundStyle(SBColors.muted)
-                }
-
-                Spacer()
-                SBStatusBadge(status: .processing, compact: true)
+            VStack(spacing: SBSpacing.xs) {
+                Text("Üretim başladı")
+                    .font(SBTypography.titleLarge)
+                    .foregroundStyle(SBColors.navy)
+                Text("\(SBOutputStyle.templateName(kind)) kuyruğa eklendi. Hazır olunca bildireceğiz.")
+                    .font(SBTypography.bodyMedium)
+                    .foregroundStyle(SBColors.muted)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 
-    private var progressCard: some View {
-        SBCard(radius: 18, borderColor: SBOutputStyle.outputColor(kind).opacity(0.18)) {
-            VStack(alignment: .leading, spacing: SBSpacing.lg) {
-                HStack {
-                    Spacer()
-                    SBProgressRing(progress: progress, tint: SBOutputStyle.outputColor(kind))
-                        .padding(.vertical, SBSpacing.sm)
-                    Spacer()
-                }
+    // MARK: - Error
 
-                VStack(spacing: SBSpacing.md) {
-                    ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
-                        HStack(alignment: .top, spacing: SBSpacing.md) {
-                            Image(systemName: index < currentStep ? "checkmark.circle.fill" : index == currentStep ? "circle.dotted" : "circle")
-                                .sbScaledFont(size: 20, weight: .semibold)
-                                .foregroundStyle(index <= currentStep ? SBOutputStyle.outputColor(kind) : SBColors.softText)
-                                .frame(width: 26)
-
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(step.title)
-                                    .font(SBTypography.labelSmall)
-                                    .foregroundStyle(SBColors.navy)
-                                Text(step.detail)
-                                    .font(SBTypography.caption)
-                                    .foregroundStyle(SBColors.muted)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-
-                            Spacer(minLength: 0)
-                        }
-                        .padding(SBSpacing.sm)
-                        .background(index == currentStep ? SBOutputStyle.outputColor(kind).opacity(0.08) : SBColors.field)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                }
+    private func errorState(_ message: String) -> some View {
+        VStack(spacing: SBSpacing.md) {
+            SBErrorState(
+                title: "Üretim başlatılamadı",
+                message: message,
+                actionLabel: "Tekrar dene",
+                onAction: { restart() },
+                context: .generation
+            )
+            SBButton("Kuyruğa git", icon: "clock", variant: .secondary, size: .medium, fullWidth: true) {
+                router.replaceCurrent(with: .queue(surface: SourceBaseQueueSurface.surface(for: kind)))
             }
         }
     }
+
+    // MARK: - Flow
 
     private func startIfNeeded() async {
         guard !didStart else { return }
         didStart = true
-        await workspaceStore.loadWorkspace()
-        await animateSteps()
-        await runGeneration()
-    }
 
-    private func animateSteps() async {
-        for index in steps.indices {
-            currentStep = index
-            progress = min(0.84, 0.18 + Double(index) * 0.27)
-            try? await Task.sleep(nanoseconds: 280_000_000)
-        }
-    }
-
-    private func runGeneration() async {
-        guard let source = workspaceStore.file(id: sourceFileId), workspaceStore.isReadyForGeneration(source) else {
-            errorMessage = "Bu kaynak üretim için hazır değil. Hazır bir Drive kaynağı seçip tekrar deneyebilirsin."
-            progress = 1
+        guard let source = workspaceStore.file(id: sourceFileId) ?? workspaceStore.readyFiles.first else {
+            await workspaceStore.loadWorkspace()
+            guard let reloaded = workspaceStore.file(id: sourceFileId) else {
+                errorMessage = "Bu kaynak üretim için hazır değil. Drive'dan hazır bir kaynak seç."
+                return
+            }
+            await launch(source: reloaded)
             return
         }
-
-        let job = await workspaceStore.startGeneration(
-            file: source,
-            kind: kind,
-            options: generationOptions
-        )
-
-        progress = 1.0
-        currentStep = max(steps.count - 1, 0)
-
-        if let job {
-            SBHaptics.success()
-            await workspaceStore.refreshGenerationQueue()
-            withAnimation(SBMotion.softSpring) { isComplete = true }
-            try? await Task.sleep(nanoseconds: 650_000_000)
-            router.replaceCurrent(with: .queue(surface: SourceBaseQueueSurface.surface(for: job.kind)))
-        } else if let toast = workspaceStore.toastMessage {
-            errorMessage = toast
-        } else {
-            router.replaceCurrent(with: .queue(surface: SourceBaseQueueSurface.surface(for: kind)))
-        }
+        await launch(source: source)
     }
+
+    private func launch(source: DriveFile) async {
+        let job = await workspaceStore.startGeneration(file: source, kind: kind, options: generationOptions)
+        guard job != nil else {
+            errorMessage = workspaceStore.toastMessage ?? "Üretim başlatılamadı. Tekrar dene."
+            return
+        }
+        SBHaptics.success()
+        await countdownThenQueue()
+    }
+
+    private func countdownThenQueue() async {
+        for value in stride(from: 3, through: 1, by: -1) {
+            withAnimation(SBMotion.spring) { countdown = value }
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+        router.replaceCurrent(with: .queue(surface: SourceBaseQueueSurface.surface(for: kind)))
+    }
+
+    private func restart() {
+        errorMessage = nil
+        countdown = 3
+        didStart = false
+        Task { await startIfNeeded() }
+    }
+
+    // MARK: - Options
 
     private var generationOptions: [String: String] {
         var options = [
@@ -293,16 +159,8 @@ struct GenerationProcessingView: View {
             "source_coverage_policy": contract.sourceCoveragePolicy,
             "sourceChunkPolicy": contract.sourceChunkPolicy,
             "source_chunk_policy": contract.sourceChunkPolicy,
-            "ocrPolicy": "use_ocr_text_for_scanned_or_low_text_density_pages_before_generation",
-            "ocr_policy": "use_ocr_text_for_scanned_or_low_text_density_pages_before_generation",
-            "largeSourcePolicy": "10_pages_full_read_200_pages_chunk_map_reduce_full_deck_synthesis",
-            "large_source_policy": "10_pages_full_read_200_pages_chunk_map_reduce_full_deck_synthesis",
             "qualityGate": contract.qualityGate,
             "quality_gate": contract.qualityGate,
-            "modelUpgradeAllowed": "true",
-            "model_upgrade_allowed": "true",
-            "ecosystemAuditRequired": "true",
-            "preflightPolicy": "evaluate_user_ecosystem_mistakes_before_generation",
             "aiBrief": contract.aiBrief,
             "ai_brief": contract.aiBrief,
             "outputContract": contract.outputContract
@@ -314,9 +172,7 @@ struct GenerationProcessingView: View {
             options["gpt_image_model"] = imageModelPolicy
             options["openaiImageModel"] = imageModelPolicy
             options["openai_image_model"] = imageModelPolicy
-            options["assetFallbackPolicy"] = "structured_text_blocks_when_image_unavailable"
         }
-
         if let count = requestedCount {
             options["count"] = String(count)
         }
@@ -325,24 +181,12 @@ struct GenerationProcessingView: View {
             options["schema"] = "qlinik_public_review_v1"
             options["persistCandidateQuestions"] = "true"
         }
-        // Structured per-tool settings (cardStyle, difficulty, scenarioType, ...) so the
-        // backend prompt actually honours the student's choices. Contract keys win on collision.
         options.merge(extraOptions) { existing, _ in existing }
         return options
     }
 
     private var requestedCount: Int? {
-        let matches = mode.matches(of: /\d+/)
-        return matches.compactMap { Int(String($0.output)) }.last
-    }
-
-    private func restart() {
-        errorMessage = nil
-        progress = 0.12
-        currentStep = 0
-        didStart = false
-        isComplete = false
-        Task { await startIfNeeded() }
+        mode.matches(of: /\d+/).compactMap { Int(String($0.output)) }.last
     }
 }
 

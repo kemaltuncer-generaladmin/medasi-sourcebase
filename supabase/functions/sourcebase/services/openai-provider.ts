@@ -22,31 +22,87 @@ export class OpenAIProvider {
         500,
       );
     }
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: options.model,
-        input: [
-          { role: "system", content: systemInstruction },
-          { role: "user", content: prompt },
-        ],
-        max_output_tokens: options.maxTokens ?? 2048,
-      }),
+    const body = JSON.stringify({
+      model: options.model,
+      input: [
+        { role: "system", content: systemInstruction },
+        { role: "user", content: prompt },
+      ],
+      max_output_tokens: options.maxTokens ?? 2048,
     });
-    if (response.status === 401 || response.status === 403) {
-      console.error("OpenAI request rejected:", response.status);
-      throw new SafeError(
-        "OPENAI_AUTH_FAILED",
-        "AI üretim sağlayıcısı kimlik doğrulaması başarısız.",
-        500,
-      );
+    // Transient OpenAI failures (5xx, 429, connection reset/timeout) are common and
+    // were hard-failing whole generations. Retry with backoff; only 4xx (real
+    // request errors) and auth are non-retryable.
+    const maxAttempts = 3;
+    let response: Response | undefined;
+    let lastErr = "";
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 150_000);
+      try {
+        response = await fetch("https://api.openai.com/v1/responses", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body,
+          signal: controller.signal,
+        });
+      } catch (error) {
+        lastErr = String(error);
+        response = undefined;
+      } finally {
+        clearTimeout(timer);
+      }
+
+      if (response) {
+        if (response.status === 401 || response.status === 403) {
+          console.error("OpenAI request rejected:", response.status);
+          throw new SafeError(
+            "OPENAI_AUTH_FAILED",
+            "AI üretim sağlayıcısı kimlik doğrulaması başarısız.",
+            500,
+          );
+        }
+        if (response.ok) break;
+        const errBody = await response.text().catch(() => "");
+        lastErr = `${response.status} ${errBody.slice(0, 400)}`;
+        console.error(
+          "OpenAI upstream error:",
+          response.status,
+          "model:",
+          options.model,
+          "attempt:",
+          attempt,
+          "body:",
+          errBody.slice(0, 400),
+        );
+        const retryable = response.status === 429 || response.status >= 500;
+        if (!retryable) {
+          throw new SafeError(
+            "OPENAI_UPSTREAM_ERROR",
+            "AI servisine ulaşılamadı.",
+            502,
+          );
+        }
+        response = undefined;
+      } else {
+        console.error(
+          "OpenAI request failed:",
+          options.model,
+          "attempt:",
+          attempt,
+          lastErr.slice(0, 200),
+        );
+      }
+
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, attempt * 2000));
+      }
     }
-    if (!response.ok) {
-      console.error("OpenAI upstream error:", response.status);
+
+    if (!response || !response.ok) {
       throw new SafeError(
         "OPENAI_UPSTREAM_ERROR",
         "AI servisine ulaşılamadı.",

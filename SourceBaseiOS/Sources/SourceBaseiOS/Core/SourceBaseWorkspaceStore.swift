@@ -571,12 +571,17 @@ public final class SourceBaseWorkspaceStore {
 
         do {
             let sourceIds = Array((selectedSourceIds.union([source.id])).filter { !$0.isEmpty })
-            let enrichedOptions = generationOptions(
+            var enrichedOptions = generationOptions(
                 base: options,
                 source: source,
                 kind: kind,
                 sourceIds: sourceIds
             )
+            // Personalize every generation with the student's setup profile (level + exam goal).
+            if let context = await AuthBackend.shared.currentProfile()?.studentContext, !context.isEmpty {
+                enrichedOptions["studentContext"] = context
+                enrichedOptions["student_context"] = context
+            }
             let snapshot = try await repository().startGenerationJob(
                 file: source,
                 kind: kind,
@@ -872,7 +877,7 @@ public final class SourceBaseWorkspaceStore {
             guard let self else { return }
             await SBNotificationService.shared.prepareGenerationNotificationsIfNeeded()
 
-            for _ in 0..<90 {
+            for _ in 0..<120 {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
 
                 await self.refreshGenerationQueue()

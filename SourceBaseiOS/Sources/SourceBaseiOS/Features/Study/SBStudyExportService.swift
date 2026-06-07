@@ -288,19 +288,29 @@ private enum AppKitStudyPDF {
     }
 
     private static func accent(for kind: GeneratedKind) -> NSColor {
+        // Mirror SBOutputStyle.outputColor so the macOS standalone PDF matches the
+        // diversified per-kind accents used in-app and in the iOS export path.
         switch kind {
-        case .flashcard, .comparison, .table:
+        case .flashcard:
             return NSColor(calibratedRed: 0.04, green: 0.36, blue: 0.95, alpha: 1)
-        case .question, .infographic:
-            return NSColor(calibratedRed: 0.02, green: 0.56, blue: 0.72, alpha: 1)
-        case .summary, .examMorningSummary, .mindMap:
-            return NSColor(calibratedRed: 0.45, green: 0.24, blue: 0.82, alpha: 1)
-        case .algorithm, .clinicalScenario:
-            return NSColor(calibratedRed: 0.86, green: 0.36, blue: 0.13, alpha: 1)
+        case .question:
+            return NSColor(calibratedRed: 0.18, green: 0.48, blue: 1.0, alpha: 1)
+        case .comparison, .table:
+            return NSColor(calibratedRed: 0.04, green: 0.25, blue: 0.90, alpha: 1)
+        case .summary:
+            return NSColor(calibratedRed: 0.48, green: 0.25, blue: 0.95, alpha: 1)
+        case .examMorningSummary:
+            return NSColor(calibratedRed: 0.96, green: 0.62, blue: 0.04, alpha: 1)
+        case .algorithm:
+            return NSColor(calibratedRed: 1.0, green: 0.42, blue: 0.075, alpha: 1)
+        case .clinicalScenario:
+            return NSColor(calibratedRed: 1.0, green: 0.23, blue: 0.23, alpha: 1)
         case .learningPlan:
-            return NSColor(calibratedRed: 0.12, green: 0.56, blue: 0.32, alpha: 1)
+            return NSColor(calibratedRed: 0.07, green: 0.68, blue: 0.33, alpha: 1)
         case .podcast:
-            return NSColor(calibratedRed: 0.74, green: 0.18, blue: 0.25, alpha: 1)
+            return NSColor(calibratedRed: 1.0, green: 0.23, blue: 0.23, alpha: 1)
+        case .infographic, .mindMap:
+            return NSColor(calibratedRed: 0.03, green: 0.78, blue: 0.84, alpha: 1)
         }
     }
 }
@@ -779,7 +789,7 @@ private struct DocumentIntro: View {
                     )
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        Text(doc.kind.titleLabel.uppercased())
+                        Text(SBOutputStyle.templateName(doc.kind).uppercased())
                             .font(.system(size: 8, weight: .bold))
                             .foregroundStyle(accent)
                         Text("STUDY PACK")
@@ -796,6 +806,11 @@ private struct DocumentIntro: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+
+            Text(SBOutputStyle.templatePurpose(doc.kind))
+                .font(.system(size: 9.5, weight: .semibold))
+                .foregroundStyle(accent)
+                .fixedSize(horizontal: false, vertical: true)
 
             if !doc.subtitle.isEmpty {
                 Text(doc.subtitle)

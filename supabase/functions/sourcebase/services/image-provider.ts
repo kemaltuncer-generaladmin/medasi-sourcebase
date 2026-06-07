@@ -6,7 +6,10 @@ import {
   RouteOptions,
 } from "./model-router.ts";
 
-const DEFAULT_IMAGE_UPSTREAM_TIMEOUT_MS = 90_000;
+// Premium gpt-image-2 portrait (1024x1536, high quality) regularly needs 90-150s.
+// Generation runs in the background (EdgeRuntime.waitUntil, ~5min worker) so this
+// can be generous; 90s was cutting premium images off → IMAGE_UPSTREAM_TIMEOUT.
+const DEFAULT_IMAGE_UPSTREAM_TIMEOUT_MS = 180_000;
 
 export interface GeneratedImage {
   provider: string;
