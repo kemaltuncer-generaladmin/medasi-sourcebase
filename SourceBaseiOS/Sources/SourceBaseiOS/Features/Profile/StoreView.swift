@@ -854,9 +854,8 @@ struct MedasiCoinPackage: Identifiable, Sendable {
         Self.priceLabel(cents: priceCents, currency: currency)
     }
 
-    var currencyDisplay: String {
-        currency == "TRY" ? "TL" : currency
-    }
+    // SourceBase prices are always in Turkish Lira — display TL everywhere.
+    var currencyDisplay: String { "TL" }
 
     private static func priceLabel(cents: Int, currency: String) -> String {
         guard cents > 0 else { return "Ücretsiz" }
@@ -864,7 +863,7 @@ struct MedasiCoinPackage: Identifiable, Sendable {
         let formatted = amount.truncatingRemainder(dividingBy: 1) == 0
             ? String(format: "%.0f", amount)
             : String(format: "%.2f", amount)
-        return "\(formatted) \(currency == "TRY" ? "TL" : currency)"
+        return "\(formatted) TL"
     }
 }
 

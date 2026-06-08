@@ -318,6 +318,10 @@ struct ProfileSetupView: View {
 
         Task {
             await session.updateProfile(faculty: faculty, department: department, classYear: classYear, goal: goal)
+            // Auto-dismiss on success — no manual back tap needed.
+            if session.errorMessage == nil {
+                finishEditing()
+            }
         }
     }
 

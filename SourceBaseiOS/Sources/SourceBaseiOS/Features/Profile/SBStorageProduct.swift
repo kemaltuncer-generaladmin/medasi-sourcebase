@@ -49,9 +49,9 @@ enum SBStorageProduct: String, CaseIterable, Identifiable {
     /// price still comes from App Store Connect; keep these in sync as a hint.
     var fallbackPriceLabel: String {
         switch self {
-        case .gb15: return "40 ₺/ay"
-        case .gb25: return "60 ₺/ay"
-        case .gb50: return "110 ₺/ay"
+        case .gb15: return "40 TL/ay"
+        case .gb25: return "60 TL/ay"
+        case .gb50: return "110 TL/ay"
         }
     }
 
