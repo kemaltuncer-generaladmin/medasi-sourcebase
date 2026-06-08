@@ -28,8 +28,12 @@ public final class SessionStore {
         let metadata = user.userMetadata
         let faculty = metadata["sourcebase_faculty"]?.stringValue ?? ""
         let department = metadata["sourcebase_department"]?.stringValue ?? ""
+        let classYear = metadata["sourcebase_class_year"]?.stringValue ?? ""
+        let goal = metadata["sourcebase_goal"]?.stringValue ?? ""
         return faculty.trimmingCharacters(in: .whitespaces).isEmpty
             || department.trimmingCharacters(in: .whitespaces).isEmpty
+            || classYear.trimmingCharacters(in: .whitespaces).isEmpty
+            || goal.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     public var displayName: String {

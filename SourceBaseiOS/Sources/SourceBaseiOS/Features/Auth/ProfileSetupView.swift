@@ -20,7 +20,7 @@ struct ProfileSetupView: View {
         case "Tıp": return ["Dönem sınavları", "TUS", "USMLE", "Genel tekrar"]
         case "Diş Hekimliği": return ["Dönem sınavları", "DUS", "Genel tekrar"]
         case "Veterinerlik": return ["Dönem sınavları", "Uzmanlık/alan sınavı", "Saha pratiği", "Genel tekrar"]
-        case "Hemşirelik", "Ebelik": return ["Dönem sınavları", "KPSS/atama", "Klinik pratik", "Genel tekrar"]
+        case "Hemşirelik", "Ebelik": return ["Dönem sınavları", "KPSS/atama", "İntibak", "Klinik pratik", "Genel tekrar"]
         default: return ["Dönem sınavları", "Genel tekrar"]
         }
     }
@@ -66,93 +66,115 @@ struct ProfileSetupView: View {
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: SBSpacing.md) {
+            Text("Kurulum")
+                .font(SBTypography.labelSmall)
+                .foregroundStyle(SBColors.blue)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 5)
+                .background(SBColors.softBlue, in: Capsule())
+
             Text("Profilini tamamla")
                 .font(SBTypography.display2)
                 .foregroundStyle(SBColors.navy)
 
-            Text("Hesap ve çalışma alanı bilgilerini düzenle.")
+            Text("Bölümün, sınıfın ve hedefin; üretilen tüm çalışma içeriğinin terminolojisini, derinliğini ve odağını belirler.")
                 .font(SBTypography.bodyMedium)
                 .foregroundStyle(SBColors.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func disciplineIcon(_ discipline: String) -> String {
+        switch discipline {
+        case "Veterinerlik": return "pawprint.fill"
+        case "Tıp": return "stethoscope"
+        case "Diş Hekimliği": return "mouth.fill"
+        case "Hemşirelik": return "cross.case.fill"
+        case "Ebelik": return "figure.and.child.holdinghands"
+        default: return "graduationcap.fill"
         }
     }
 
     // MARK: - Form
 
     private var formSection: some View {
-        VStack(spacing: SBSpacing.lg) {
-            // Faculty
-            VStack(alignment: .leading, spacing: SBSpacing.sm) {
-                Text("Fakülte / Üniversite")
-                    .font(SBTypography.labelMedium)
-                    .foregroundStyle(SBColors.navy)
-
-                HStack(spacing: SBSpacing.md) {
-                    Image(systemName: "building.columns")
-                        .sbScaledFont(size: 18, weight: .medium)
-                        .foregroundStyle(SBColors.blue)
-                        .frame(width: 24)
-
-                    TextField("Örn: İstanbul Üniversitesi", text: $faculty)
-                        .font(SBTypography.bodyMedium)
-                        .foregroundStyle(SBColors.navy)
-                        .focused($isFacultyFocused)
-                        #if os(iOS)
-                        .textInputAutocapitalization(.words)
-                        #endif
-                        .submitLabel(.done)
-                        .accessibilityLabel("Fakülte veya üniversite")
-                }
-                .padding(.horizontal, SBSpacing.lg)
-                .frame(height: 52)
-                .background(SBColors.white.opacity(0.96))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(isFacultyFocused ? SBColors.blue : SBColors.line, lineWidth: isFacultyFocused ? 1.5 : 1)
-                )
-                .shadow(color: SBColors.navy.opacity(0.05), radius: 8, x: 0, y: 4)
-
+        VStack(alignment: .leading, spacing: SBSpacing.xl) {
+            SBFieldSection(title: "Fakülte / Üniversite", icon: "building.columns") {
+                facultyField
                 universitySuggestions
             }
 
-            // Department (discipline) — tailors AI terminology/scope per field
-            menuField(title: "Bölüm", icon: "graduationcap", selection: $department, options: departments)
-            // Class year — tailors AI depth
-            menuField(title: "Sınıf", icon: "calendar", selection: $classYear, options: classYears)
-            // Goal — tailors AI focus (discipline-specific)
-            menuField(title: "Hedef", icon: "target", selection: $goal, options: goals(for: department))
+            // Discipline — tailors AI terminology/scope per field
+            SBFieldSection(title: "Bölüm", icon: "graduationcap") {
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: SBSpacing.md), GridItem(.flexible(), spacing: SBSpacing.md)],
+                    spacing: SBSpacing.md
+                ) {
+                    ForEach(departments, id: \.self) { discipline in
+                        SBDisciplineCard(
+                            title: discipline,
+                            icon: disciplineIcon(discipline),
+                            isSelected: department == discipline
+                        ) {
+                            SBHaptics.selection()
+                            department = discipline
+                        }
+                    }
+                }
+            }
 
-            Text("Bölüm, sınıf ve hedefin; üretilen tüm çalışma içeriğinin terminolojisini, derinliğini ve odağını belirler.")
-                .font(SBTypography.caption)
-                .foregroundStyle(SBColors.muted)
-                .fixedSize(horizontal: false, vertical: true)
+            // Class year — tailors AI depth
+            SBFieldSection(title: "Sınıf", icon: "calendar") {
+                FlowLayout(spacing: SBSpacing.sm) {
+                    ForEach(classYears, id: \.self) { year in
+                        SBSelectPill(label: year, isSelected: classYear == year) {
+                            SBHaptics.selection()
+                            classYear = year
+                        }
+                    }
+                }
+            }
+
+            // Goal — tailors AI focus (discipline-specific)
+            SBFieldSection(title: "Hedef", icon: "target") {
+                FlowLayout(spacing: SBSpacing.sm) {
+                    ForEach(goals(for: department), id: \.self) { option in
+                        SBSelectPill(label: option, isSelected: goal == option) {
+                            SBHaptics.selection()
+                            goal = option
+                        }
+                    }
+                }
+            }
         }
     }
 
-    private func menuField(title: String, icon: String, selection: Binding<String>, options: [String]) -> some View {
-        VStack(alignment: .leading, spacing: SBSpacing.sm) {
-            Text(title)
-                .font(SBTypography.labelMedium)
+    private var facultyField: some View {
+        HStack(spacing: SBSpacing.md) {
+            Image(systemName: "building.columns")
+                .sbScaledFont(size: 18, weight: .medium)
+                .foregroundStyle(isFacultyFocused ? SBColors.blue : SBColors.muted)
+                .frame(width: 24)
+
+            TextField("Örn: İstanbul Üniversitesi", text: $faculty)
+                .font(SBTypography.bodyMedium)
                 .foregroundStyle(SBColors.navy)
-            HStack(spacing: SBSpacing.md) {
-                Image(systemName: icon)
-                    .sbScaledFont(size: 18, weight: .medium)
-                    .foregroundStyle(SBColors.blue)
-                    .frame(width: 24)
-                Picker(title, selection: selection) {
-                    ForEach(options, id: \.self) { Text($0).tag($0) }
-                }
-                .pickerStyle(.menu)
-                .tint(SBColors.navy)
-                Spacer()
-            }
-            .padding(.horizontal, SBSpacing.lg)
-            .frame(height: 52)
-            .background(SBColors.white.opacity(0.96))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(SBColors.line, lineWidth: 1))
-            .shadow(color: SBColors.navy.opacity(0.05), radius: 8, x: 0, y: 4)
+                .focused($isFacultyFocused)
+                #if os(iOS)
+                .textInputAutocapitalization(.words)
+                #endif
+                .submitLabel(.done)
+                .accessibilityLabel("Fakülte veya üniversite")
         }
+        .padding(.horizontal, SBSpacing.lg)
+        .frame(height: 56)
+        .background(isFacultyFocused ? SBColors.fieldFocus : SBColors.field)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(isFacultyFocused ? SBColors.blue.opacity(0.7) : SBColors.line, lineWidth: isFacultyFocused ? 1.4 : 1)
+        )
     }
 
     // MARK: - University Suggestions

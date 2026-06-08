@@ -5,7 +5,7 @@ struct DriveHomeView: View {
     @Environment(AppState.self) private var appState
     @Environment(SourceBaseWorkspaceStore.self) private var workspaceStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @State private var showUploadSheet = false
+    @State private var showDirectFileImporter = false
     @State private var showCreateCourse = false
 
     private var router: AppRouter { appState.router }
@@ -76,11 +76,12 @@ struct DriveHomeView: View {
             .frame(maxWidth: .infinity)
         }
         .sbPageBackground(tone: .warm)
-        .sheet(isPresented: $showUploadSheet) {
-            DriveUploadSheet(initialDestination: workspaceStore.preferredUploadDestination) { uploaded in
-                if uploaded != nil {
-                    router.navigate(to: .uploads)
-                }
+        .driveDirectFileImporter(
+            isPresented: $showDirectFileImporter,
+            initialDestination: workspaceStore.preferredUploadDestination
+        ) { uploaded in
+            if uploaded != nil {
+                router.navigate(to: .uploads)
             }
         }
         .sheet(isPresented: $showCreateCourse) {
@@ -89,7 +90,11 @@ struct DriveHomeView: View {
                 placeholder: "Örn: Anatomi",
                 confirmLabel: "Oluştur"
             ) { title, icon, color in
-                Task { await workspaceStore.createCourse(title: title, iconName: icon, colorHex: color) }
+                Task {
+                    if let course = await workspaceStore.createCourse(title: title, iconName: icon, colorHex: color) {
+                        router.navigate(to: .courseDetail(courseId: course.id))
+                    }
+                }
             }
         }
         .refreshable {
@@ -127,11 +132,11 @@ struct DriveHomeView: View {
                         selectSourceAndOpenBaseForce(quickContinueFile)
                     }
                     SBButton("Yeni kaynak yükle", icon: "icloud.and.arrow.up", variant: .secondary, size: .medium) {
-                        showUploadSheet = true
+                        showDirectFileImporter = true
                     }
                 } else {
                     SBButton("Yeni kaynak yükle", icon: "icloud.and.arrow.up", variant: .primary, size: .medium, fullWidth: true) {
-                        showUploadSheet = true
+                        showDirectFileImporter = true
                     }
                     if processingCount > 0 {
                         SBButton("Hazırlananları gör", icon: "clock", variant: .secondary, size: .medium) {

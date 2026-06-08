@@ -281,7 +281,7 @@ private enum AppKitStudyPDF {
                 transform.translateX(by: x, yBy: y)
                 transform.rotate(byDegrees: -28)
                 transform.concat()
-                NSString(string: "SourceBase Premium Plus").draw(at: .zero, withAttributes: attributes)
+                NSString(string: "medasi sourcebase").draw(at: .zero, withAttributes: attributes)
                 NSGraphicsContext.restoreGraphicsState()
             }
         }
@@ -351,8 +351,8 @@ enum SBStudyExportService {
         return url
     }
 
-    static func exportPodcastAudio(for output: GeneratedOutput) async throws -> URL {
-        guard let remoteURL = output.podcastContent.audioURL else {
+    static func exportPodcastAudio(for output: GeneratedOutput, remoteURL: URL? = nil) async throws -> URL {
+        guard let remoteURL = remoteURL ?? output.podcastContent.audioURL else {
             throw CocoaError(.fileNoSuchFile)
         }
         let data = try await Data(from: remoteURL, timeout: 30)
@@ -366,8 +366,8 @@ enum SBStudyExportService {
         return url
     }
 
-    static func exportInfographicImage(for output: GeneratedOutput) async throws -> URL {
-        guard let remoteURL = output.infographicContent.imageURL else {
+    static func exportInfographicImage(for output: GeneratedOutput, remoteURL: URL? = nil) async throws -> URL {
+        guard let remoteURL = remoteURL ?? output.infographicContent.imageURL else {
             throw CocoaError(.fileNoSuchFile)
         }
         let data = try await Data(from: remoteURL, timeout: 30)
@@ -446,22 +446,45 @@ enum StudyPDF {
     static let pageH: CGFloat = 842
     static let sideMargin: CGFloat = 34
     static let contentWidth: CGFloat = 595 - 68
-    /// Vertical budget for blocks on a content page (between header and footer).
-    static let contentBudget: CGFloat = 720
-    static let firstPageContentBudget: CGFloat = 580
     static let blockSpacing: CGFloat = 8
+    /// Measured chrome reserved on every page so blocks never overflow into the
+    /// footer / off the page (the cause of the "1 page, text cut off" bug). The
+    /// per-page block budget is computed dynamically from these + the *measured*
+    /// intro/continuation height rather than a flat guess.
+    static let headerOverhead: CGFloat = 72
+    static let footerOverhead: CGFloat = 34
+    static let contentTopGap: CGFloat = 18      // intro/continuation top (8) + blocks top (10)
+    static let pageSafety: CGFloat = 28
+    /// Above this length the summary is paginated as a flowing paragraph block
+    /// instead of being dumped, unbounded, into the first-page cover intro.
+    static let maxIntroSummaryChars = 480
 
     static func render(doc: SBStudyDocument, image: UIImage?) -> Data {
         let accent = SBOutputStyle.accent(for: doc.kind)
         let profile = StudyExportProfile.make(for: doc)
 
-        // 1) Pack blocks into pages by measured height.
+        // Long summaries must paginate too: keep short ones in the cover intro,
+        // but push long ones into the flowing block stream so they can never
+        // overflow page 1 and get clipped mid-sentence.
+        let summaryInIntro = doc.summary.count <= maxIntroSummaryChars
+        var stream: [SBStudyBlock] = []
+        if !summaryInIntro, !doc.summary.isEmpty {
+            stream.append(.paragraph(id: "summary-overflow", text: doc.summary))
+        }
+        stream.append(contentsOf: splitBlocksForPagination(doc.blocks))
+
+        // 1) Pack blocks into pages by measured height. The first page reserves
+        // the *measured* intro height; later pages reserve the continuation bar.
+        let introHeight = measure(DocumentIntro(doc: doc, profile: profile, accent: accent, showSummary: summaryInIntro))
+        let firstBudget = max(220, pageH - headerOverhead - introHeight - contentTopGap - footerOverhead - pageSafety)
+        let restBudget = max(320, pageH - headerOverhead - 52 - contentTopGap - footerOverhead - pageSafety)
+
         var pages: [[SBStudyBlock]] = []
         var current: [SBStudyBlock] = []
         var height: CGFloat = 0
-        var budget = firstPageContentBudget
+        var budget = firstBudget
 
-        for block in splitBlocksForPagination(doc.blocks) {
+        for block in stream {
             let view = PrintBlock(block: block, accent: accent, image: image)
             let h = measure(view)
             let add = h + (current.isEmpty ? 0 : blockSpacing)
@@ -469,7 +492,7 @@ enum StudyPDF {
                 pages.append(current)
                 current = [block]
                 height = h
-                budget = contentBudget
+                budget = restBudget
             } else {
                 current.append(block)
                 height += add
@@ -499,11 +522,12 @@ enum StudyPDF {
                         accent: accent,
                         image: image,
                         pageNumber: index + 1,
-                        totalPages: total
+                        totalPages: total,
+                        showSummaryInIntro: summaryInIntro
                     ),
                     into: ctx
                 )
-                drawSearchableTextLayer(doc: doc, pageNumber: index + 1, totalPages: total)
+                drawSearchableTextLayer(doc: doc, blocks: blocks, pageNumber: index + 1, totalPages: total)
             }
         }
     }
@@ -619,13 +643,71 @@ enum StudyPDF {
         }
     }
 
-    private static func drawSearchableTextLayer(doc: SBStudyDocument, pageNumber: Int, totalPages: Int) {
-        let text = "SourceBase Premium Plus · \(doc.title) · \(doc.kind.titleLabel) · Sayfa \(pageNumber) / \(totalPages)"
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 5, weight: .medium),
-            .foregroundColor: UIColor.black.withAlphaComponent(0.18)
-        ]
-        NSString(string: text).draw(at: CGPoint(x: sideMargin, y: pageH - 18), withAttributes: attributes)
+    private static func drawSearchableTextLayer(doc: SBStudyDocument, blocks: [SBStudyBlock], pageNumber: Int, totalPages: Int) {
+        // Faint visible footer brand strip.
+        let brand = "SourceBase Premium Plus · \(doc.title) · \(doc.kind.titleLabel) · Sayfa \(pageNumber) / \(totalPages)"
+        NSString(string: brand).draw(
+            at: CGPoint(x: sideMargin, y: pageH - 18),
+            withAttributes: [
+                .font: UIFont.systemFont(ofSize: 5, weight: .medium),
+                .foregroundColor: UIColor.black.withAlphaComponent(0.18)
+            ]
+        )
+
+        // Invisible, selectable/searchable copy of this page's real content so the
+        // exported PDF is searchable and copy-pasteable regardless of whether the
+        // body was rasterised (ImageRenderer.uiImage) or vector-rendered. Drawn in
+        // clear ink, so it never alters the premium visual layout.
+        var parts: [String] = []
+        if pageNumber == 1 {
+            parts.append(doc.title)
+            if !doc.subtitle.isEmpty { parts.append(doc.subtitle) }
+            if !doc.summary.isEmpty { parts.append(doc.summary) }
+        }
+        parts.append(contentsOf: blocks.map(searchableText(for:)))
+        let body = parts.filter { !$0.isEmpty }.joined(separator: "\n")
+        guard !body.isEmpty else { return }
+        let style = NSMutableParagraphStyle()
+        style.lineBreakMode = .byWordWrapping
+        NSString(string: body).draw(
+            with: CGRect(x: sideMargin, y: 70, width: contentWidth, height: pageH - 110),
+            options: [.usesLineFragmentOrigin],
+            attributes: [
+                .font: UIFont.systemFont(ofSize: 7),
+                .foregroundColor: UIColor.clear,
+                .paragraphStyle: style
+            ],
+            context: nil
+        )
+    }
+
+    private static func searchableText(for block: SBStudyBlock) -> String {
+        switch block {
+        case let .paragraph(_, t):
+            return t
+        case let .calloutList(_, title, items, _), let .steps(_, title, items):
+            return ([title] + items).joined(separator: "\n")
+        case let .decisions(_, title, nodes):
+            return ([title] + nodes.map { "\($0.title) \($0.detail)" }).joined(separator: "\n")
+        case let .table(_, title, table):
+            return ([title, table.headers.joined(separator: " ")] + table.rows.map { $0.joined(separator: " ") }).joined(separator: "\n")
+        case let .keyValues(_, title, pairs):
+            return ([title] + pairs.map { "\($0.key): \($0.value)" }).joined(separator: "\n")
+        case let .qa(_, title, pairs):
+            return ([title] + pairs.flatMap { [$0.question, $0.answer, $0.explanation] }).joined(separator: "\n")
+        case let .timeline(_, title, entries):
+            return ([title] + entries.map { "\($0.title) \($0.meta) " + $0.items.joined(separator: " ") }).joined(separator: "\n")
+        case let .mindBranches(_, title, branches):
+            return ([title] + branches.map { "\($0.label) " + $0.children.joined(separator: " ") }).joined(separator: "\n")
+        case let .cards(_, cards):
+            return cards.map { "\($0.front) \($0.back) \($0.explanation)" }.joined(separator: "\n")
+        case let .quiz(_, qs):
+            return qs.map { "\($0.text) " + $0.options.joined(separator: " ") + " \($0.explanation)" }.joined(separator: "\n")
+        case let .image(_, _, caption):
+            return caption
+        case let .audio(_, _, segments):
+            return segments.map { "\($0.title) \($0.text)" }.joined(separator: "\n")
+        }
     }
 
     private static func measure(_ view: some View) -> CGFloat {
@@ -649,6 +731,7 @@ private struct ContentPage: View {
     let image: UIImage?
     let pageNumber: Int
     let totalPages: Int
+    var showSummaryInIntro: Bool = true
 
     var body: some View {
         ZStack {
@@ -661,7 +744,7 @@ private struct ContentPage: View {
                 pageHeader
 
                 if pageNumber == 1 {
-                    DocumentIntro(doc: doc, profile: profile, accent: accent)
+                    DocumentIntro(doc: doc, profile: profile, accent: accent, showSummary: showSummaryInIntro)
                         .padding(.horizontal, StudyPDF.sideMargin)
                         .padding(.top, 8)
                 } else {
@@ -775,6 +858,7 @@ private struct DocumentIntro: View {
     let doc: SBStudyDocument
     let profile: StudyExportProfile
     let accent: Color
+    var showSummary: Bool = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -821,7 +905,7 @@ private struct DocumentIntro: View {
 
             MetricStrip(profile: profile, accent: accent)
 
-            if !doc.summary.isEmpty {
+            if showSummary, !doc.summary.isEmpty {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "quote.bubble.fill")
                         .font(.system(size: 9, weight: .bold))
@@ -886,11 +970,17 @@ private struct PDFWatermarkLayer: View {
 
     var body: some View {
         ZStack {
-            Text("SourceBase")
-                .font(.system(size: 58, weight: .black))
-                .foregroundStyle(accent.opacity(0.02))
-                .rotationEffect(.degrees(-28))
-                .position(x: 320, y: 430)
+            // Faint, corner-to-corner diagonal brand wash ("medasi sourcebase"),
+            // angled along the page diagonal (bottom-left → top-right).
+            Text("medasi  sourcebase")
+                .font(.system(size: 96, weight: .black, design: .rounded))
+                .tracking(2)
+                .foregroundStyle(SBColors.navy.opacity(0.04))
+                .lineLimit(1)
+                .minimumScaleFactor(0.2)
+                .frame(width: 1020)
+                .rotationEffect(.degrees(-54.7))
+                .position(x: StudyPDF.pageW / 2, y: StudyPDF.pageH / 2)
             Rectangle()
                 .fill(accent.opacity(0.52))
                 .frame(width: 3)

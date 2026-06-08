@@ -306,7 +306,7 @@ struct FileDetailView: View {
 
                     routeCard(
                         icon: "flask",
-                        title: "Derin çalışma",
+                        title: "Üretim araçları",
                         subtitle: "Vaka, plan, dinleme ve görsel özet",
                         color: SBColors.purple
                     ) {

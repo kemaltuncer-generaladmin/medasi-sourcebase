@@ -1,6 +1,10 @@
 import SwiftUI
 import SourceBaseBackend
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 /// Reusable "save to section + export to branded PDF + share" control. Dropped
 /// into every study surface so all output types share the same save + export
 /// behaviour.
@@ -12,6 +16,7 @@ struct SBPdfExportControls: View {
     @State private var isExporting = false
     @State private var exportMessage: String?
     @State private var showSavePicker = false
+    @State private var showShareSheet = false
 
     var body: some View {
         SBCard(radius: 18, borderColor: SBOutputStyle.accent(for: output.kind).opacity(0.16)) {
@@ -54,10 +59,12 @@ struct SBPdfExportControls: View {
                 }
 
                 if let exportURL {
-                    ShareLink(item: exportURL) {
+                    Button {
+                        showShareSheet = true
+                    } label: {
                         HStack(spacing: SBSpacing.sm) {
                             Image(systemName: "paperplane.fill")
-                            Text("PDF paylaş veya yazdır")
+                            Text("Tekrar paylaş veya yazdır")
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.caption)
@@ -78,6 +85,13 @@ struct SBPdfExportControls: View {
         .sheet(isPresented: $showSavePicker) {
             SaveToSectionSheet(output: output)
         }
+        #if canImport(UIKit)
+        .sheet(isPresented: $showShareSheet) {
+            if let exportURL {
+                ShareActivityView(items: [exportURL])
+            }
+        }
+        #endif
     }
 
     private var saveButton: some View {
@@ -88,7 +102,7 @@ struct SBPdfExportControls: View {
 
     private var exportButton: some View {
         SBButton(
-            isExporting ? "Hazırlanıyor" : "PDF oluştur",
+            isExporting ? "Hazırlanıyor" : "PDF paylaş",
             icon: isExporting ? "hourglass" : "square.and.arrow.up",
             fullWidth: true
         ) {
@@ -104,6 +118,9 @@ struct SBPdfExportControls: View {
             do {
                 let url = try await SBStudyExportService.exportPDF(for: output)
                 exportURL = url
+                // Auto-present the system share sheet the moment the PDF is ready
+                // so "PDF paylaş" opens the share menu in one tap.
+                showShareSheet = true
             } catch {
                 exportMessage = "PDF hazırlanamadı. Lütfen tekrar dene."
             }
@@ -179,3 +196,17 @@ private struct SaveToSectionSheet: View {
         }
     }
 }
+
+#if canImport(UIKit)
+/// Thin wrapper around `UIActivityViewController` so the native share sheet can
+/// be presented programmatically (auto-opened right after a PDF is exported).
+private struct ShareActivityView: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+#endif

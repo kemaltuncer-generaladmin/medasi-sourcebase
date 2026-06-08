@@ -90,7 +90,7 @@ public struct DriveUploadService: Sendable {
     public static let allowedExtensions = ["pdf", "pptx", "docx", "ppt", "doc"]
     public static let supportedExtensionsDisplay = "PDF, PPTX, DOCX, PPT veya DOC"
     public static let primarySupportedExtensionsDisplay = "PDF, PPTX veya DOCX"
-    public static let maxSizeBytes: Int = 100_000_000 // 100 MB
+    public static let maxSizeBytes: Int = 25 * 1024 * 1024 // 25 MB (matches server MAX_UPLOAD_BYTES)
 
     public static func isSupportedFileName(_ fileName: String) -> Bool {
         allowedExtensions.contains(normalizedExtension(fileName))

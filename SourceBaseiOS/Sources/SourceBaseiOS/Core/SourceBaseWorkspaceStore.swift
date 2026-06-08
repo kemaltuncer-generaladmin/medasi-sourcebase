@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import SourceBaseBackend
 import Supabase
 
@@ -157,8 +158,16 @@ public final class SourceBaseWorkspaceStore {
             syncSelection()
             try? await refreshGenerationJobs(using: repo)
         } catch {
-            errorMessage = friendlyError(error)
-            workspace = .empty
+            // A transient refresh failure (e.g. pull-to-refresh during a network
+            // blip) must NOT wipe already-loaded data and flip the screen to a
+            // full-screen error. Only surface a blocking error on the very first
+            // load; once we have data, degrade to a non-destructive toast.
+            if hasLoadedWorkspace {
+                toast(friendlyError(error))
+            } else {
+                errorMessage = friendlyError(error)
+                workspace = .empty
+            }
         }
         isLoading = false
     }
@@ -237,37 +246,55 @@ public final class SourceBaseWorkspaceStore {
         file.isReadyForGeneration && !file.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    @discardableResult
     public func createCourse(
         title: String = "Yeni Ders",
         iconName: String? = nil,
         colorHex: String? = nil
-    ) async {
-        await runBusy("Ders oluşturuluyor...") {
-            _ = try await repository().createCourse(title, iconName: iconName, colorHex: colorHex)
+    ) async -> DriveCourse? {
+        await runBusyReturning("Ders oluşturuluyor...") {
+            let created = try await repository().createCourse(title, iconName: iconName, colorHex: colorHex)
             await refresh()
+            let resolved = course(id: created.id) ?? created
+            selectedCourseId = resolved.id
+            selectedSectionId = resolved.sections.first?.id
+            return resolved
         }
     }
 
+    @discardableResult
     public func createSection(
         courseId: String? = nil,
         title: String = "Genel",
         iconName: String? = nil,
         colorHex: String? = nil
-    ) async {
-        await runBusy("Bölüm ekleniyor...") {
-            let targetCourse = course(id: courseId) ?? workspace.primaryCourse
-            guard let targetCourse else {
-                _ = try await repository().createCourse("Yeni Ders")
+    ) async -> DriveSection? {
+        await runBusyReturning("Bölüm ekleniyor...") {
+            let targetCourse: DriveCourse
+            if let existingCourse = course(id: courseId) ?? workspace.primaryCourse {
+                targetCourse = existingCourse
+            } else {
+                let createdCourse = try await repository().createCourse("Yeni Ders")
                 await refresh()
-                return
+                targetCourse = course(id: createdCourse.id) ?? createdCourse
             }
-            _ = try await repository().createSection(
+            let created = try await repository().createSection(
                 courseId: targetCourse.id,
                 title: title,
                 iconName: iconName,
                 colorHex: colorHex
             )
             await refresh()
+            let resolved = section(id: created.id) ?? created
+            selectedCourseId = targetCourse.id
+            selectedSectionId = resolved.id
+            currentUploadDestination = DriveDestination(
+                courseId: targetCourse.id,
+                sectionId: resolved.id,
+                courseTitle: course(id: targetCourse.id)?.title ?? targetCourse.title,
+                sectionTitle: resolved.title
+            )
+            return resolved
         }
     }
 
@@ -430,7 +457,7 @@ public final class SourceBaseWorkspaceStore {
         }
         guard file.sizeBytes <= DriveUploadService.maxSizeBytes else {
             uploadPhase = .error
-            toast("Dosya boyutu 100 MB sınırını aşıyor.")
+            toast("Dosya boyutu 25 MB sınırını aşıyor. Daha küçük bir dosya yükle.")
             return
         }
 
@@ -444,13 +471,13 @@ public final class SourceBaseWorkspaceStore {
             var pageCount: Int? = nil
             var extractionMetadata: ExtractionMetadata? = nil
 
-            if let fileURL = file.fileURL {
-                let extractor = DocumentExtractor.shared
-                let result = try await extractor.extract(from: fileURL, fileType: file.contentType)
-                extractedText = result.text
-                pageCount = result.pageCount
-                extractionMetadata = result.metadata
+            guard let fileURL = file.fileURL else {
+                throw WorkspaceStoreError(message: "Dosya mobilde okunamadı. Files içinden tekrar seç.")
             }
+            let extraction = try await extractLocalText(from: fileURL, fileType: file.contentType)
+            extractedText = extraction.text
+            pageCount = extraction.pageCount
+            extractionMetadata = extraction.metadata
 
             uploadPhase = .uploading
             toast(uploadPhase.message)
@@ -577,10 +604,21 @@ public final class SourceBaseWorkspaceStore {
                 kind: kind,
                 sourceIds: sourceIds
             )
-            // Personalize every generation with the student's setup profile (level + exam goal).
-            if let context = await AuthBackend.shared.currentProfile()?.studentContext, !context.isEmpty {
-                enrichedOptions["studentContext"] = context
-                enrichedOptions["student_context"] = context
+            // Personalize every generation with the student's setup profile (level +
+            // exam goal) AND the discipline framing (e.g. nursing → bakım planı /
+            // ilaç dozu focus, midwifery → partograf, vet → species differences).
+            // Folded into the existing studentContext the server already prepends,
+            // so no backend change is needed.
+            if let studentProfile = await AuthBackend.shared.currentProfile() {
+                var context = studentProfile.studentContext
+                let hint = DisciplineOptionProfile.profile(for: studentProfile.department).aiPersonaHint
+                if !hint.isEmpty {
+                    context = context.isEmpty ? hint : "\(context)\n\(hint)"
+                }
+                if !context.isEmpty {
+                    enrichedOptions["studentContext"] = context
+                    enrichedOptions["student_context"] = context
+                }
             }
             let snapshot = try await repository().startGenerationJob(
                 file: source,
@@ -707,6 +745,29 @@ public final class SourceBaseWorkspaceStore {
         )
     }
 
+    public func generatedAssetURL(assetPath: String, outputId: String? = nil) async throws -> URL {
+        let trimmedPath = assetPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPath.isEmpty else {
+            throw WorkspaceStoreError(message: "Dosya yolu bulunamadı.")
+        }
+
+        let response = try await api().generatedAssetURL(assetPath: trimmedPath, outputId: outputId)
+        let data: [String: AnyJSON]
+        if case .object(let object)? = response["data"] {
+            data = object
+        } else {
+            data = response
+        }
+        let urlText = data["url"]?.stringValue ?? data["assetUrl"]?.stringValue ?? data["asset_url"]?.stringValue
+        guard let urlText,
+              let url = URL(string: urlText),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "https" || scheme == "http" else {
+            throw WorkspaceStoreError(message: "Dosya bağlantısı alınamadı.")
+        }
+        return url
+    }
+
     public func requestAccountDeletion() async -> Bool {
         do {
             let driveRepository = try await repository()
@@ -757,6 +818,9 @@ public final class SourceBaseWorkspaceStore {
         }
         if let storeError = error as? WorkspaceStoreError {
             return storeError.message
+        }
+        if let extractionError = error as? ExtractionError {
+            return extractionError.errorDescription ?? "Dosya mobilde işlenemedi. Farklı bir kaynak deneyebilirsin."
         }
         let text = String(describing: error)
             .replacingOccurrences(of: "Error Domain=NSCocoaErrorDomain Code=257", with: "")
@@ -955,6 +1019,35 @@ public final class SourceBaseWorkspaceStore {
             toast(friendlyError(error))
         }
         isBusy = false
+    }
+
+    private func runBusyReturning<T>(_ label: String, action: () async throws -> T) async -> T? {
+        guard !isBusy else { return nil }
+        isBusy = true
+        toast(label)
+        defer { isBusy = false }
+        do {
+            return try await action()
+        } catch {
+            toast(friendlyError(error))
+            return nil
+        }
+    }
+
+    private func extractLocalText(from url: URL, fileType: String) async throws -> ExtractionResult {
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if didAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            return try await DocumentExtractor.shared.extract(from: url, fileType: fileType)
+        } catch {
+            SBLog.drive.error("local document extraction failed file=\(url.lastPathComponent, privacy: .public) error=\(String(describing: error), privacy: .private)")
+            throw error
+        }
     }
 
     private func repository() async throws -> DriveRepository {

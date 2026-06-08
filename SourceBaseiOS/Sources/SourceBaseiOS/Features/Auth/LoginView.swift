@@ -29,11 +29,19 @@ struct LoginView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                brandHeader
+                AuthBrandHeader(subtitle: "Hesabına giriş yap")
                     .padding(.top, isCompact ? SBSpacing.xxxl : 56)
                     .padding(.bottom, SBSpacing.xxl)
 
                 loginPanel
+
+                VStack(spacing: SBSpacing.md) {
+                    Text("Sağlık bilimleri için kişiselleştirilmiş çalışma")
+                        .font(SBTypography.caption)
+                        .foregroundStyle(SBColors.softText)
+                    AuthDisciplineChips()
+                }
+                .padding(.top, SBSpacing.xl)
 
                 footerSection
                     .padding(.top, SBSpacing.xl)
@@ -50,34 +58,6 @@ struct LoginView: View {
                 navigateAfterLogin()
             }
         }
-    }
-
-    private var brandHeader: some View {
-        VStack(spacing: SBSpacing.lg) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(SBColors.blue)
-                    .frame(width: 64, height: 64)
-                    .shadow(color: SBColors.blue.opacity(0.22), radius: 18, x: 0, y: 10)
-
-                Image(systemName: "book.closed.fill")
-                    .sbScaledFont(size: 28, weight: .semibold)
-                    .foregroundStyle(.white)
-            }
-
-            VStack(spacing: SBSpacing.xs) {
-                Text("SourceBase")
-                    .font(SBTypography.heading1)
-                    .foregroundStyle(SBColors.navy)
-                    .multilineTextAlignment(.center)
-
-                Text("Hesabına giriş yap")
-                    .font(SBTypography.bodyMedium)
-                    .foregroundStyle(SBColors.muted)
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .frame(maxWidth: .infinity)
     }
 
     private var loginPanel: some View {

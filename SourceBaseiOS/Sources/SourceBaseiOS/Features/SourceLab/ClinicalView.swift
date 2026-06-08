@@ -413,7 +413,7 @@ struct ClinicalView: View {
                 file: file,
                 kind: .clinicalScenario,
                 label: "Klinik Senaryo",
-                surface: "Derin Çalışma Klinik Senaryo",
+                surface: "Üretim Klinik Senaryo",
                 mode: mode,
                 extraOptions: [
                     "scenario_type": clinicalType.rawValue,
@@ -425,7 +425,7 @@ struct ClinicalView: View {
                 isGenerating = false
                 if job != nil {
                     SBHaptics.success()
-                    router.showGenerationQueue(.sourceLab)
+                    router.showGenerationQueue(.all)
                 }
             }
         }

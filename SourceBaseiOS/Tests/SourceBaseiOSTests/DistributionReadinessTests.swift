@@ -56,7 +56,7 @@ private func plist(at relativePath: String) throws -> [String: Any] {
     )
     #expect(project.contains("PRODUCT_BUNDLE_IDENTIFIER = tr.com.medasi.sourcebase;"))
     #expect(project.contains("MARKETING_VERSION = 1.0.0;"))
-    #expect(project.contains("CURRENT_PROJECT_VERSION = 51;"))
+    #expect(project.contains("CURRENT_PROJECT_VERSION = 53;"))
     #expect(project.contains("CODE_SIGN_ENTITLEMENTS = SourceBase/SourceBase.entitlements;"))
     #expect(project.contains("PrivacyInfo.xcprivacy in Resources"))
 }

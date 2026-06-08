@@ -4,7 +4,7 @@ import SourceBaseBackend
 struct UploadsView: View {
     @Environment(SourceBaseWorkspaceStore.self) private var workspaceStore
     @State private var selectedFilter: UploadFilter = .all
-    @State private var showUploadSheet = false
+    @State private var showDirectFileImporter = false
 
     private var uploads: [UploadTask] { workspaceStore.workspace.uploads }
 
@@ -90,16 +90,17 @@ struct UploadsView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    showUploadSheet = true
+                    showDirectFileImporter = true
                 } label: {
                     Label("Yeni dosya", systemImage: "plus")
                 }
             }
         }
-        .sheet(isPresented: $showUploadSheet) {
-            DriveUploadSheet(initialDestination: workspaceStore.preferredUploadDestination) { _ in
-                selectedFilter = .all
-            }
+        .driveDirectFileImporter(
+            isPresented: $showDirectFileImporter,
+            initialDestination: workspaceStore.preferredUploadDestination
+        ) { _ in
+            selectedFilter = .all
         }
         .task {
             await workspaceStore.loadWorkspace()
@@ -158,7 +159,7 @@ struct UploadsView: View {
                 message: emptyMessage,
                 badges: ["PDF", "PPTX", "DOCX", "PPT", "DOC"],
                 actionLabel: "Yeni dosya",
-                onAction: { showUploadSheet = true }
+                onAction: { showDirectFileImporter = true }
             )
         } else if filteredUploads.isEmpty {
             SBEmptyState(

@@ -421,7 +421,7 @@ struct ExamMorningView: View {
                 file: file,
                 kind: .examMorningSummary,
                 label: "Sınav Sabahı Özeti",
-                surface: "Derin Çalışma Sınav Sabahı",
+                surface: "Üretim Sınav Sabahı",
                 mode: mode,
                 extraOptions: [
                     "summary_mode": summaryMode.rawValue,
@@ -433,7 +433,7 @@ struct ExamMorningView: View {
                 isGenerating = false
                 if job != nil {
                     SBHaptics.success()
-                    router.showGenerationQueue(.sourceLab)
+                    router.showGenerationQueue(.all)
                 }
             }
         }

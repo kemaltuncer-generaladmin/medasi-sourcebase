@@ -7,7 +7,7 @@ struct CourseDetailView: View {
     @Environment(AppState.self) private var appState
     @Environment(SourceBaseWorkspaceStore.self) private var workspaceStore
     @State private var selectedTab: Tab = .sections
-    @State private var showUploadSheet = false
+    @State private var showDirectFileImporter = false
     @State private var showRenameAlert = false
     @State private var renameTitle = ""
     @State private var showDeleteConfirmation = false
@@ -122,11 +122,12 @@ struct CourseDetailView: View {
         } message: { section in
             Text("\(section.title) içindeki dosyalar kaldırılacak.")
         }
-        .sheet(isPresented: $showUploadSheet) {
-            DriveUploadSheet(initialDestination: initialUploadDestination) { _ in
-                Task { await loadCourse() }
-                selectedTab = .files
-            }
+        .driveDirectFileImporter(
+            isPresented: $showDirectFileImporter,
+            initialDestination: initialUploadDestination
+        ) { _ in
+            Task { await loadCourse() }
+            selectedTab = .files
         }
         .sheet(isPresented: $showCreateSection) {
             SBCreateNodeSheet(
@@ -135,8 +136,11 @@ struct CourseDetailView: View {
                 confirmLabel: "Oluştur"
             ) { title, icon, color in
                 Task {
-                    await workspaceStore.createSection(courseId: courseId, title: title, iconName: icon, colorHex: color)
-                    await loadCourse()
+                    if let section = await workspaceStore.createSection(courseId: courseId, title: title, iconName: icon, colorHex: color) {
+                        router.navigate(to: .folder(courseId: courseId, sectionId: section.id))
+                    } else {
+                        await loadCourse()
+                    }
                 }
             }
         }
@@ -175,7 +179,7 @@ struct CourseDetailView: View {
         ) {
             HStack(spacing: SBSpacing.sm) {
                 SBButton("Dosya yükle", icon: "icloud.and.arrow.up", variant: .primary, size: .small) {
-                    showUploadSheet = true
+                    showDirectFileImporter = true
                 }
                 SBButton("Bölüm ekle", icon: "folder.badge.plus", variant: .secondary, size: .small) {
                     showCreateSection = true

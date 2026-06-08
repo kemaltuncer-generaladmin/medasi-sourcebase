@@ -70,12 +70,20 @@ final class AuthTests: XCTestCase {
     }
 
     func testSourceBaseProfileMetadata() {
-        let profile = SourceBaseProfile(faculty: "Tıp", department: "Kardiyoloji")
+        let profile = SourceBaseProfile(
+            faculty: "Tıp",
+            department: "Kardiyoloji",
+            classYear: "3. sınıf",
+            goal: "TUS"
+        )
         let metadata = profile.metadata()
         XCTAssertEqual(metadata["sourcebase_faculty"] as? String, "Tıp")
         XCTAssertEqual(metadata["sourcebase_department"] as? String, "Kardiyoloji")
+        XCTAssertEqual(metadata["sourcebase_class_year"] as? String, "3. sınıf")
+        XCTAssertEqual(metadata["sourcebase_goal"] as? String, "TUS")
         XCTAssertEqual(metadata["sourcebase_profile_completed"] as? Bool, true)
         XCTAssertNotNil(metadata["sourcebase_profile_completed_at"])
+        XCTAssertEqual(profile.studentContext, "Kardiyoloji · 3. sınıf · hedef: TUS · Tıp")
     }
 
     func testFriendlyErrorInvalidCredentials() {

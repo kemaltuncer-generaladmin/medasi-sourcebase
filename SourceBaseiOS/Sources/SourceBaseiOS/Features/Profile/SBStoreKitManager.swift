@@ -89,6 +89,26 @@ final class SBStoreKitManager {
         }
     }
 
+    // Re-validate active auto-renewable subscriptions (storage plans) against the
+    // backend so a renewal that happened while the app was closed refreshes the
+    // server-side quota/expiry. Consumable coin purchases never appear here.
+    func syncActiveEntitlements() async {
+        for await verification in Transaction.currentEntitlements {
+            guard !Task.isCancelled else { break }
+            guard let transaction = try? checkVerified(verification) else { continue }
+            do {
+                try await redeemAndFinish(
+                    transaction,
+                    productId: transaction.productID,
+                    jws: verification.jwsRepresentation,
+                    source: "entitlements"
+                )
+            } catch {
+                Self.logger.info("storekit entitlement sync skipped product=\(transaction.productID, privacy: .public)")
+            }
+        }
+    }
+
     // Restore consumable purchases (App Store requirement; consumables don't actually restore
     // but AppStore.sync() satisfies the restore button requirement).
     func restore() async throws {

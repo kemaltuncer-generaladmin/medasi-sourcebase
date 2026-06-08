@@ -96,7 +96,7 @@ struct SourceLabToolFlowView: View {
 
     private var hero: some View {
         SBSignatureHero(
-            eyebrow: "Derin çalışma",
+            eyebrow: "Üretim aracı",
             title: title,
             message: subtitle,
             icon: icon,
@@ -364,7 +364,7 @@ struct SourceLabToolFlowView: View {
                 file: readyFile,
                 kind: kind,
                 label: outputLabel,
-                surface: "Derin Çalışma \(outputLabel)",
+                surface: "Üretim \(outputLabel)",
                 mode: mode,
                 extraOptions: options
             )
@@ -372,7 +372,7 @@ struct SourceLabToolFlowView: View {
                 isGenerating = false
                 if job != nil {
                     SBHaptics.success()
-                    router.showGenerationQueue(.sourceLab)
+                    router.showGenerationQueue(.all)
                 }
             }
         }

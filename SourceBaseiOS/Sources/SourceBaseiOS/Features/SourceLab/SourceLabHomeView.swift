@@ -1,7 +1,7 @@
 import SwiftUI
 import SourceBaseBackend
 
-/// Pure, minimal "Derin Çalışma" home: a clean tool grid, a slim source line,
+/// Pure, minimal production tools home: a clean tool grid, a slim source line,
 /// and one queue entry point. No oversized hero, no metric clutter.
 struct SourceLabHomeView: View {
     @Environment(AppState.self) private var appState
@@ -17,14 +17,21 @@ struct SourceLabHomeView: View {
         }.count
     }
 
-    private let tools: [Tool] = [
-        Tool(kind: .examMorningSummary, title: "Sınav Sabahı", subtitle: "Kritik tarama", icon: "bolt.fill", tint: SBColors.warning),
-        Tool(kind: .clinicalScenario, title: "Klinik Senaryo", subtitle: "Ayırıcı tanı", icon: "cross.case.fill", tint: SBColors.red),
-        Tool(kind: .learningPlan, title: "Öğrenme Planı", subtitle: "Günlere bölünmüş", icon: "calendar", tint: SBColors.green),
-        Tool(kind: .podcast, title: "Podcast", subtitle: "Sesli tekrar", icon: "headphones", tint: SBColors.purple),
-        Tool(kind: .infographic, title: "İnfografik", subtitle: "Görsel özet", icon: "chart.bar.fill", tint: SBColors.cyan),
-        Tool(kind: .mindMap, title: "Zihin Haritası", subtitle: "Kavram ilişkileri", icon: "point.3.connected.trianglepath.dotted", tint: SBColors.blue)
-    ]
+    /// Deep/media tools, ordered + labeled for the signed-in student's discipline.
+    private var tools: [Tool] {
+        DisciplineOptionProfile
+            .profile(for: AuthBackend.shared.currentProfile()?.department)
+            .deepKinds
+            .map { tool in
+                Tool(
+                    kind: tool.kind,
+                    title: tool.title,
+                    subtitle: tool.subtitle,
+                    icon: tool.icon,
+                    tint: SBOutputStyle.outputColor(tool.kind)
+                )
+            }
+    }
 
     var body: some View {
         ScrollView {
@@ -51,7 +58,7 @@ struct SourceLabHomeView: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Derin Çalışma")
+                Text("Üretim Araçları")
                     .font(SBTypography.heading1)
                     .foregroundStyle(SBColors.navy)
                 Text("Bir araç seç, kaynağından üret.")
@@ -61,7 +68,7 @@ struct SourceLabHomeView: View {
             Spacer()
             Button {
                 SBHaptics.selection()
-                router.navigate(to: .queue(surface: .sourceLab))
+                router.navigate(to: .queue(surface: .all))
             } label: {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: "clock")
@@ -78,7 +85,7 @@ struct SourceLabHomeView: View {
                     }
                 }
             }
-            .accessibilityLabel("Kuyruk\(activeJobs > 0 ? ", \(activeJobs) aktif" : "")")
+            .accessibilityLabel("Üretim Kuyruğu\(activeJobs > 0 ? ", \(activeJobs) aktif" : "")")
         }
     }
 

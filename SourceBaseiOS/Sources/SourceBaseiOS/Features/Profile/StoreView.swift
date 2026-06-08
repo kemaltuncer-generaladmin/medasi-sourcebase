@@ -23,8 +23,28 @@ struct StoreView: View {
     @State private var isRestoring = false
     @State private var restoreNotice: StoreNotice?
 
+    // Storage subscriptions
+    @State private var storageStatus: SBStorageStatus?
+    @State private var buyingStorageId: String?
+    @State private var storageError: String?
+    @State private var storageInfo: String?
+
+    @Environment(\.openURL) private var openURL
+
     private var storeKit: SBStoreKitManager { SBStoreKitManager.shared }
     private var router: AppRouter { appState.router }
+
+    /// The user's single active storage tier (cascade: at most one).
+    private var activeStoragePlan: SBStorageProduct? {
+        if let code = storageStatus?.plans.first?.productCode,
+           let plan = SBStorageProduct(rawValue: code) {
+            return plan
+        }
+        if let bonus = storageStatus?.bonusBytes, bonus > 0 {
+            return SBStorageProduct.allCases.first { $0.bonusBytes == bonus }
+        }
+        return nil
+    }
 
     private enum StoreNotice {
         case success(String)
@@ -64,6 +84,8 @@ struct StoreView: View {
                 storeKitDebugNotice
 #endif
                 walletSummarySection
+
+                storageSection
 
                 if isLoading {
                     SBLoadingState(
@@ -421,11 +443,12 @@ struct StoreView: View {
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await fetchPackages() }
             group.addTask { await fetchWallet() }
+            group.addTask { await fetchStorageStatus() }
         }
 
-        // Load StoreKit products for the fetched packages
-        if !packages.isEmpty {
-            let ids = Set(packages.map(\.appStoreProductId))
+        // Load StoreKit products for the MC packages AND the storage subscriptions.
+        let ids = Set(packages.map(\.appStoreProductId)).union(SBStorageProduct.allProductIds)
+        if !ids.isEmpty {
             do {
                 try await storeKit.loadProducts(ids: ids)
 #if DEBUG
@@ -537,6 +560,7 @@ struct StoreView: View {
         do {
             try await storeKit.restore()
             await fetchWallet()
+            await fetchStorageStatus()
             restoreNotice = .success("App Store eşitlemesi tamamlandı. Varsa bekleyen satın almalar bakiyene yansıtıldı.")
         } catch {
             restoreNotice = .error(
@@ -545,6 +569,226 @@ struct StoreView: View {
                     : error.localizedDescription
             )
         }
+    }
+
+    // MARK: - Storage
+
+    @ViewBuilder
+    private var storageSection: some View {
+        let storageProducts = SBStorageProduct.allCases.filter { storeKit.product(id: $0.productId) != nil }
+        if storageStatus != nil || !storageProducts.isEmpty {
+            SBCard(radius: 18) {
+                VStack(alignment: .leading, spacing: SBSpacing.md) {
+                    HStack(spacing: SBSpacing.sm) {
+                        Image(systemName: "externaldrive.badge.plus")
+                            .sbScaledFont(size: 18, weight: .semibold)
+                            .foregroundStyle(SBColors.blue)
+                        Text("Depolama")
+                            .font(SBTypography.titleSmall)
+                            .foregroundStyle(SBColors.navy)
+                        Spacer()
+                    }
+
+                    if let storageStatus {
+                        storageUsageBar(storageStatus)
+                    }
+
+                    Text("Aylık abonelikle depolama kotanı artır. Tek plan aktif olur; istediğin zaman planını yükseltip düşürebilir veya App Store'dan iptal edebilirsin.")
+                        .font(SBTypography.caption)
+                        .foregroundStyle(SBColors.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    ForEach(storageProducts) { product in
+                        storageTile(product)
+                    }
+
+                    if activeStoragePlan != nil {
+                        Button {
+                            if let url = URL(string: "itms-apps://apps.apple.com/account/subscriptions") {
+                                openURL(url)
+                            }
+                        } label: {
+                            HStack(spacing: SBSpacing.xs) {
+                                Image(systemName: "gearshape")
+                                    .sbScaledFont(size: 13, weight: .semibold)
+                                Text("Aboneliği yönet")
+                                    .font(SBTypography.labelSmall)
+                            }
+                            .foregroundStyle(SBColors.blue)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if let storageInfo {
+                        Text(storageInfo)
+                            .font(SBTypography.caption)
+                            .foregroundStyle(SBColors.green)
+                    } else if let storageError {
+                        SBInlineError(message: storageError, isWarning: true)
+                    }
+                }
+            }
+        }
+    }
+
+    private func storageUsageBar(_ status: SBStorageStatus) -> some View {
+        let barColor: Color = status.isOverQuota ? SBColors.red : (status.isNearlyFull ? SBColors.orange : SBColors.blue)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("\(byteString(status.usedBytes)) / \(byteString(status.totalBytes))")
+                    .font(SBTypography.labelMedium)
+                    .foregroundStyle(SBColors.navy)
+                Spacer()
+                if status.bonusBytes > 0 {
+                    Text("+\(byteString(status.bonusBytes)) abonelik")
+                        .font(SBTypography.caption)
+                        .foregroundStyle(SBColors.green)
+                }
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(SBColors.field)
+                    Capsule()
+                        .fill(barColor)
+                        .frame(width: max(4, geo.size.width * status.usedFraction))
+                }
+            }
+            .frame(height: 8)
+
+            if status.isOverQuota {
+                Label("Kotan aşıldı. Mevcut dosyaların korunur ama yeni yükleme için plan yükselt veya dosya sil.", systemImage: "exclamationmark.triangle.fill")
+                    .font(SBTypography.caption)
+                    .foregroundStyle(SBColors.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if status.isNearlyFull {
+                Label("Depolaman neredeyse doldu. Plan yükselterek yer açabilirsin.", systemImage: "exclamationmark.circle")
+                    .font(SBTypography.caption)
+                    .foregroundStyle(SBColors.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func storageTile(_ product: SBStorageProduct) -> some View {
+        let skProduct = storeKit.product(id: product.productId)
+        let priceLabel = skProduct?.displayPrice ?? product.fallbackPriceLabel
+        let isBuying = buyingStorageId == product.id
+        let active = activeStoragePlan
+        let isCurrent = active == product
+        let isUpgrade = active.map { product.gigabytes > $0.gigabytes } ?? false
+        let actionLabel: String = {
+            if active == nil { return priceLabel }
+            return isUpgrade ? "Yükselt" : "Düşür"
+        }()
+        let borderColor = isCurrent ? SBColors.green.opacity(0.55) : SBColors.softLine
+
+        return HStack(spacing: SBSpacing.md) {
+            Image(systemName: product.icon)
+                .sbScaledFont(size: 20, weight: .semibold)
+                .foregroundStyle(isCurrent ? SBColors.green : SBColors.blue)
+                .frame(width: 40, height: 40)
+                .background((isCurrent ? SBColors.green : SBColors.blue).opacity(0.12), in: RoundedRectangle(cornerRadius: 11))
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: SBSpacing.xs) {
+                    Text("\(product.gbLabel) / ay")
+                        .font(SBTypography.titleSmall)
+                        .foregroundStyle(SBColors.navy)
+                    if !isCurrent {
+                        Text(priceLabel)
+                            .font(SBTypography.caption)
+                            .foregroundStyle(SBColors.muted)
+                    }
+                }
+                if isCurrent, let renews = renewalText(for: product) {
+                    Text(renews)
+                        .font(SBTypography.caption)
+                        .foregroundStyle(SBColors.green)
+                } else {
+                    Text(product.tagline)
+                        .font(SBTypography.caption)
+                        .foregroundStyle(SBColors.muted)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Spacer(minLength: SBSpacing.sm)
+
+            if isCurrent {
+                Text("Mevcut plan")
+                    .font(SBTypography.labelSmall)
+                    .foregroundStyle(SBColors.green)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(SBColors.green.opacity(0.12), in: Capsule())
+            } else {
+                SBButton(
+                    actionLabel,
+                    variant: isUpgrade || active == nil ? .primary : .secondary,
+                    size: .small,
+                    isLoading: isBuying,
+                    isDisabled: skProduct == nil
+                ) {
+                    Task { await purchaseStorage(product) }
+                }
+            }
+        }
+        .padding(SBSpacing.sm)
+        .background(SBColors.white, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(borderColor, lineWidth: isCurrent ? 1.5 : 1))
+    }
+
+    private func byteString(_ bytes: Int) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .binary)
+    }
+
+    /// "Yenileme: 8 Tem 2026" line for the active plan, from its server expiry.
+    private func renewalText(for product: SBStorageProduct) -> String? {
+        guard let plan = storageStatus?.plans.first(where: { $0.productCode == product.rawValue }),
+              let iso = plan.expiresAt,
+              let date = parseISODate(iso) else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "tr_TR")
+        formatter.dateFormat = "d MMM yyyy"
+        return "Yenileme: \(formatter.string(from: date))"
+    }
+
+    private func parseISODate(_ string: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: string) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: string)
+    }
+
+    private func fetchStorageStatus() async {
+        guard let client = await AuthBackend.shared.getClient() else { return }
+        storageStatus = try? await DriveAPI(client: client).storageStatus()
+    }
+
+    private func purchaseStorage(_ product: SBStorageProduct) async {
+        guard let skProduct = storeKit.product(id: product.productId) else {
+            storageError = "Bu abonelik şu anda App Store'dan yüklenemedi. Tekrar deneyebilirsin."
+            return
+        }
+        buyingStorageId = product.id
+        storageError = nil
+        storageInfo = nil
+        do {
+            try await storeKit.purchase(skProduct)
+            storageInfo = "Depolama aboneliğin etkinleşti. Kotan güncellendi."
+            await fetchStorageStatus()
+        } catch SBStoreError.cancelled {
+            // user cancelled — stay silent
+        } catch SBStoreError.pending {
+            storageInfo = SBStoreError.pending.errorDescription
+        } catch {
+            storageError = error.localizedDescription.isEmpty
+                ? "Abonelik tamamlanamadı. Tekrar deneyebilirsin."
+                : error.localizedDescription
+        }
+        buyingStorageId = nil
     }
 }
 

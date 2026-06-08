@@ -158,16 +158,7 @@ public struct SBGradientHero<Actions: View, Footer: View>: View {
         }
         .padding(padding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color(red: 0.906, green: 0.941, blue: 1.0),
-                    Color(red: 0.984, green: 0.992, blue: 1.0)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .background(SBColors.heroWash(tint))
         .clipShape(RoundedRectangle(cornerRadius: size == .compact ? 20 : 26))
         .overlay(
             RoundedRectangle(cornerRadius: size == .compact ? 20 : 26)

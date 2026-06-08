@@ -85,7 +85,7 @@ struct RegisterView: View {
         } footer: {
             SBMetricRibbon(items: [
                 .init(icon: "checkmark.shield.fill", value: "Güvenli", label: "hesap akışı", tint: SBColors.green),
-                .init(icon: "graduationcap.fill", value: "Tıp", label: "öğrenci profili", tint: SBColors.blue)
+                .init(icon: "graduationcap.fill", value: "5 disiplin", label: "sağlık bilimleri", tint: SBColors.blue)
             ])
         }
     }

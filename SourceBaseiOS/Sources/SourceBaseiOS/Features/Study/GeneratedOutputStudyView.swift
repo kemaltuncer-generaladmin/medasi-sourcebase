@@ -1052,11 +1052,27 @@ private struct StudyDocumentSurface: View {
         if let url {
             SBCard(radius: 16) {
                 VStack(alignment: .leading, spacing: SBSpacing.sm) {
-                    AsyncImage(url: url) { image in
-                        image.resizable().scaledToFit()
-                    } placeholder: {
-                        ProgressView().frame(maxWidth: .infinity, minHeight: 160)
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty:
+                            SBLoadingState(icon: "photo", title: "Görsel yükleniyor", message: "Kaynak görsel açılıyor.")
+                                .frame(maxWidth: .infinity, minHeight: 160)
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity)
+                        case .failure:
+                            SBInlineError(message: "Görsel bağlantısı açılmadı. Metin içeriği gösterilmeye devam eder.", isWarning: true)
+                                .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
+                                .padding(SBSpacing.md)
+                        @unknown default:
+                            SBInlineError(message: "Görsel bağlantısı açılmadı.", isWarning: true)
+                                .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
+                                .padding(SBSpacing.md)
+                        }
                     }
+                    .background(SBColors.field)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     if !caption.isEmpty {
                         Text(caption)
@@ -1226,6 +1242,7 @@ private extension SBStudyBlock {
 private struct PodcastStudySurface: View {
     let output: GeneratedOutput
 
+    @Environment(SourceBaseWorkspaceStore.self) private var workspaceStore
     @State private var player: AVPlayer?
     @State private var isPlaying = false
     @State private var speed: Float = 1
@@ -1234,8 +1251,13 @@ private struct PodcastStudySurface: View {
     @State private var audioExportURL: URL?
     @State private var isExportingAudio = false
     @State private var audioExportMessage: String?
+    @State private var signedAudioURL: URL?
+    @State private var isResolvingAudioURL = false
+    @State private var audioAssetMessage: String?
 
     private var content: SBPodcastContent { output.podcastContent }
+    private var displayAudioURL: URL? { content.audioURL ?? signedAudioURL }
+    private var hasAudioSource: Bool { displayAudioURL != nil || content.assetPath != nil }
 
     var body: some View {
         ScrollView {
@@ -1258,19 +1280,19 @@ private struct PodcastStudySurface: View {
                                     .sbScaledFont(size: 22, weight: .bold)
                                     .foregroundStyle(.white)
                                     .frame(width: 54, height: 54)
-                                    .background(content.audioURL == nil ? SBColors.softLine : SBColors.purple)
+                                    .background(displayAudioURL == nil ? SBColors.softLine : SBColors.purple)
                                     .clipShape(Circle())
                             }
-                            .disabled(content.audioURL == nil)
-                            .accessibilityLabel(content.audioURL == nil ? "Sesli anlatım hazır değil" : (isPlaying ? "Sesli anlatımı duraklat" : "Sesli anlatımı oynat"))
+                            .disabled(displayAudioURL == nil)
+                            .accessibilityLabel(displayAudioURL == nil ? "Sesli anlatım hazır değil" : (isPlaying ? "Sesli anlatımı duraklat" : "Sesli anlatımı oynat"))
                             .accessibilityValue(isPlaying ? "Oynatılıyor" : "Duraklatıldı")
-                            .accessibilityHint(content.audioURL == nil ? "Aşağıdaki anlatım metnini okuyabilirsin" : "Podcast oynatımını değiştirir")
+                            .accessibilityHint(displayAudioURL == nil ? "Aşağıdaki anlatım metnini okuyabilirsin" : "Podcast oynatımını değiştirir")
 
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(content.audioURL == nil ? "Sesli anlatım hazır değil" : "Sesli anlatım hazır")
+                                Text(audioStatusTitle)
                                     .font(SBTypography.titleSmall)
                                     .foregroundStyle(SBColors.navy)
-                                Text(content.audioURL == nil ? "Aşağıdaki anlatım metnini okuyabilirsin." : "Medasi oynatıcı")
+                                Text(audioStatusMessage)
                                     .font(SBTypography.caption)
                                     .foregroundStyle(SBColors.muted)
                             }
@@ -1287,16 +1309,20 @@ private struct PodcastStudySurface: View {
                             } label: {
                                 Text("\(Double(speed), specifier: "%.2g")x")
                                     .font(SBTypography.labelSmall)
-                                    .foregroundStyle(SBColors.purple)
+                                    .foregroundStyle(displayAudioURL == nil ? SBColors.muted : SBColors.purple)
                                     .padding(.horizontal, SBSpacing.sm)
                                     .padding(.vertical, SBSpacing.xs)
-                                    .background(SBColors.purple.opacity(0.1))
+                                    .background((displayAudioURL == nil ? SBColors.field : SBColors.purple.opacity(0.1)))
                                     .clipShape(Capsule())
                             }
+                            .disabled(displayAudioURL == nil)
                         }
 
-                        if content.audioURL != nil {
+                        if displayAudioURL != nil {
                             ProgressView(value: progress)
+                                .tint(SBColors.purple)
+                        } else if isResolvingAudioURL {
+                            ProgressView()
                                 .tint(SBColors.purple)
                         }
 
@@ -1344,6 +1370,9 @@ private struct PodcastStudySurface: View {
             .padding(SBSpacing.lg)
             .sbFloatingTabContentPadding()
         }
+        .task(id: content.assetPath) {
+            await resolveAudioAssetIfNeeded()
+        }
         .onAppear {
             setupPlayer()
         }
@@ -1357,7 +1386,7 @@ private struct PodcastStudySurface: View {
     }
 
     private func setupPlayer() {
-        guard player == nil, let url = content.audioURL else { return }
+        guard player == nil, let url = displayAudioURL else { return }
         let newPlayer = AVPlayer(url: url)
         // Real progress: poll the player clock 4×/sec and update the bar.
         let interval = CMTime(seconds: 0.25, preferredTimescale: 600)
@@ -1380,6 +1409,9 @@ private struct PodcastStudySurface: View {
     }
 
     private func togglePlayback() {
+        if player == nil {
+            setupPlayer()
+        }
         guard let player else { return }
         isPlaying.toggle()
         if isPlaying {
@@ -1389,9 +1421,38 @@ private struct PodcastStudySurface: View {
         }
     }
 
+    @MainActor
+    private func resolveAudioAssetIfNeeded() async {
+        guard content.audioURL == nil, signedAudioURL == nil else { return }
+        guard let assetPath = content.assetPath else { return }
+        isResolvingAudioURL = true
+        audioAssetMessage = nil
+        do {
+            signedAudioURL = try await workspaceStore.generatedAssetURL(assetPath: assetPath, outputId: output.id)
+            setupPlayer()
+        } catch {
+            audioAssetMessage = workspaceStore.friendlyError(error)
+        }
+        isResolvingAudioURL = false
+    }
+
+    private var audioStatusTitle: String {
+        if displayAudioURL != nil { return "Sesli anlatım hazır" }
+        if isResolvingAudioURL { return "Sesli anlatım bağlanıyor" }
+        if hasAudioSource { return "Sesli anlatım bekleniyor" }
+        return "Sesli anlatım hazır değil"
+    }
+
+    private var audioStatusMessage: String {
+        if displayAudioURL != nil { return "Medasi oynatıcı" }
+        if isResolvingAudioURL { return "Ses dosyası açılıyor." }
+        if hasAudioSource { return "Bağlantı alınamadı; aşağıdaki transkript kullanılabilir." }
+        return "Aşağıdaki anlatım metnini okuyabilirsin."
+    }
+
     @ViewBuilder
     private var audioExportControls: some View {
-        if content.audioURL != nil {
+        if displayAudioURL != nil {
             VStack(alignment: .leading, spacing: SBSpacing.sm) {
                 SBButton(
                     isExportingAudio ? "Ses hazırlanıyor" : "Ses dosyası oluştur",
@@ -1413,10 +1474,16 @@ private struct PodcastStudySurface: View {
                     SBInlineError(message: audioExportMessage, isWarning: true)
                 }
             }
+        } else if isResolvingAudioURL {
+            SBNotice(
+                icon: "waveform",
+                message: "Ses dosyası bağlanıyor. Birkaç saniye içinde oynatıcı aktifleşir.",
+                tint: SBColors.purple
+            )
         } else {
             SBNotice(
                 icon: "waveform.badge.exclamationmark",
-                message: "Ses dosyası henüz hazır değil. Transkript hazır; ses tamamlandığında buradan dışa aktarılacak.",
+                message: audioAssetMessage ?? "Ses dosyası henüz hazır değil. Transkript hazır; ses tamamlandığında buradan dışa aktarılacak.",
                 tint: SBColors.purple
             )
         }
@@ -1428,7 +1495,7 @@ private struct PodcastStudySurface: View {
         audioExportMessage = nil
         Task {
             do {
-                audioExportURL = try await SBStudyExportService.exportPodcastAudio(for: output)
+                audioExportURL = try await SBStudyExportService.exportPodcastAudio(for: output, remoteURL: displayAudioURL)
             } catch {
                 audioExportMessage = "Ses dosyası indirilemedi. Bağlantı hazır olunca tekrar dene."
             }
@@ -1450,12 +1517,17 @@ private struct PodcastStudySurface: View {
 private struct InfographicStudySurface: View {
     let output: GeneratedOutput
 
+    @Environment(SourceBaseWorkspaceStore.self) private var workspaceStore
     @State private var imageExportURL: URL?
     @State private var isExportingImage = false
     @State private var imageExportMessage: String?
+    @State private var signedImageURL: URL?
+    @State private var isResolvingImageURL = false
+    @State private var imageAssetMessage: String?
 
     private var content: SBInfographicContent { output.infographicContent }
-    private var hasImage: Bool { content.imageURL != nil }
+    private var displayImageURL: URL? { content.imageURL ?? signedImageURL }
+    private var hasImage: Bool { displayImageURL != nil || content.assetPath != nil }
 
     var body: some View {
         ScrollView {
@@ -1478,7 +1550,7 @@ private struct InfographicStudySurface: View {
                     studyBlocksCard
                 }
 
-                if content.imageURL != nil {
+                if displayImageURL != nil {
                     SBButton(
                         isExportingImage ? "Görsel hazırlanıyor" : "Görsel dosyası oluştur",
                         icon: isExportingImage ? "hourglass" : "photo.badge.arrow.down",
@@ -1498,10 +1570,16 @@ private struct InfographicStudySurface: View {
                     if let imageExportMessage {
                         SBInlineError(message: imageExportMessage, isWarning: true)
                     }
+                } else if isResolvingImageURL {
+                    SBNotice(
+                        icon: "photo",
+                        message: "İnfografik görseli bağlanıyor. Birkaç saniye içinde ekranda görünür.",
+                        tint: SBColors.cyan
+                    )
                 } else {
                     SBNotice(
                         icon: "photo.badge.exclamationmark",
-                        message: "Paylaşılabilir görsel henüz hazır değil. Görsel tamamlandığında buradan doğrudan paylaşılacak.",
+                        message: imageAssetMessage ?? "Paylaşılabilir görsel henüz hazır değil. Görsel tamamlandığında buradan doğrudan paylaşılacak.",
                         tint: SBColors.cyan
                     )
                 }
@@ -1510,6 +1588,9 @@ private struct InfographicStudySurface: View {
             }
             .padding(SBSpacing.lg)
             .sbFloatingTabContentPadding()
+        }
+        .task(id: content.assetPath) {
+            await resolveImageAssetIfNeeded()
         }
     }
 
@@ -1554,8 +1635,11 @@ private struct InfographicStudySurface: View {
     private var infographicCard: some View {
         SBCard(radius: 18, borderColor: SBColors.cyan.opacity(0.22)) {
             ZStack(alignment: .bottomTrailing) {
-                if let url = content.imageURL {
+                if let url = displayImageURL {
                     remoteImage(url)
+                } else if isResolvingImageURL {
+                    SBLoadingState(icon: "photo", title: "Görsel bağlanıyor", message: "İnfografik dosyası açılıyor.")
+                        .padding(SBSpacing.lg)
                 } else {
                     fallbackInfographicBody(assetIssue: false)
                 }
@@ -1661,12 +1745,26 @@ private struct InfographicStudySurface: View {
         imageExportMessage = nil
         Task {
             do {
-                imageExportURL = try await SBStudyExportService.exportInfographicImage(for: output)
+                imageExportURL = try await SBStudyExportService.exportInfographicImage(for: output, remoteURL: displayImageURL)
             } catch {
                 imageExportMessage = "Görsel dosyası indirilemedi. PDF hâlâ kullanılabilir."
             }
             isExportingImage = false
         }
+    }
+
+    @MainActor
+    private func resolveImageAssetIfNeeded() async {
+        guard content.imageURL == nil, signedImageURL == nil else { return }
+        guard let assetPath = content.assetPath else { return }
+        isResolvingImageURL = true
+        imageAssetMessage = nil
+        do {
+            signedImageURL = try await workspaceStore.generatedAssetURL(assetPath: assetPath, outputId: output.id)
+        } catch {
+            imageAssetMessage = workspaceStore.friendlyError(error)
+        }
+        isResolvingImageURL = false
     }
 }
 

@@ -84,6 +84,7 @@ struct SBCreateNodeSheet: View {
     let onCreate: (_ title: String, _ iconName: String, _ colorHex: String) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var title = ""
     @State private var selectedSymbol = SBNodePalette.defaultSymbol
     @State private var selectedColor = SBNodePalette.defaultColor
@@ -93,12 +94,10 @@ struct SBCreateNodeSheet: View {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    private let symbolColumns = Array(repeating: GridItem(.flexible(), spacing: SBSpacing.sm), count: 4)
-
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: SBSpacing.xl) {
+                VStack(alignment: .leading, spacing: SBSpacing.lg) {
                     previewCard
                     nameField
                     symbolPicker
@@ -132,15 +131,20 @@ struct SBCreateNodeSheet: View {
     }
 
     private var color: Color { Color(hex: selectedColor) }
+    private var isCompact: Bool { horizontalSizeClass == .compact }
+
+    private var symbolColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: SBSpacing.sm), count: isCompact ? 5 : 4)
+    }
 
     private var previewCard: some View {
         HStack(spacing: SBSpacing.md) {
             RoundedRectangle(cornerRadius: 14)
                 .fill(color.opacity(0.14))
-                .frame(width: 56, height: 56)
+                .frame(width: isCompact ? 48 : 56, height: isCompact ? 48 : 56)
                 .overlay(
                     Image(systemName: selectedSymbol)
-                        .sbScaledFont(size: 24, weight: .semibold)
+                        .sbScaledFont(size: isCompact ? 21 : 24, weight: .semibold)
                         .foregroundStyle(color)
                 )
 
@@ -190,30 +194,46 @@ struct SBCreateNodeSheet: View {
             Text("Sembol")
                 .font(SBTypography.labelMedium)
                 .foregroundStyle(SBColors.navy)
-            LazyVGrid(columns: symbolColumns, spacing: SBSpacing.sm) {
-                ForEach(SBNodePalette.symbols, id: \.self) { symbol in
-                    let isSelected = symbol == selectedSymbol
-                    Button {
-                        selectedSymbol = symbol
-                    } label: {
-                        Image(systemName: symbol)
-                            .sbScaledFont(size: 20, weight: .medium)
-                            .foregroundStyle(isSelected ? color : SBColors.muted)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .background(isSelected ? color.opacity(0.14) : SBColors.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(isSelected ? color.opacity(0.5) : SBColors.softLine, lineWidth: isSelected ? 1.5 : 1)
-                            )
+            if isCompact {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: SBSpacing.sm) {
+                        ForEach(SBNodePalette.symbols, id: \.self) { symbol in
+                            symbolButton(symbol)
+                                .frame(width: 50)
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(SBNodePalette.symbolLabel(for: symbol))
-                    .accessibilityValue(isSelected ? "Seçili" : "Seçili değil")
+                    .padding(.vertical, 2)
+                }
+            } else {
+                LazyVGrid(columns: symbolColumns, spacing: SBSpacing.sm) {
+                    ForEach(SBNodePalette.symbols, id: \.self) { symbol in
+                        symbolButton(symbol)
+                    }
                 }
             }
         }
+    }
+
+    private func symbolButton(_ symbol: String) -> some View {
+        let isSelected = symbol == selectedSymbol
+        return Button {
+            selectedSymbol = symbol
+        } label: {
+            Image(systemName: symbol)
+                .sbScaledFont(size: 20, weight: .medium)
+                .foregroundStyle(isSelected ? color : SBColors.muted)
+                .frame(maxWidth: .infinity)
+                .frame(height: isCompact ? 48 : 52)
+                .background(isSelected ? color.opacity(0.14) : SBColors.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(isSelected ? color.opacity(0.5) : SBColors.softLine, lineWidth: isSelected ? 1.5 : 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(SBNodePalette.symbolLabel(for: symbol))
+        .accessibilityValue(isSelected ? "Seçili" : "Seçili değil")
     }
 
     private var colorPicker: some View {
@@ -221,31 +241,32 @@ struct SBCreateNodeSheet: View {
             Text("Renk")
                 .font(SBTypography.labelMedium)
                 .foregroundStyle(SBColors.navy)
-            HStack(spacing: SBSpacing.md) {
-                ForEach(SBNodePalette.colors, id: \.self) { hex in
-                    let swatch = Color(hex: hex)
-                    Button {
-                        selectedColor = hex
-                    } label: {
-                        Circle()
-                            .fill(swatch)
-                            .frame(width: 34, height: 34)
-                            .overlay(
-                                Circle()
-                                    .stroke(SBColors.white, lineWidth: selectedColor == hex ? 3 : 0)
-                            )
-                            .overlay(
-                                Circle()
-                                    .stroke(swatch.opacity(selectedColor == hex ? 1 : 0.2), lineWidth: 2)
-                            )
-                            .shadow(color: swatch.opacity(selectedColor == hex ? 0.4 : 0), radius: 5, y: 2)
-                            .frame(width: 44, height: 44)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: SBSpacing.md) {
+                    ForEach(SBNodePalette.colors, id: \.self) { hex in
+                        let swatch = Color(hex: hex)
+                        Button {
+                            selectedColor = hex
+                        } label: {
+                            Circle()
+                                .fill(swatch)
+                                .frame(width: 34, height: 34)
+                                .overlay(
+                                    Circle()
+                                        .stroke(SBColors.white, lineWidth: selectedColor == hex ? 3 : 0)
+                                )
+                                .overlay(
+                                    Circle()
+                                        .stroke(swatch.opacity(selectedColor == hex ? 1 : 0.2), lineWidth: 2)
+                                )
+                                .shadow(color: swatch.opacity(selectedColor == hex ? 0.4 : 0), radius: 5, y: 2)
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(SBNodePalette.colorLabel(for: hex))
+                        .accessibilityValue(selectedColor == hex ? "Seçili" : "Seçili değil")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(SBNodePalette.colorLabel(for: hex))
-                    .accessibilityValue(selectedColor == hex ? "Seçili" : "Seçili değil")
                 }
-                Spacer()
             }
         }
     }

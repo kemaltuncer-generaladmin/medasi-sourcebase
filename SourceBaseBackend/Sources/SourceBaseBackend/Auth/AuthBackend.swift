@@ -62,8 +62,12 @@ public actor AuthBackend {
         let metadata = user.userMetadata
         let faculty = metadata["sourcebase_faculty"]?.stringValue ?? ""
         let department = metadata["sourcebase_department"]?.stringValue ?? ""
+        let classYear = metadata["sourcebase_class_year"]?.stringValue ?? ""
+        let goal = metadata["sourcebase_goal"]?.stringValue ?? ""
         return faculty.trimmingCharacters(in: .whitespaces).isEmpty
             || department.trimmingCharacters(in: .whitespaces).isEmpty
+            || classYear.trimmingCharacters(in: .whitespaces).isEmpty
+            || goal.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     // MARK: - Initialize
@@ -124,6 +128,8 @@ public actor AuthBackend {
         if let profile {
             userData["sourcebase_faculty"] = .string(profile.faculty)
             userData["sourcebase_department"] = .string(profile.department)
+            userData["sourcebase_class_year"] = .string(profile.classYear)
+            userData["sourcebase_goal"] = .string(profile.goal)
             userData["sourcebase_profile_completed"] = .bool(true)
             userData["sourcebase_profile_completed_at"] = .string(
                 ISO8601DateFormatter().string(from: Date())

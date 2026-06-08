@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 46;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -18,7 +18,7 @@
 		43C6E81D1B85A3137DD28E9E /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		A48CFD98CE745CA715F1A058 /* SourceBase.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SourceBase.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C3D81F63C72E2BD12DFA392F /* SourceBaseAppMain.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SourceBaseAppMain.swift; sourceTree = "<group>"; };
-		CCA2793744D90AE2EBB0384B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		CCA2793744D90AE2EBB0384B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		D21C2F2FDD187825B0B1C7AF /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E0E849E0830DC808AA261464 /* SourceBase.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = SourceBase.entitlements; sourceTree = "<group>"; };
 		E832C4F5D63C8FB22352A07E /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -54,7 +54,6 @@
 				D21C2F2FDD187825B0B1C7AF /* Info.plist */,
 				E0E849E0830DC808AA261464 /* SourceBase.entitlements */,
 			);
-			name = SourceBase;
 			path = SourceBase;
 			sourceTree = "<group>";
 		};
@@ -124,11 +123,9 @@
 				Base,
 			);
 			mainGroup = BD8D71A3C74A7FC6496024F3;
-			minimizedProjectReferenceProxies = 0;
 			packageReferences = (
-				523C0A34A9FE5383AC829262 /* XCLocalSwiftPackageReference "SourceBaseiOS" */,
+				523C0A34A9FE5383AC829262 /* XCLocalSwiftPackageReference "../SourceBaseiOS" */,
 			);
-			preferredProjectObjectVersion = 77;
 			productRefGroup = 9705D1F1CB99520C0008A674 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -230,13 +227,16 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = SourceBase/SourceBase.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 51;
+				CURRENT_PROJECT_VERSION = 53;
 				DEVELOPMENT_TEAM = 489N9D2VTC;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SourceBase/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = tr.com.medasi.sourcebase;
 				PRODUCT_NAME = SourceBase;
@@ -258,13 +258,16 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = SourceBase/SourceBase.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 51;
+				CURRENT_PROJECT_VERSION = 53;
 				DEVELOPMENT_TEAM = 489N9D2VTC;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SourceBase/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = tr.com.medasi.sourcebase;
 				PRODUCT_NAME = SourceBase;
@@ -367,7 +370,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		523C0A34A9FE5383AC829262 /* XCLocalSwiftPackageReference "SourceBaseiOS" */ = {
+		523C0A34A9FE5383AC829262 /* XCLocalSwiftPackageReference "../SourceBaseiOS" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../SourceBaseiOS;
 		};
@@ -376,7 +379,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		B3C9D4B0E47649E9C3B45E85 /* SourceBaseiOS */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 523C0A34A9FE5383AC829262 /* XCLocalSwiftPackageReference "SourceBaseiOS" */;
+			package = 523C0A34A9FE5383AC829262 /* XCLocalSwiftPackageReference "../SourceBaseiOS" */;
 			productName = SourceBaseiOS;
 		};
 /* End XCSwiftPackageProductDependency section */

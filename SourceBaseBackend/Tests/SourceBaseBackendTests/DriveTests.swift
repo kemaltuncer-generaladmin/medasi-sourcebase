@@ -483,6 +483,61 @@ final class DriveTests: XCTestCase {
         XCTAssertEqual(array.blocks, ["Ana mesajı 20 saniyede tara."])
     }
 
+    func testMediaParsersExposePrivateGeneratedAssetPaths() {
+        let infographicContent: AnyJSON = .object([
+            "title": .string("Klinik Görsel"),
+            "image": .object([
+                "storageObjectName": .string("sourcebase/users/user-1/generated/infographics/job-1.png"),
+                "storageUrl": .string("s3://medasistorage/sourcebase/users/user-1/generated/infographics/job-1.png")
+            ]),
+            "blocks": .array([.string("Ana mesajı görselde göster.")])
+        ])
+        let podcastContent: AnyJSON = .object([
+            "title": .string("Klinik Podcast"),
+            "audio": .object([
+                "storageObjectName": .string("sourcebase/users/user-1/generated/podcasts/job-1.m4a"),
+                "storageUrl": .string("s3://medasistorage/sourcebase/users/user-1/generated/podcasts/job-1.m4a")
+            ]),
+            "segments": .array([.string("Kalp yetmezliği anlatımı.")])
+        ])
+
+        let infographic = GeneratedContentParser.infographic(
+            from: infographicContent,
+            fallbackTitle: "Fallback"
+        )
+        let podcast = GeneratedContentParser.podcast(
+            from: podcastContent,
+            fallbackTitle: "Fallback"
+        )
+        let ignored = GeneratedContentParser.infographic(
+            from: .object(["assetPath": .string("generated/missing.png")]),
+            fallbackTitle: "Fallback"
+        )
+
+        XCTAssertEqual(infographic.assetPath, "sourcebase/users/user-1/generated/infographics/job-1.png")
+        XCTAssertEqual(podcast.assetPath, "sourcebase/users/user-1/generated/podcasts/job-1.m4a")
+        XCTAssertNil(podcast.audioURL)
+        XCTAssertNil(ignored.assetPath)
+    }
+
+    func testFlashcardParserHidesClozeMarkup() {
+        let content: AnyJSON = .object([
+            "cards": .array([
+                .object([
+                    "front": .string("Beta bloker {{c1::kalp hızını azaltır::ipucu}}"),
+                    "back": .string("Yanıt: {{c2::kontraktilite azalır}}"),
+                    "hint": .string("{{c3::sempatik tonus}}")
+                ])
+            ])
+        ])
+
+        let card = GeneratedContentParser.flashcards(from: content).first
+
+        XCTAssertEqual(card?.front, "Beta bloker kalp hızını azaltır")
+        XCTAssertEqual(card?.back, "Yanıt: kontraktilite azalır")
+        XCTAssertEqual(card?.hint, "sempatik tonus")
+    }
+
     func testInfographicDocumentDoesNotCreateEmptyImageBlockWithoutRemoteURL() {
         let content: AnyJSON = .object([
             "title": .string("Metin İnfografik"),
@@ -840,7 +895,7 @@ final class DriveTests: XCTestCase {
     }
 
     func testMaxSizeBytes() {
-        XCTAssertEqual(DriveUploadService.maxSizeBytes, 100_000_000)
+        XCTAssertEqual(DriveUploadService.maxSizeBytes, 25 * 1024 * 1024)
     }
 
     // MARK: - API Error

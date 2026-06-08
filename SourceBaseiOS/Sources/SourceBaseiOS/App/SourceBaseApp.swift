@@ -35,7 +35,14 @@ public struct SourceBaseRootView: View {
             guard let client = await AuthBackend.shared.getClient() else {
                 throw DriveAPIError(message: "IAP: oturum bulunamadı", code: nil, status: nil)
             }
-            return try await DriveAPI(client: client).redeemAppStorePurchase(
+            let api = DriveAPI(client: client)
+            // Storage subscriptions redeem via a separate action and don't change
+            // the MC wallet; return 0 so the (wallet-oriented) callers stay correct.
+            if SBStorageProduct.isStorageProductId(productId) {
+                _ = try await api.redeemStorageSubscription(jws: jws)
+                return 0
+            }
+            return try await api.redeemAppStorePurchase(
                 transactionId: txId,
                 productId: productId,
                 jws: jws
@@ -47,6 +54,8 @@ public struct SourceBaseRootView: View {
         guard !Task.isCancelled else { return }
 
         SBStoreKitManager.shared.startListening()
+        // Refresh active storage subscriptions (renewals) against the backend.
+        await SBStoreKitManager.shared.syncActiveEntitlements()
     }
 }
 

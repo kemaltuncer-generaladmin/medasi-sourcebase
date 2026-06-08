@@ -1109,6 +1109,48 @@ public struct DriveAPI: Sendable {
         return 0
     }
 
+    // MARK: - Storage quota / subscriptions
+
+    /// Current storage usage + effective quota (free 25 GB + active subscriptions).
+    public func storageStatus() async throws -> SBStorageStatus {
+        let response = try await invoke("get_storage_status", payload: [:])
+        return Self.parseStorageStatus(response["data"])
+    }
+
+    /// Redeem a verified StoreKit 2 storage subscription; returns the updated quota.
+    public func redeemStorageSubscription(jws: String) async throws -> SBStorageStatus {
+        let response = try await invoke("redeem_storage_subscription", payload: [
+            "jws": .string(jws)
+        ])
+        return Self.parseStorageStatus(response["data"])
+    }
+
+    private static func parseStorageStatus(_ data: AnyJSON?) -> SBStorageStatus {
+        guard let dict = data?.dictValue else { return .empty }
+        func bytes(_ key: String) -> Int {
+            if let i = dict[key]?.intValue { return i }
+            if let d = dict[key]?.doubleValue { return Int(d) }
+            return 0
+        }
+        let plans = (dict["plans"]?.arrayValue ?? []).compactMap { item -> SBStoragePlan? in
+            guard let row = item.dictValue else { return nil }
+            let code = row["product_code"]?.stringValue ?? ""
+            guard !code.isEmpty else { return nil }
+            let bonus = row["bonus_bytes"]?.intValue ?? row["bonus_bytes"]?.doubleValue.map(Int.init) ?? 0
+            return SBStoragePlan(productCode: code, bonusBytes: bonus, expiresAt: row["expires_at"]?.stringValue)
+        }
+        let base = bytes("baseBytes")
+        let bonus = bytes("bonusBytes")
+        let total = bytes("totalBytes")
+        return SBStorageStatus(
+            usedBytes: bytes("usedBytes"),
+            baseBytes: base,
+            bonusBytes: bonus,
+            totalBytes: total > 0 ? total : base + bonus,
+            plans: plans
+        )
+    }
+
     // MARK: - Study Sessions
 
     public func sourcebaseQuestionSession(outputId: String) async throws -> [String: AnyJSON] {

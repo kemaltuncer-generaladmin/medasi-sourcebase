@@ -14,7 +14,7 @@ struct QueueView: View {
 
     private var router: AppRouter { appState.router }
     private var jobs: [JobState] {
-        workspaceStore.generationJobs.filter { surface.includes($0.kind) }.map { job in
+        workspaceStore.generationJobs.map { job in
             let source = workspaceStore.file(id: job.sourceFileId)
             return JobState(
                 id: job.output?.jobId ?? job.id,
@@ -85,10 +85,7 @@ struct QueueView: View {
 
     private var offlineRequests: [OfflineGenerationRequest] {
         guard selectedFilter == .all || selectedFilter == .preparing else { return [] }
-        return offlineQueue.pendingRequests.filter { request in
-            guard let kind = GeneratedKind(rawValue: request.kind) else { return surface == .all }
-            return surface.includes(kind)
-        }
+        return offlineQueue.pendingRequests
     }
 
     private var filteredJobs: [JobState] {
@@ -104,7 +101,7 @@ struct QueueView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: SBSpacing.lg) {
                 if isLoading {
-                    SBLoadingState(icon: "clock", title: "Kuyruk açılıyor", message: "Çalışmalar güncelleniyor.")
+                    SBLoadingState(icon: "clock", title: "Üretim Kuyruğu açılıyor", message: "Üretimler güncelleniyor.")
                 } else if let error = errorMessage {
                     SBErrorState(
                         title: "Yüklenemedi",
@@ -207,7 +204,7 @@ struct QueueView: View {
             SBCard {
                 SBEmptyState(
                     icon: "clock.badge.questionmark",
-                    title: "Henüz çalışma yok",
+                    title: "Henüz üretim yok",
                     message: surface.emptyMessage,
                     badges: ["Başladı", "Hazırlanıyor", "Hazır", "Tekrar dene"]
                 )
@@ -455,11 +452,21 @@ struct QueueView: View {
     // MARK: - Helpers
 
     private func loadJobs() async {
-        isLoading = true
         errorMessage = nil
-        await workspaceStore.refresh()
-        errorMessage = workspaceStore.errorMessage
-        isLoading = false
+        // The queue only needs the job list — not a full workspace bootstrap
+        // (courses + sections + files + outputs). When the workspace is already
+        // loaded (the common case, navigating in from Üret/Drive), refresh ONLY
+        // the generation jobs so the queue opens instantly. Fall back to a one-time
+        // full load when nothing is cached yet.
+        if workspaceStore.hasLoadedWorkspace {
+            isLoading = false
+            await workspaceStore.refreshGenerationQueue()
+        } else {
+            isLoading = true
+            await workspaceStore.loadWorkspace()
+            errorMessage = workspaceStore.errorMessage
+            isLoading = false
+        }
     }
 
     private func pollActiveJobs() async {
@@ -512,84 +519,34 @@ struct QueueView: View {
 
 extension SourceBaseQueueSurface {
     var title: String {
-        switch self {
-        case .all: return "Kuyruk"
-        case .baseForce: return "Çalışma Kuyruğu"
-        case .sourceLab: return "Derin Çalışma Kuyruğu"
-        }
+        "Üretim Kuyruğu"
     }
 
     var eyebrow: String {
-        switch self {
-        case .all: return "Üretim takibi"
-        case .baseForce: return "Kart, soru, özet"
-        case .sourceLab: return "Klinik, plan, görsel"
-        }
+        "Üretim takibi"
     }
 
     var message: String {
-        switch self {
-        case .all:
-            return "Başlayan, hazırlanan ve hazır olan çalışmalar burada."
-        case .baseForce:
-            return "Kart, soru, son tekrar, akış ve tabloları buradan takip et."
-        case .sourceLab:
-            return "Klinik senaryo, plan, podcast ve görsel çalışmalarını buradan takip et."
-        }
+        "Başlayan, hazırlanan ve hazır olan tüm üretimler burada."
     }
 
     var emptyMessage: String {
-        switch self {
-        case .all:
-            return "Üretim başlayınca burada görünür."
-        case .baseForce:
-            return "Kart, soru veya özet başlatınca burada takip edersin."
-        case .sourceLab:
-            return "Vaka, plan, podcast veya infografik başlatınca burada takip edersin."
-        }
+        "Üretim başlayınca burada görünür."
     }
 
     var icon: String {
-        switch self {
-        case .all: return "clock.badge.checkmark.fill"
-        case .baseForce: return "bolt.fill"
-        case .sourceLab: return "flask.fill"
-        }
+        "clock.badge.checkmark.fill"
     }
 
     var tint: Color {
-        switch self {
-        case .all: return SBColors.blue
-        case .baseForce: return SBColors.blue
-        case .sourceLab: return SBColors.purple
-        }
+        SBColors.blue
     }
 
-    func includes(_ kind: GeneratedKind) -> Bool {
-        switch self {
-        case .all:
-            return true
-        case .baseForce:
-            switch kind {
-            case .flashcard, .question, .summary, .algorithm, .comparison, .table:
-                return true
-            case .examMorningSummary, .clinicalScenario, .learningPlan, .podcast, .infographic, .mindMap:
-                return false
-            }
-        case .sourceLab:
-            switch kind {
-            case .examMorningSummary, .clinicalScenario, .learningPlan, .podcast, .infographic, .mindMap:
-                return true
-            case .flashcard, .question, .summary, .algorithm, .comparison, .table:
-                return false
-            }
-        }
+    func includes(_: GeneratedKind) -> Bool {
+        true
     }
 
-    static func surface(for kind: GeneratedKind) -> SourceBaseQueueSurface {
-        if SourceBaseQueueSurface.sourceLab.includes(kind) {
-            return .sourceLab
-        }
-        return .baseForce
+    static func surface(for _: GeneratedKind) -> SourceBaseQueueSurface {
+        .all
     }
 }

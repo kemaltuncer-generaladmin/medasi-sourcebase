@@ -14,7 +14,7 @@ struct FolderView: View {
     @State private var selectedFileIds: Set<String> = []
     @State private var kindFilter: SBFileKind?
     @State private var sortOrder: SortOrder = .newest
-    @State private var showUploadSheet = false
+    @State private var showDirectFileImporter = false
     @State private var filePendingDelete: DriveFile?
     @State private var showBulkDeleteConfirmation = false
     @State private var fileIdsPendingMove: Set<String> = []
@@ -40,6 +40,8 @@ struct FolderView: View {
     }
 
     private var hasSelection: Bool { !selectedFileIds.isEmpty }
+
+    private var sectionOutputs: [GeneratedOutput] { section?.savedOutputs ?? [] }
 
     private var initialUploadDestination: DriveDestination? {
         guard let section else { return workspaceStore.preferredUploadDestination }
@@ -75,6 +77,7 @@ struct FolderView: View {
                     actionButtons
                     toolbarSection
                     filesList
+                    outputsList
                     if hasSelection {
                         selectionTray
                     }
@@ -85,10 +88,11 @@ struct FolderView: View {
         }
         .sbPageBackground(tone: .warm)
         .navigationTitle(section?.title ?? "Bölüm")
-        .sheet(isPresented: $showUploadSheet) {
-            DriveUploadSheet(initialDestination: initialUploadDestination) { _ in
-                Task { await loadSection() }
-            }
+        .driveDirectFileImporter(
+            isPresented: $showDirectFileImporter,
+            initialDestination: initialUploadDestination
+        ) { _ in
+            Task { await loadSection() }
         }
         .sheet(isPresented: $showMoveSheet) {
             DriveMoveSheet(
@@ -160,7 +164,7 @@ struct FolderView: View {
                 variant: .primary,
                 size: .small,
                 fullWidth: true,
-                action: { showUploadSheet = true }
+                action: { showDirectFileImporter = true }
             )
 
             SBButton(
@@ -226,11 +230,13 @@ struct FolderView: View {
     @ViewBuilder
     private var filesList: some View {
         if section?.files.isEmpty == true {
-            SBEmptyState(
-                icon: "doc.badge.plus",
-                title: "Bu bölümde henüz dosya yok",
-                message: "Yeni dosyalar yükleyerek başlayabilirsin."
-            )
+            if sectionOutputs.isEmpty {
+                SBEmptyState(
+                    icon: "doc.badge.plus",
+                    title: "Bu bölümde henüz dosya yok",
+                    message: "Yeni dosyalar yükleyerek başlayabilirsin."
+                )
+            }
         } else if visibleFiles.isEmpty {
             SBEmptyState(
                 icon: "line.3.horizontal.decrease.circle",
@@ -372,6 +378,87 @@ struct FolderView: View {
                 .frame(width: 44, height: 44)
         }
         .accessibilityLabel("Dosya işlemleri")
+    }
+
+    // MARK: - Saved outputs (study packs saved into this section)
+
+    @ViewBuilder
+    private var outputsList: some View {
+        if !sectionOutputs.isEmpty {
+            VStack(alignment: .leading, spacing: SBSpacing.md) {
+                HStack(spacing: SBSpacing.sm) {
+                    Image(systemName: "sparkles.rectangle.stack")
+                        .sbScaledFont(size: 16, weight: .semibold)
+                        .foregroundStyle(SBColors.purple)
+                    Text("Çalışmalar")
+                        .font(SBTypography.titleSmall)
+                        .foregroundStyle(SBColors.navy)
+                    Text("\(sectionOutputs.count)")
+                        .font(SBTypography.caption)
+                        .foregroundStyle(SBColors.muted)
+                    Spacer()
+                }
+
+                LazyVStack(spacing: SBSpacing.md) {
+                    ForEach(sectionOutputs) { output in
+                        outputRow(output)
+                    }
+                }
+            }
+        }
+    }
+
+    private func outputRow(_ output: GeneratedOutput) -> some View {
+        let accent = SBOutputStyle.accent(for: output.kind)
+        return Button {
+            router.navigate(to: .studyOutput(outputId: output.id))
+        } label: {
+            SBCard(radius: 14, borderColor: accent.opacity(0.18)) {
+                HStack(spacing: SBSpacing.md) {
+                    Image(systemName: SBOutputStyle.icon(for: output.kind))
+                        .sbScaledFont(size: 18, weight: .semibold)
+                        .foregroundStyle(.white)
+                        .frame(width: 38, height: 38)
+                        .background(accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 11))
+
+                    VStack(alignment: .leading, spacing: SBSpacing.xs) {
+                        Text(output.title)
+                            .font(SBTypography.titleSmall)
+                            .foregroundStyle(SBColors.navy)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        FlowLayout(spacing: SBSpacing.sm) {
+                            Text(SBOutputStyle.templateName(output.kind))
+                                .font(SBTypography.caption)
+                                .foregroundStyle(accent)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(accent.opacity(0.1))
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                            Text(output.updatedLabel)
+                                .font(SBTypography.caption)
+                                .foregroundStyle(SBColors.muted)
+                        }
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .sbScaledFont(size: 13, weight: .semibold)
+                        .foregroundStyle(SBColors.softText)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(output.title) çalışmasını aç")
+        .contextMenu {
+            Button("Aç", systemImage: "arrow.up.right.square") {
+                router.navigate(to: .studyOutput(outputId: output.id))
+            }
+        }
     }
 
     // MARK: - Selection Tray

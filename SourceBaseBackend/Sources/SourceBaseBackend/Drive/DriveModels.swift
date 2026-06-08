@@ -215,6 +215,10 @@ public struct DriveSection: Codable, Identifiable, Sendable {
     public let title: String
     public let status: DriveItemStatus
     public let files: [DriveFile]
+    /// Generated study outputs that were explicitly saved INTO this section
+    /// ("Bölüme kaydet"). They live alongside `files` and are shown as
+    /// first-class, file-like items in the section browser.
+    public let savedOutputs: [GeneratedOutput]
     public let iconName: String
     public let iconColorHex: String
 
@@ -223,6 +227,7 @@ public struct DriveSection: Codable, Identifiable, Sendable {
         title: String,
         status: DriveItemStatus,
         files: [DriveFile],
+        savedOutputs: [GeneratedOutput] = [],
         iconName: String = "folder",
         iconColorHex: String = "#0A5BFF"
     ) {
@@ -230,12 +235,24 @@ public struct DriveSection: Codable, Identifiable, Sendable {
         self.title = title
         self.status = status
         self.files = files
+        self.savedOutputs = savedOutputs
         self.iconName = iconName
         self.iconColorHex = iconColorHex
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, status, files, iconName, iconColorHex
+        case id, title, status, files, savedOutputs, iconName, iconColorHex
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        status = try c.decode(DriveItemStatus.self, forKey: .status)
+        files = try c.decode([DriveFile].self, forKey: .files)
+        savedOutputs = try c.decodeIfPresent([GeneratedOutput].self, forKey: .savedOutputs) ?? []
+        iconName = try c.decodeIfPresent(String.self, forKey: .iconName) ?? "folder"
+        iconColorHex = try c.decodeIfPresent(String.self, forKey: .iconColorHex) ?? "#0A5BFF"
     }
 }
 
@@ -296,6 +313,51 @@ public struct DriveFile: Codable, Identifiable, Sendable {
         case courseTitle, sectionTitle, status, statusMessage, tag
         case featured, selected, generated
     }
+}
+
+/// One active storage subscription a user has purchased (App Store auto-renewable).
+public struct SBStoragePlan: Codable, Sendable, Equatable, Identifiable {
+    public let productCode: String
+    public let bonusBytes: Int
+    public let expiresAt: String?
+
+    public var id: String { productCode + "-" + (expiresAt ?? "") }
+
+    public init(productCode: String, bonusBytes: Int, expiresAt: String?) {
+        self.productCode = productCode
+        self.bonusBytes = bonusBytes
+        self.expiresAt = expiresAt
+    }
+}
+
+/// A user's storage usage + quota snapshot. `baseBytes` is the free tier (25 GB);
+/// `bonusBytes` is the sum of active storage subscriptions; `totalBytes` is the
+/// effective quota enforced server-side at upload time.
+public struct SBStorageStatus: Codable, Sendable, Equatable {
+    public let usedBytes: Int
+    public let baseBytes: Int
+    public let bonusBytes: Int
+    public let totalBytes: Int
+    public let plans: [SBStoragePlan]
+
+    public var availableBytes: Int { max(0, totalBytes - usedBytes) }
+    public var usedFraction: Double {
+        totalBytes > 0 ? min(1, max(0, Double(usedBytes) / Double(totalBytes))) : 0
+    }
+    public var isNearlyFull: Bool { usedFraction >= 0.9 }
+    /// Used storage exceeds the current quota (e.g. after a subscription expired
+    /// or was downgraded). Existing files stay; new uploads are blocked.
+    public var isOverQuota: Bool { totalBytes > 0 && usedBytes > totalBytes }
+
+    public init(usedBytes: Int, baseBytes: Int, bonusBytes: Int, totalBytes: Int, plans: [SBStoragePlan]) {
+        self.usedBytes = usedBytes
+        self.baseBytes = baseBytes
+        self.bonusBytes = bonusBytes
+        self.totalBytes = totalBytes
+        self.plans = plans
+    }
+
+    public static let empty = SBStorageStatus(usedBytes: 0, baseBytes: 0, bonusBytes: 0, totalBytes: 0, plans: [])
 }
 
 public struct GeneratedOutput: Codable, Identifiable, Sendable {

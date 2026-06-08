@@ -11,12 +11,11 @@ extension SourceBaseWorkspaceStore {
         let ids = sourceIds ?? [file.id]
         setSelectedSources(ids)
         selectFile(file)
-        let surface = SourceBaseQueueSurface.surface(for: kind)
         return await enqueueGeneration(
             file: file,
             kind: kind,
             label: kind.titleLabel,
-            surface: surface == .sourceLab ? "Derin Çalışma" : "Üret",
+            surface: "Üretim",
             mode: mode
         )
     }
@@ -99,8 +98,8 @@ extension SourceBaseWorkspaceStore {
 }
 
 extension AppRouter {
-    public func showGenerationQueue(_ surface: SourceBaseQueueSurface = .baseForce) {
+    public func showGenerationQueue(_: SourceBaseQueueSurface = .all) {
         switchTab(to: .baseForce)
-        navigate(to: .queue(surface: surface))
+        navigate(to: .queue(surface: .all))
     }
 }

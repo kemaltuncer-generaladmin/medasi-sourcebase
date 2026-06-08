@@ -9,6 +9,11 @@ struct BaseForceHomeView: View {
 
     private var router: AppRouter { appState.router }
 
+    /// Discipline-tailored tool menu (order/labels/hero) for the signed-in student.
+    private var profile: DisciplineOptionProfile {
+        DisciplineOptionProfile.profile(for: AuthBackend.shared.currentProfile()?.department)
+    }
+
     private var readyFiles: [DriveFile] {
         workspaceStore.readyFiles
     }
@@ -69,7 +74,7 @@ struct BaseForceHomeView: View {
                 .foregroundStyle(SBColors.navy)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Flashcard, soru, özet, akış, tablo ve klinik tekrarları tek yerden başlat.")
+            Text(profile.heroSubtitle)
                 .font(SBTypography.bodyMedium)
                 .foregroundStyle(SBColors.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -112,7 +117,7 @@ struct BaseForceHomeView: View {
             SBSectionHeader(title: "Üretim türleri")
 
             toolGroup(title: "Ana", tools: mainTools)
-            toolGroup(title: "Derin", tools: deepTools)
+            toolGroup(title: "Görsel ve sesli üretim", tools: deepTools)
         }
     }
 
@@ -143,25 +148,38 @@ struct BaseForceHomeView: View {
     }
 
     private var mainTools: [ProductionTool] {
-        [
-            .init(icon: "rectangle.on.rectangle", title: "Flashcard", subtitle: "Tekrar kartları", color: SBColors.blue, route: .flashcardFactory),
-            .init(icon: "questionmark.circle", title: "Soru", subtitle: "Klinik soru pratiği", color: SBColors.questionTint, route: .questionFactory),
-            .init(icon: "doc.text", title: "Son tekrar", subtitle: "Kısa ve net özet", color: SBColors.purple, route: .summaryFactory),
-            .init(icon: "arrow.triangle.branch", title: "Akış", subtitle: "Karar adımlarını sadeleştir", color: SBColors.orange, route: .algorithmFactory),
-            .init(icon: "tablecells", title: "Tablo", subtitle: "Konuları yan yana kıyasla", color: SBColors.purple, route: .comparisonFactory),
-            .init(icon: "clock", title: "Kuyruk", subtitle: activeBaseForceJobs == 0 ? "Başlayan çalışmaları takip et" : "\(activeBaseForceJobs) çalışma hazırlanıyor", color: SBColors.blue, route: .queue(surface: .all))
-        ]
+        var tools = profile.mainKinds.map { tool in
+            ProductionTool(
+                icon: tool.icon,
+                title: tool.title,
+                subtitle: tool.subtitle,
+                color: SBOutputStyle.outputColor(tool.kind),
+                route: tool.kind.factoryRoute
+            )
+        }
+        tools.append(
+            ProductionTool(
+                icon: "clock",
+                title: "Üretim Kuyruğu",
+                subtitle: activeBaseForceJobs == 0 ? "Başlayan üretimleri takip et" : "\(activeBaseForceJobs) üretim hazırlanıyor",
+                color: SBColors.blue,
+                route: .queue(surface: .all)
+            )
+        )
+        return tools
     }
 
     private var deepTools: [ProductionTool] {
-        [
-            .init(icon: "cross.case", title: "Klinik Senaryo", subtitle: "Ayırıcı tanı pratiği", color: SBColors.purple, route: .clinical, isDeepTool: true),
-            .init(icon: "bolt", title: "Sınav Sabahı", subtitle: "7 dakikalık kritik tarama", color: SBColors.orange, route: .examMorning, isDeepTool: true),
-            .init(icon: "checklist", title: "Öğrenme Planı", subtitle: "Bugün, 72 saat, 7 gün", color: SBColors.green, route: .plan, isDeepTool: true),
-            .init(icon: "mic", title: "Podcast", subtitle: "Dinlenebilir tekrar", color: SBColors.red, route: .podcast, isDeepTool: true),
-            .init(icon: "chart.bar.doc.horizontal", title: "İnfografik", subtitle: "Tek bakışlık görsel hafıza", color: SBColors.cyan, route: .infographic, isDeepTool: true),
-            .init(icon: "point.3.connected.trianglepath.dotted", title: "Zihin Haritası", subtitle: "Kavram ilişkilerini ayır", color: SBColors.blue, route: .mindMap, isDeepTool: true)
-        ]
+        profile.deepKinds.map { tool in
+            ProductionTool(
+                icon: tool.icon,
+                title: tool.title,
+                subtitle: tool.subtitle,
+                color: SBOutputStyle.outputColor(tool.kind),
+                route: tool.kind.deepRoute,
+                isDeepTool: true
+            )
+        }
     }
 
     private func factoryTile(

@@ -80,6 +80,32 @@ import SourceBaseBackend
     #expect(result.pageCount == 2)
 }
 
+@Test func documentExtractorReadsCompressedOfficeArchives() async throws {
+    let docxData = Data(base64Encoded: "UEsDBBQAAAAIAL0UyFzT2R3zhwAAALEAAAARABwAd29yZC9kb2N1bWVudC54bWxVVAkAA9YAJmrWACZqdXgLAAEE9QEAAAQAAAAARc4xDsMgDAXQq6AcoI46dEApS7p37UqBkkgxRsYRye0b0qHLs6z/ZXmo2pNbMSRRGy6p6HrvJpGsAYqbAtpyoRzSkX2I0cqxcoRK7DOTC6XMKeIC176/Ado5dWao+k1+bzM3uCFmJMx89INXj+f4Us6yn2mhuCsJmwzQSk0+zae/Q/B/0nwBUEsBAh4DFAAAAAgAvRTIXNPZHfOHAAAAsQAAABEAGAAAAAAAAQAAAKSBAAAAAHdvcmQvZG9jdW1lbnQueG1sVVQFAAPWACZqdXgLAAEE9QEAAAQAAAAAUEsFBgAAAAABAAEAVwAAANIAAAAAAA==")!
+    let pptxData = Data(base64Encoded: "UEsDBBQAAAAIAL0UyFzl5YwupwAAABwBAAAVABwAcHB0L3NsaWRlcy9zbGlkZTEueG1sVVQJAAPWACZq1gAmanV4CwABBPUBAAAEAAAAAI2QPQ7CMAyFr1L1ALhiYIhCBrhAJTqwRo1pI+XHcoJob0/Tgio2ls+2bL9nWZJIzlSTdyEJOtdjziQAUj+i1+kQCcPSe0T2Oi8lD0CMCUPW2cbgHRyb5gRe21B/RPQ/Iob1y4bhZ19JEv3NmRITdYy4ZYV5ukQzK6kFFXBBVtfoyzUJTdW23b0K+OTo4jBXyVmDEspQIa9cVmGXgk0bdjP4+sP6FPUGUEsBAh4DFAAAAAgAvRTIXOXljC6nAAAAHAEAABUAGAAAAAAAAQAAAKSBAAAAAHBwdC9zbGlkZXMvc2xpZGUxLnhtbFVUBQAD1gAmanV4CwABBPUBAAAEAAAAAFBLBQYAAAAAAQABAFsAAAD2AAAAAAA=")!
+    let docxURL = FileManager.default.temporaryDirectory.appendingPathComponent("compressed-\(UUID().uuidString).docx")
+    let pptxURL = FileManager.default.temporaryDirectory.appendingPathComponent("compressed-\(UUID().uuidString).pptx")
+    try docxData.write(to: docxURL, options: .atomic)
+    try pptxData.write(to: pptxURL, options: .atomic)
+    defer {
+        try? FileManager.default.removeItem(at: docxURL)
+        try? FileManager.default.removeItem(at: pptxURL)
+    }
+
+    let docx = try await DocumentExtractor.shared.extract(
+        from: docxURL,
+        fileType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    let pptx = try await DocumentExtractor.shared.extract(
+        from: pptxURL,
+        fileType: "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    )
+
+    #expect(docx.text.contains("Compressed DOCX cardiology text"))
+    #expect(pptx.text.contains("Compressed PPTX neurology slide"))
+    #expect(pptx.pageCount == 1)
+}
+
 @Test func generatedOutputKeepsBackendContentText() async throws {
     let output = GeneratedOutput(
         id: "output-1",
@@ -315,7 +341,7 @@ import SourceBaseBackend
 
     router.showGenerationQueue(.sourceLab)
     #expect(router.selectedTab == .baseForce)
-    #expect(router.path == [.queue(surface: .sourceLab)])
+    #expect(router.path == [.queue(surface: .all)])
 
     router.reset(to: .drive)
 }
@@ -402,6 +428,32 @@ import SourceBaseBackend
     #expect(output.flashcards.first?.front == "Beta bloker etkisi?")
 }
 
+@Test func generatedOutputStripsClozeMarkupFromFlashcards() async throws {
+    let output = GeneratedOutput(
+        id: "output-cloze",
+        sourceFileId: "file-1",
+        kind: .flashcard,
+        rawType: "flashcard",
+        title: "Flashcard",
+        detail: "1 kart",
+        content: .object([
+            "cards": .array([
+                .object([
+                    "front": .string("Tedavi: {{c1::beta bloker::ilaç}}"),
+                    "back": .string("Etki: {{c2::kalp hızını azaltır}}")
+                ])
+            ])
+        ]),
+        updatedLabel: "Bugün",
+        status: "ready",
+        itemCount: 1,
+        jobId: "job-cloze"
+    )
+
+    #expect(output.flashcards.first?.front == "Tedavi: beta bloker")
+    #expect(output.flashcards.first?.back == "Etki: kalp hızını azaltır")
+}
+
 @Test func generatedOutputDecodesPodcastAudioAndInfographicAssetUrls() async throws {
     let podcast = GeneratedOutput(
         id: "output-podcast",
@@ -452,6 +504,60 @@ import SourceBaseBackend
     #expect(podcast.studyDocument.blocks.contains { if case .audio(_, let url, let segments) = $0 { return url?.pathExtension == "m4a" && segments.count == 1 }; return false })
     #expect(infographic.infographicContent.imageURL?.absoluteString == "https://cdn.example.com/kardiyoloji.png")
     #expect(infographic.studyDocument.blocks.contains { if case .image(_, let url, _) = $0 { return url?.lastPathComponent == "kardiyoloji.png" }; return false })
+}
+
+@Test func generatedOutputDecodesPrivateMediaAssetPaths() async throws {
+    let podcast = GeneratedOutput(
+        id: "output-private-podcast",
+        sourceFileId: "file-1",
+        kind: .podcast,
+        rawType: "podcast",
+        title: "Podcast",
+        detail: "Ses",
+        content: .object([
+            "audio": .object([
+                "storageObjectName": .string("sourcebase/users/user-1/generated/podcasts/job-1.m4a"),
+                "storageUrl": .string("s3://medasistorage/sourcebase/users/user-1/generated/podcasts/job-1.m4a")
+            ]),
+            "segments": .array([.string("Kalp yetmezliği anlatımı.")])
+        ]),
+        updatedLabel: "Bugün",
+        status: "ready",
+        itemCount: 1,
+        jobId: "job-private-podcast"
+    )
+    let infographic = GeneratedOutput(
+        id: "output-private-infographic",
+        sourceFileId: "file-1",
+        kind: .infographic,
+        rawType: "infographic",
+        title: "İnfografik",
+        detail: "Görsel",
+        content: .object([
+            "image": .object([
+                "storageObjectName": .string("sourcebase/users/user-1/generated/infographics/job-1.png")
+            ]),
+            "blocks": .array([.string("Konjesyonu erken tanı.")])
+        ]),
+        updatedLabel: "Bugün",
+        status: "ready",
+        itemCount: 1,
+        jobId: "job-private-info"
+    )
+
+    #expect(podcast.podcastContent.audioURL == nil)
+    #expect(podcast.podcastContent.assetPath == "sourcebase/users/user-1/generated/podcasts/job-1.m4a")
+    #expect(infographic.infographicContent.imageURL == nil)
+    #expect(infographic.infographicContent.assetPath == "sourcebase/users/user-1/generated/infographics/job-1.png")
+}
+
+@Test func productionQueueSurfaceShowsEveryGenerationKind() async throws {
+    for kind in GeneratedKind.allCases {
+        #expect(SourceBaseQueueSurface.surface(for: kind) == .all)
+        #expect(SourceBaseQueueSurface.baseForce.includes(kind))
+        #expect(SourceBaseQueueSurface.sourceLab.includes(kind))
+    }
+    #expect(SourceBaseQueueSurface.sourceLab.title == "Üretim Kuyruğu")
 }
 
 @Test func mediaGenerationContractsRequestExportableAssets() async throws {

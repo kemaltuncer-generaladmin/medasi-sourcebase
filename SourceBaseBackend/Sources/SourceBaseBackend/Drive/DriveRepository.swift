@@ -728,6 +728,12 @@ public struct DriveRepository: Sendable {
             .filter { $0.stringValue(for: "section_id") == id }
             .map { fileFromRow($0, courseTitle: courseTitle ?? "", sectionTitle: title, allOutputs: allOutputs) }
 
+        // Outputs that were explicitly saved into this section ("Bölüme kaydet")
+        // surface as first-class, file-like items alongside the section's files.
+        let savedOutputs = allOutputs
+            .filter { $0.stringValue(for: "section_id") == id }
+            .map { outputFromRow($0) }
+
         let iconName = metadataText(from: row["metadata"], key: "iconName") ?? "folder"
         let colorHex = metadataText(from: row["metadata"], key: "colorHex") ?? "#0A5BFF"
 
@@ -736,6 +742,7 @@ public struct DriveRepository: Sendable {
             title: title,
             status: statusFromText(row.stringValue(for: "status") ?? "active"),
             files: files,
+            savedOutputs: savedOutputs,
             iconName: iconName,
             iconColorHex: colorHex
         )

@@ -188,12 +188,14 @@ public struct SBPodcastContent: Sendable, Equatable {
     public let title: String
     public let durationLabel: String
     public let audioURL: URL?
+    public let assetPath: String?
     public let segments: [SBPodcastSegment]
 
-    public init(title: String, durationLabel: String = "", audioURL: URL? = nil, segments: [SBPodcastSegment]) {
+    public init(title: String, durationLabel: String = "", audioURL: URL? = nil, assetPath: String? = nil, segments: [SBPodcastSegment]) {
         self.title = title
         self.durationLabel = durationLabel
         self.audioURL = audioURL
+        self.assetPath = assetPath
         self.segments = segments
     }
 }
@@ -201,11 +203,13 @@ public struct SBPodcastContent: Sendable, Equatable {
 public struct SBInfographicContent: Sendable, Equatable {
     public let title: String
     public let imageURL: URL?
+    public let assetPath: String?
     public let blocks: [String]
 
-    public init(title: String, imageURL: URL? = nil, blocks: [String]) {
+    public init(title: String, imageURL: URL? = nil, assetPath: String? = nil, blocks: [String]) {
         self.title = title
         self.imageURL = imageURL
+        self.assetPath = assetPath
         self.blocks = blocks
     }
 }
@@ -288,24 +292,24 @@ public enum GeneratedContentParser {
         let rawCards = array(in: content, keys: ["cards", "flashcards"]) ?? arrayValue(content)
         let cards = rawCards?.enumerated().compactMap { index, value -> SBFlashcard? in
             guard let dict = objectValue(value) else {
-                let text = stringValue(value)
+                let text = cleanFlashcardText(stringValue(value))
                 return text.isEmpty ? nil : SBFlashcard(id: "card-\(index)", front: text, back: "")
             }
-            let front = firstString(dict, keys: ["front", "question", "prompt", "term", "title"])
-            let back = firstString(dict, keys: ["back", "answer", "definition", "text"])
+            let front = cleanFlashcardText(firstString(dict, keys: ["front", "question", "prompt", "term", "title"]))
+            let back = cleanFlashcardText(firstString(dict, keys: ["back", "answer", "definition", "text"]))
             guard !front.isEmpty || !back.isEmpty else { return nil }
             return SBFlashcard(
                 id: firstString(dict, keys: ["id"]).nilIfEmpty ?? "card-\(index)",
                 front: front.isEmpty ? "Kart \(index + 1)" : front,
                 back: back,
-                explanation: firstString(dict, keys: ["explanation", "rationale", "note"]),
+                explanation: cleanFlashcardText(firstString(dict, keys: ["explanation", "rationale", "note"])),
                 difficulty: firstString(dict, keys: ["difficulty"]),
-                hint: firstString(dict, keys: ["hint", "ipucu"])
+                hint: cleanFlashcardText(firstString(dict, keys: ["hint", "ipucu"]))
             )
         } ?? []
 
         if !cards.isEmpty { return cards }
-        let fallback = fallbackText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let fallback = cleanFlashcardText(fallbackText ?? "")
         guard !fallback.isEmpty else { return [] }
         return [SBFlashcard(front: fallback.components(separatedBy: "\n").first ?? "Kart", back: fallback)]
     }
@@ -412,7 +416,8 @@ public enum GeneratedContentParser {
         return SBPodcastContent(
             title: title,
             durationLabel: duration,
-            audioURL: URL(string: audioText),
+            audioURL: absoluteRemoteURL(from: audioText),
+            assetPath: dict.flatMap(podcastAssetPath),
             segments: segments.isEmpty && !fallback.isEmpty
                 ? [SBPodcastSegment(title: "Transkript", text: fallback)]
                 : segments
@@ -425,6 +430,7 @@ public enum GeneratedContentParser {
         return SBInfographicContent(
             title: title,
             imageURL: dict.flatMap(infographicImageURL),
+            assetPath: dict.flatMap(infographicAssetPath),
             blocks: dict.map { infographicBlocks(from: $0, fallbackText: fallbackText) }
                 ?? fallbackLines(fallbackText)
         )
@@ -743,6 +749,56 @@ public enum GeneratedContentParser {
         }
     }
 
+    private static func podcastAssetPath(from dict: [String: AnyJSON]) -> String? {
+        for key in [
+            "audio", "asset", "media", "file", "output",
+            "audios", "assets", "mediaAssets", "media_assets",
+            "files", "outputs", "generatedAudio", "generated_audio"
+        ] {
+            if let path = generatedAssetPath(from: dict[key]) { return path }
+        }
+
+        return generatedAssetPath(
+            from: firstString(
+                dict,
+                keys: [
+                    "storageObjectName", "storage_object_name",
+                    "objectName", "object_name",
+                    "assetPath", "asset_path",
+                    "storagePath", "storage_path",
+                    "storageUrl", "storage_url",
+                    "path"
+                ]
+            )
+        )
+    }
+
+    private static func cleanFlashcardText(_ raw: String) -> String {
+        var cleaned = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return "" }
+
+        if let regex = try? NSRegularExpression(pattern: #"\{\{c\d+::(.*?)(?:::[^{}]*)?\}\}"#) {
+            let nsText = cleaned as NSString
+            let matches = regex.matches(in: cleaned, range: NSRange(location: 0, length: nsText.length))
+            if !matches.isEmpty {
+                var mutable = cleaned
+                for match in matches.reversed() {
+                    guard match.numberOfRanges > 1,
+                          match.range(at: 1).location != NSNotFound,
+                          let whole = Range(match.range(at: 0), in: mutable),
+                          let inner = Range(match.range(at: 1), in: mutable) else { continue }
+                    mutable.replaceSubrange(whole, with: String(mutable[inner]))
+                }
+                cleaned = mutable
+            }
+        }
+
+        return cleaned
+            .replacingOccurrences(of: #"\{\{c\d+::"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: "}}", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private static func infographicImageURL(from dict: [String: AnyJSON]) -> URL? {
         let direct = firstString(
             dict,
@@ -763,6 +819,30 @@ public enum GeneratedContentParser {
             if let url = remoteImageURL(from: dict[key]) { return url }
         }
         return nil
+    }
+
+    private static func infographicAssetPath(from dict: [String: AnyJSON]) -> String? {
+        for key in [
+            "image", "asset", "visual", "media", "file", "output",
+            "images", "assets", "visuals", "mediaAssets", "media_assets",
+            "files", "outputs", "generatedImages", "generated_images"
+        ] {
+            if let path = generatedAssetPath(from: dict[key]) { return path }
+        }
+
+        return generatedAssetPath(
+            from: firstString(
+                dict,
+                keys: [
+                    "storageObjectName", "storage_object_name",
+                    "objectName", "object_name",
+                    "assetPath", "asset_path",
+                    "storagePath", "storage_path",
+                    "storageUrl", "storage_url",
+                    "path"
+                ]
+            )
+        )
     }
 
     private static func remoteImageURL(from value: AnyJSON?) -> URL? {
@@ -797,6 +877,66 @@ public enum GeneratedContentParser {
             return nil
         }
         return remoteImageURL(from: stringValue(value))
+    }
+
+    private static func generatedAssetPath(from value: AnyJSON?) -> String? {
+        if let array = arrayValue(value) {
+            for item in array {
+                if let path = generatedAssetPath(from: item) { return path }
+            }
+            return nil
+        }
+
+        if let dict = objectValue(value) {
+            let direct = firstString(
+                dict,
+                keys: [
+                    "storageObjectName", "storage_object_name",
+                    "objectName", "object_name",
+                    "assetPath", "asset_path",
+                    "storagePath", "storage_path",
+                    "storageUrl", "storage_url",
+                    "path"
+                ]
+            )
+            if let path = generatedAssetPath(from: direct) { return path }
+
+            for key in dict.keys.sorted() {
+                let normalized = key.lowercased()
+                guard normalized.contains("storage")
+                    || normalized.contains("object")
+                    || normalized.contains("asset")
+                    || normalized.contains("image")
+                    || normalized.contains("path") else { continue }
+                if let path = generatedAssetPath(from: dict[key]) { return path }
+            }
+            return nil
+        }
+
+        return generatedAssetPath(from: stringValue(value))
+    }
+
+    private static func generatedAssetPath(from raw: String) -> String? {
+        let trimmed = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "<>()[]{}\"'`"))
+        guard !trimmed.isEmpty else { return nil }
+
+        if trimmed.hasPrefix("sourcebase/users/"), trimmed.contains("/generated/") {
+            return trimmed
+        }
+
+        if let url = URL(string: trimmed),
+           let scheme = url.scheme?.lowercased(),
+           scheme != "http",
+           scheme != "https" {
+            let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            if path.hasPrefix("sourcebase/users/"), path.contains("/generated/") {
+                return path
+            }
+        }
+
+        return nil
     }
 
     private static func remoteImageURL(from raw: String) -> URL? {
