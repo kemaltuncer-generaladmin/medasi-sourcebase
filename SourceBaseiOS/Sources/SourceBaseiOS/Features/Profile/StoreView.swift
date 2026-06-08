@@ -242,7 +242,7 @@ struct StoreView: View {
         let isBuying = buyingPackageCode == package.code
         let hasStatus = purchaseStatusPackageCode == package.code
         let skProduct = storeKit.product(id: package.appStoreProductId)
-        let priceDisplay = skProduct?.displayPrice ?? package.priceLabel
+        let priceDisplay = tlPrice(skProduct, fallback: package.priceLabel)
         let isBestValue = package.coin >= 200
         let purchaseLabel = "\(package.coin) MC satın al"
 
@@ -671,7 +671,7 @@ struct StoreView: View {
 
     private func storageTile(_ product: SBStorageProduct) -> some View {
         let skProduct = storeKit.product(id: product.productId)
-        let priceLabel = skProduct?.displayPrice ?? product.fallbackPriceLabel
+        let priceLabel = tlPrice(skProduct, fallback: product.fallbackPriceLabel)
         let isBuying = buyingStorageId == product.id
         let active = activeStoragePlan
         let isCurrent = active == product
@@ -744,6 +744,17 @@ struct StoreView: View {
 
     private func byteString(_ bytes: Int) -> String {
         ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .binary)
+    }
+
+    /// Always show prices in Turkish Lira. Uses the live App Store price only when
+    /// it is already in TRY (the real TR storefront); otherwise (e.g. a US sandbox
+    /// test account) falls back to our TL label so the user never sees USD.
+    private func tlPrice(_ product: Product?, fallback: String) -> String {
+        guard let product else { return fallback }
+        if product.priceFormatStyle.currencyCode == "TRY" {
+            return product.displayPrice
+        }
+        return fallback
     }
 
     /// "Yenileme: 8 Tem 2026" line for the active plan, from its server expiry.
