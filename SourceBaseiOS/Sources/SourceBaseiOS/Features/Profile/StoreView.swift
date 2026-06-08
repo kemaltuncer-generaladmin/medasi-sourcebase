@@ -675,7 +675,7 @@ struct StoreView: View {
         let isBuying = buyingStorageId == product.id
         let active = activeStoragePlan
         let isCurrent = active == product
-        let isUpgrade = active.map { product.gigabytes > $0.gigabytes } ?? false
+        let isUpgrade = active.map { product.rank > $0.rank } ?? false
         let actionLabel: String = {
             if active == nil { return priceLabel }
             return isUpgrade ? "Yükselt" : "Düşür"
@@ -694,10 +694,13 @@ struct StoreView: View {
                     Text("\(product.gbLabel) / ay")
                         .font(SBTypography.titleSmall)
                         .foregroundStyle(SBColors.navy)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                     if !isCurrent {
                         Text(priceLabel)
                             .font(SBTypography.caption)
                             .foregroundStyle(SBColors.muted)
+                            .fixedSize()
                     }
                 }
                 if isCurrent, let renews = renewalText(for: product) {
