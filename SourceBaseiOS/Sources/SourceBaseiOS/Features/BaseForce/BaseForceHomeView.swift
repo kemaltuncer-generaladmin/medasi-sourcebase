@@ -349,7 +349,7 @@ struct BaseForceHomeView: View {
     // MARK: - Actions
 
     private func loadWorkspace() async {
-        isLoading = true
+        isLoading = !workspaceStore.hasLoadedWorkspace
         errorMessage = nil
         await workspaceStore.loadWorkspace()
         errorMessage = workspaceStore.errorMessage

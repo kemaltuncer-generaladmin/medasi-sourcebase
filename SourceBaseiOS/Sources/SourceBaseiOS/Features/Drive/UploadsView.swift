@@ -63,7 +63,7 @@ struct UploadsView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: SBSpacing.lg) {
-                if workspaceStore.isLoading {
+                if workspaceStore.isLoading && !workspaceStore.hasLoadedWorkspace {
                     SBLoadingState(
                         icon: "icloud",
                         title: "Yüklemeler alınıyor",

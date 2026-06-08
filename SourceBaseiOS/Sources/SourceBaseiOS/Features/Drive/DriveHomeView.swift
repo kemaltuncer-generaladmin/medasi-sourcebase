@@ -42,7 +42,7 @@ struct DriveHomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SBSpacing.lg) {
-                if workspaceStore.isLoading {
+                if workspaceStore.isLoading && !workspaceStore.hasLoadedWorkspace {
                     SBLoadingState(
                         icon: "folder",
                         title: "Drive yükleniyor",

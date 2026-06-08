@@ -85,7 +85,7 @@ struct SearchView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: SBSpacing.lg) {
-                if workspaceStore.isLoading {
+                if workspaceStore.isLoading && !workspaceStore.hasLoadedWorkspace {
                     SBLoadingState(
                         icon: "magnifyingglass",
                         title: "Arama hazırlanıyor",

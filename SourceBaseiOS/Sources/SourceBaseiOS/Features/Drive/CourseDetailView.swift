@@ -37,7 +37,7 @@ struct CourseDetailView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: SBSpacing.lg) {
-                if workspaceStore.isLoading {
+                if workspaceStore.isLoading && !workspaceStore.hasLoadedWorkspace {
                     SBLoadingState(
                         icon: "book",
                         title: "Ders yükleniyor",
