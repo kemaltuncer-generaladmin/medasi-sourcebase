@@ -28,6 +28,7 @@ struct StoreView: View {
     @State private var buyingStorageId: String?
     @State private var storageError: String?
     @State private var storageInfo: String?
+    @State private var pendingDowngrade: SBStorageProduct?
 
     @Environment(\.openURL) private var openURL
 
@@ -593,7 +594,7 @@ struct StoreView: View {
                         storageUsageBar(storageStatus)
                     }
 
-                    Text("Aylık abonelikle depolama kotanı artır. Tek plan aktif olur; istediğin zaman planını yükseltip düşürebilir veya App Store'dan iptal edebilirsin.")
+                    Text("Aylık abonelikle depolama kotanı artır. Tek plan aktif olur. Yükseltme hemen geçerli olur; düşürme ve iptal App Store kuralı gereği mevcut dönem sonunda devreye girer, o zamana kadar şu anki paketin devam eder.")
                         .font(SBTypography.caption)
                         .foregroundStyle(SBColors.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -627,6 +628,22 @@ struct StoreView: View {
                         SBInlineError(message: storageError, isWarning: true)
                     }
                 }
+            }
+            .alert(
+                "Paketi düşür",
+                isPresented: Binding(
+                    get: { pendingDowngrade != nil },
+                    set: { if !$0 { pendingDowngrade = nil } }
+                ),
+                presenting: pendingDowngrade
+            ) { product in
+                Button("Vazgeç", role: .cancel) { pendingDowngrade = nil }
+                Button("Onayla") {
+                    pendingDowngrade = nil
+                    Task { await purchaseStorage(product, isDowngrade: true) }
+                }
+            } message: { product in
+                Text(downgradeMessage(to: product))
             }
         }
     }
@@ -733,7 +750,14 @@ struct StoreView: View {
                     isLoading: isBuying,
                     isDisabled: skProduct == nil
                 ) {
-                    Task { await purchaseStorage(product) }
+                    // Downgrades don't apply immediately (App Store rule) — confirm
+                    // the period-end timing first so the user isn't surprised by the
+                    // unchanged quota / Apple's "already subscribed" sheet.
+                    if active != nil && !isUpgrade {
+                        pendingDowngrade = product
+                    } else {
+                        Task { await purchaseStorage(product) }
+                    }
                 }
             }
         }
@@ -781,26 +805,79 @@ struct StoreView: View {
         storageStatus = try? await DriveAPI(client: client).storageStatus()
     }
 
-    private func purchaseStorage(_ product: SBStorageProduct) async {
+    /// Formatted end-of-period date of the active plan ("8 Temmuz 2026"), if known.
+    private var activePlanEndDate: String? {
+        guard let iso = storageStatus?.plans.first?.expiresAt,
+              let date = parseISODate(iso) else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "tr_TR")
+        formatter.dateFormat = "d MMMM yyyy"
+        return formatter.string(from: date)
+    }
+
+    /// Confirmation copy shown before a downgrade so the user understands the
+    /// App Store rule: the lower tier starts only when the current period ends.
+    private func downgradeMessage(to product: SBStorageProduct) -> String {
+        let current = activeStoragePlan?.displayName ?? "Mevcut paketin"
+        if let end = activePlanEndDate {
+            return "\(current) paketinden \(product.displayName) paketine geçiyorsun. "
+                + "App Store kuralı gereği bu değişiklik hemen uygulanmaz: "
+                + "\(current) paketin \(end) tarihine kadar devam eder, süresi dolunca "
+                + "\(product.displayName) paketine otomatik geçilir. Şimdi ödeme alınmaz."
+        }
+        return "\(current) paketinden \(product.displayName) paketine geçiyorsun. "
+            + "App Store kuralı gereği bu değişiklik mevcut dönem sonunda uygulanır; "
+            + "o zamana kadar \(current) paketin devam eder. Şimdi ödeme alınmaz."
+    }
+
+    private func purchaseStorage(_ product: SBStorageProduct, isDowngrade: Bool = false) async {
         guard let skProduct = storeKit.product(id: product.productId) else {
             storageError = "Bu abonelik şu anda App Store'dan yüklenemedi. Tekrar deneyebilirsin."
             return
         }
+        let endDate = activePlanEndDate
+        let currentName = activeStoragePlan?.displayName ?? "Mevcut paketin"
         buyingStorageId = product.id
         storageError = nil
         storageInfo = nil
         do {
             try await storeKit.purchase(skProduct)
-            storageInfo = "Depolama aboneliğin etkinleşti. Kotan güncellendi."
+            if isDowngrade {
+                // Downgrade is scheduled by Apple for the next renewal; the quota
+                // does NOT change now, so don't claim it did.
+                if let endDate {
+                    storageInfo = "Plan değişikliğin alındı. \(currentName) paketin "
+                        + "\(endDate) tarihine kadar devam edecek, ardından "
+                        + "\(product.displayName) paketine geçilecek."
+                } else {
+                    storageInfo = "Plan değişikliğin alındı. Mevcut paketin dönem "
+                        + "sonuna kadar devam edecek, ardından \(product.displayName) başlayacak."
+                }
+            } else {
+                storageInfo = "Depolama aboneliğin etkinleşti. Kotan güncellendi."
+            }
             await fetchStorageStatus()
         } catch SBStoreError.cancelled {
             // user cancelled — stay silent
         } catch SBStoreError.pending {
             storageInfo = SBStoreError.pending.errorDescription
         } catch {
-            storageError = error.localizedDescription.isEmpty
-                ? "Abonelik tamamlanamadı. Tekrar deneyebilirsin."
-                : error.localizedDescription
+            if isDowngrade {
+                // A downgrade may already be scheduled (Apple's "already
+                // subscribed" sheet) — reassure instead of showing a hard error.
+                if let endDate {
+                    storageInfo = "Plan değişikliğin zaten alınmış olabilir. "
+                        + "\(currentName) paketin \(endDate) tarihine kadar devam eder, "
+                        + "ardından \(product.displayName) başlar. App Store > Abonelikler'den kontrol edebilirsin."
+                } else {
+                    storageInfo = "Plan değişikliğin zaten alınmış olabilir. Mevcut paketin "
+                        + "dönem sonunda \(product.displayName) paketine geçer. App Store > Abonelikler'den kontrol edebilirsin."
+                }
+            } else {
+                storageError = error.localizedDescription.isEmpty
+                    ? "Abonelik tamamlanamadı. Tekrar deneyebilirsin."
+                    : error.localizedDescription
+            }
         }
         buyingStorageId = nil
     }

@@ -62,6 +62,16 @@ enum SBStorageProduct: String, CaseIterable, Identifiable {
         self == .pro ? "Pro · +50 GB + 500 MC" : "+\(gigabytes) GB"
     }
 
+    /// Short human name for in-sentence messaging (upgrade/downgrade copy).
+    var displayName: String {
+        switch self {
+        case .gb15: return "15 GB"
+        case .gb25: return "25 GB"
+        case .gb50: return "50 GB"
+        case .pro: return "Pro"
+        }
+    }
+
     /// Shown when StoreKit hasn't loaded the live App Store price yet. The real
     /// price still comes from App Store Connect; keep these in sync as a hint.
     var fallbackPriceLabel: String {

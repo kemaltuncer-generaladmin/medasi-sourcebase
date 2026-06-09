@@ -51,7 +51,17 @@ type CompatibleQuestion = {
   tags: string[];
 };
 
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+const STORAGE_QUOTA_BYTES = 25 * 1024 * 1024 * 1024;
+// App Store storage subscription products (productId = `${bundleId}.<code>`).
+// Each grants a monthly storage quota increase while the subscription is active.
+const STORAGE_PRODUCTS: Record<string, number> = {
+  storage_15gb_monthly: 15 * 1024 * 1024 * 1024,
+  storage_25gb_monthly: 25 * 1024 * 1024 * 1024,
+  storage_50gb_monthly: 50 * 1024 * 1024 * 1024,
+  // Combo "Pro" tier: 50 GB storage bonus + 500 MC/month (granted separately).
+  pro_75gb_monthly: 50 * 1024 * 1024 * 1024,
+};
 const MAX_AVATAR_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 120;
 const MAX_SECTION_TITLE_LENGTH = 120;
@@ -99,6 +109,20 @@ Deno.serve(async (request) => {
     const body = isRecord(rawBody) ? rawBody : {};
     const action = String(body.action ?? "");
     const payload = isRecord(body.payload) ? body.payload : {};
+
+    // App Store Server Notifications come from Apple with no user auth header.
+    // Apple POSTs the raw envelope `{"signedPayload":"<jws>"}` at the top level;
+    // our own tooling may also call it via action+payload. Support both shapes.
+    if (action === "appstore_server_notification") {
+      return success(await handleAppStoreServerNotification(payload));
+    }
+    if (
+      typeof body.signedPayload === "string" ||
+      typeof body.signed_payload === "string"
+    ) {
+      return success(await handleAppStoreServerNotification(body));
+    }
+
     const user = await authenticate(request);
 
     switch (action) {
@@ -141,6 +165,10 @@ Deno.serve(async (request) => {
         return success(await purchaseMedasiCoin(user.id, payload));
       case "redeem_appstore_purchase":
         return success(await redeemAppStorePurchase(user, payload));
+      case "redeem_storage_subscription":
+        return success(await redeemStorageSubscription(user, payload));
+      case "get_storage_status":
+        return success(await getStorageStatus(user.id));
       case "sourcebase_question_session":
         return success(await sourcebaseQuestionSession(user.id, payload));
       case "submit_sourcebase_question_answer":
@@ -189,6 +217,12 @@ Deno.serve(async (request) => {
       : "İşlem tamamlanamadı.";
     const code = error instanceof SafeError ? error.code : "INTERNAL_ERROR";
     const status = error instanceof SafeError ? error.status : 500;
+    if (!(error instanceof SafeError)) {
+      console.error(
+        "sourcebase request failed:",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
     return failure(code, message, status);
   }
 });
@@ -459,6 +493,25 @@ async function createUploadSession(userId: string, payload: JsonMap) {
   await assertOwned(userId, "courses", courseId);
   await assertOwned(userId, "sections", sectionId);
   await assertSectionInCourse(userId, sectionId, courseId);
+
+  const usageRows = await dbSelect(
+    `drive_files?owner_user_id=eq.${userId}&select=size_bytes`,
+  );
+  let usedBytes = 0;
+  for (const r of usageRows) {
+    const v = Number((r as JsonMap).size_bytes ?? 0);
+    if (Number.isFinite(v) && v > 0) usedBytes += v;
+  }
+  const bonusBytes = await activeStorageBonusBytes(userId);
+  const quotaBytes = STORAGE_QUOTA_BYTES + bonusBytes;
+  if (usedBytes + sizeBytes > quotaBytes) {
+    const gb = (n: number) => (n / (1024 * 1024 * 1024)).toFixed(1);
+    throw new SafeError(
+      "STORAGE_QUOTA_EXCEEDED",
+      `Depolama kotan doldu (${gb(usedBytes)} / ${gb(quotaBytes)} GB). Magazadan ek depolama alarak veya dosya silerek devam edebilirsin.`,
+      413,
+    );
+  }
 
   await ensureStorageRoots(userId);
   const storage = getObjectStorageConfig();
@@ -1376,13 +1429,29 @@ async function audit(
   entityId: unknown,
   metadata: JsonMap,
 ) {
-  await dbInsert("audit_logs", [{
-    actor_user_id: userId,
-    action,
-    entity_type: entityType,
-    entity_id: typeof entityId === "string" ? entityId : null,
-    metadata,
-  }]);
+  // entity_id is a uuid column; callers sometimes pass a non-uuid reference
+  // (e.g. an App Store originalTransactionId). Only store it in entity_id when
+  // it is a real uuid, otherwise keep entity_id null and stash the reference in
+  // metadata so a bad value can never break the surrounding operation.
+  const idStr = typeof entityId === "string" ? entityId : null;
+  const isUuidId = idStr !== null && isUuid(idStr);
+  // Audit is best-effort telemetry: never let a logging failure break the
+  // surrounding purchase / grant. Swallow and log instead of throwing.
+  try {
+    await dbInsert("audit_logs", [{
+      actor_user_id: userId,
+      action,
+      entity_type: entityType,
+      entity_id: isUuidId ? idStr : null,
+      metadata: isUuidId ? metadata : { ...metadata, entity_ref: idStr },
+    }]);
+  } catch (error) {
+    console.warn(
+      "audit log insert skipped:",
+      action,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 }
 
 async function supabaseRest(path: string, init: RequestInit) {
@@ -1397,6 +1466,7 @@ async function supabaseRest(path: string, init: RequestInit) {
   }
   const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
     ...init,
+    signal: AbortSignal.timeout(8000),
     headers: {
       apikey: serviceKey,
       authorization: `Bearer ${serviceKey}`,
@@ -1481,6 +1551,228 @@ async function requestAccountDeletion(
   return { status: "received", ticketId };
 }
 
+// ---- SourceBase storage subscriptions (App Store auto-renewable) ----
+
+async function userStorageUsedBytes(userId: string): Promise<number> {
+  const rows = await dbSelect(
+    `drive_files?owner_user_id=eq.${userId}&select=size_bytes`,
+  );
+  let total = 0;
+  for (const r of rows) {
+    const v = Number((r as JsonMap).size_bytes ?? 0);
+    if (Number.isFinite(v) && v > 0) total += v;
+  }
+  return total;
+}
+
+// Cascade tier order (higher = better). All 4 storage products live in ONE
+// App Store subscription group, so a user holds at most one tier at a time.
+// Unknown codes rank 0 so they never win over a known tier.
+function storageTierRank(code: string): number {
+  switch (code) {
+    case "storage_15gb_monthly":
+      return 1;
+    case "storage_25gb_monthly":
+      return 2;
+    case "storage_50gb_monthly":
+      return 3;
+    case "pro_75gb_monthly":
+      return 4;
+    default:
+      return 0;
+  }
+}
+
+// Enforce the single-active-tier cascade server-side: among a user's active
+// storage subscriptions keep only the highest tier (ties → latest expiry) and
+// mark the rest 'superseded'. Order-independent and idempotent, so it is safe
+// to call after every redeem / renewal sync. This is the safety net for stale
+// lower tiers that linger when an upgrade arrives as a separate subscription
+// (e.g. sandbox edge cases) rather than an in-place originalTransactionId swap.
+async function cascadeStorageSubscriptions(userId: string): Promise<void> {
+  const nowIso = new Date().toISOString();
+  const rows = await dbSelect(
+    `storage_subscriptions?user_id=eq.${userId}&status=eq.active&expires_at=gt.${
+      encodeURIComponent(nowIso)
+    }&select=id,product_code,expires_at`,
+  );
+  if (rows.length <= 1) return;
+
+  let winner = rows[0] as JsonMap;
+  for (const candidate of rows as JsonMap[]) {
+    const cRank = storageTierRank(String(candidate.product_code ?? ""));
+    const wRank = storageTierRank(String(winner.product_code ?? ""));
+    if (cRank > wRank) {
+      winner = candidate;
+    } else if (cRank === wRank) {
+      const cExp = Date.parse(String(candidate.expires_at ?? ""));
+      const wExp = Date.parse(String(winner.expires_at ?? ""));
+      if (Number.isFinite(cExp) && (!Number.isFinite(wExp) || cExp > wExp)) {
+        winner = candidate;
+      }
+    }
+  }
+
+  const winnerId = String(winner.id);
+  for (const row of rows as JsonMap[]) {
+    const id = String(row.id);
+    if (id === winnerId) continue;
+    await dbPatch("storage_subscriptions", `id=eq.${id}`, {
+      status: "superseded",
+      updated_at: nowIso,
+    });
+  }
+}
+
+async function activeStorageBonusBytes(userId: string): Promise<number> {
+  const nowIso = new Date().toISOString();
+  const rows = await dbSelect(
+    `storage_subscriptions?user_id=eq.${userId}&status=eq.active&expires_at=gt.${
+      encodeURIComponent(nowIso)
+    }&select=bonus_bytes`,
+  );
+  // Cascade model: one active plan per subscription group, so the effective
+  // bonus is the largest active tier (never the sum of overlapping rows).
+  let best = 0;
+  for (const r of rows) {
+    const v = Number((r as JsonMap).bonus_bytes ?? 0);
+    if (Number.isFinite(v) && v > best) best = v;
+  }
+  return best;
+}
+
+async function getStorageStatus(userId: string) {
+  const [usedBytes, bonusBytes] = await Promise.all([
+    userStorageUsedBytes(userId),
+    activeStorageBonusBytes(userId),
+  ]);
+  const nowIso = new Date().toISOString();
+  const plans = await dbSelect(
+    `storage_subscriptions?user_id=eq.${userId}&status=eq.active&expires_at=gt.${
+      encodeURIComponent(nowIso)
+    }&select=product_code,bonus_bytes,expires_at&order=expires_at.desc`,
+  );
+  return {
+    usedBytes,
+    baseBytes: STORAGE_QUOTA_BYTES,
+    bonusBytes,
+    totalBytes: STORAGE_QUOTA_BYTES + bonusBytes,
+    plans,
+  };
+}
+
+// Redeem a verified StoreKit 2 storage subscription and (re)activate the
+// per-user storage bonus until the Apple-signed expiry. All values come from
+// the signed JWS payload; client-sent hints are untrusted.
+async function redeemStorageSubscription(
+  user: { id: string; email?: string },
+  payload: JsonMap,
+) {
+  const jws = requireString(payload.jws, "jws");
+  const transaction = await verifyAppStoreJws(jws);
+  const txBundleId = transaction.txBundleId;
+
+  const appleProductId = requireString(transaction.productId, "productId");
+  const prefix = `${txBundleId}.`;
+  const productCode = appleProductId.startsWith(prefix)
+    ? appleProductId.slice(prefix.length)
+    : appleProductId;
+
+  const bonusBytes = STORAGE_PRODUCTS[productCode];
+  if (!bonusBytes || bonusBytes <= 0) {
+    throw new SafeError(
+      "PRODUCT_NOT_PURCHASABLE",
+      "Bu urun bir depolama aboneligi degil.",
+      400,
+    );
+  }
+
+  const originalTransactionId = requireString(
+    transaction.originalTransactionId ?? transaction.transactionId,
+    "originalTransactionId",
+  );
+  const expiresMs = Number(transaction.expiresDate ?? 0);
+  const expiresAt = Number.isFinite(expiresMs) && expiresMs > 0
+    ? new Date(expiresMs).toISOString()
+    : null;
+  const environment = optionalString(transaction.environment) ?? null;
+  const nowIso = new Date().toISOString();
+
+  const existing = await dbSelect(
+    `storage_subscriptions?original_transaction_id=eq.${
+      encodeURIComponent(originalTransactionId)
+    }&select=id&limit=1`,
+  );
+  const rowData: JsonMap = {
+    user_id: user.id,
+    product_code: productCode,
+    bonus_bytes: bonusBytes,
+    expires_at: expiresAt,
+    environment: environment,
+    status: "active",
+    updated_at: nowIso,
+  };
+  if (existing.length > 0) {
+    await dbPatch(
+      "storage_subscriptions",
+      `id=eq.${existing[0].id}`,
+      rowData,
+    );
+  } else {
+    await dbInsert("storage_subscriptions", [{
+      ...rowData,
+      original_transaction_id: originalTransactionId,
+    }]);
+  }
+
+  // Cascade: this tier is now the user's single active storage plan. Supersede
+  // any older active tier so quota + UI reflect exactly one subscription, even
+  // if an upgrade arrived as a separate originalTransactionId.
+  await cascadeStorageSubscriptions(user.id);
+
+  await audit(
+    user.id,
+    "redeem_storage_subscription",
+    "storage_subscription",
+    originalTransactionId,
+    { productCode, bonusBytes, expiresAt, environment },
+  );
+
+  // Combo "Pro" subscription also grants monthly MedasiCoin into the shared
+  // wallet. grant_store_product is idempotent per (provider, transactionId) and
+  // app-scoped via raw_receipt.app_key, so each renewal credits a fresh 500 MC
+  // (valid until the next renewal) without touching other apps' subscriptions.
+  let mcGranted = 0;
+  const MC_GRANT_PRODUCTS = new Set(["pro_75gb_monthly"]);
+  if (MC_GRANT_PRODUCTS.has(productCode)) {
+    try {
+      const sharedProduct = await loadSharedMedasiCoinProduct(productCode);
+      const perRenewalTxn = optionalString(transaction.transactionId) ??
+        originalTransactionId;
+      await sharedRpc("grant_store_product", {
+        p_user_id: user.id,
+        p_product_id: requireUuid(sharedProduct.id, "shared_product_id"),
+        p_provider: "app_store",
+        p_provider_transaction_id: `appstore:${perRenewalTxn}`,
+        p_status: "active",
+        p_raw_receipt: {
+          app_key: "sourcebase",
+          provider: "app_store",
+          productId: appleProductId,
+          transaction,
+        },
+        p_expires_at: expiresAt,
+      });
+      mcGranted = Number(sharedProduct.coin_amount ?? 0);
+    } catch (_error) {
+      // Storage grant already persisted; MC re-syncs on the next launch/redeem.
+    }
+  }
+
+  const status = await getStorageStatus(user.id);
+  return { status: "ok", productCode, expiresAt, mcGranted, ...status };
+}
+
 // Redeem a verified StoreKit 2 transaction and credit MedasiCoin.
 // All credited values come from the Apple-signed JWS payload — the
 // client-sent productId/transactionId are treated as untrusted hints.
@@ -1489,28 +1781,7 @@ async function redeemAppStorePurchase(
   payload: JsonMap,
 ) {
   const jws = requireString(payload.jws, "jws");
-  const expectedBundleId =
-    optionalString(Deno.env.get("SOURCEBASE_APP_STORE_BUNDLE_ID")) ??
-      "tr.com.medasi.sourcebase";
-
-  let transaction: JsonMap;
-  try {
-    transaction = await verifyAndDecodeAppleJws(jws, appleRootCertificates());
-  } catch (_error) {
-    throw new SafeError(
-      "APPSTORE_VERIFY_FAILED",
-      "App Store satın alması doğrulanamadı.",
-      400,
-    );
-  }
-
-  if (optionalString(transaction.bundleId) !== expectedBundleId) {
-    throw new SafeError(
-      "APPSTORE_BUNDLE_MISMATCH",
-      "Satın alma bu uygulamaya ait değil.",
-      400,
-    );
-  }
+  const transaction = await verifyAppStoreJws(jws);
 
   const transactionId = requireString(
     transaction.transactionId ?? transaction.originalTransactionId,
@@ -1518,7 +1789,7 @@ async function redeemAppStorePurchase(
   );
   const appleProductId = requireString(transaction.productId, "productId");
 
-  const prefix = `${expectedBundleId}.`;
+  const prefix = `${transaction.txBundleId}.`;
   const productCode = appleProductId.startsWith(prefix)
     ? appleProductId.slice(prefix.length)
     : appleProductId;
@@ -1535,21 +1806,21 @@ async function redeemAppStorePurchase(
   }
 
   const providerPaymentId = `appstore:${transactionId}`;
-  const existing = await dbSelect(
-    `purchases?provider=eq.appstore&provider_payment_id=eq.${
-      encodeURIComponent(providerPaymentId)
-    }&select=id,status&limit=1`,
-  );
   const beforeUnits = await sharedWalletBalanceUnits(user.id);
+  // grant_store_product creates the purchase row (provider "app_store") AND
+  // credits the coins, idempotently per (provider, transactionId). The old
+  // manual purchases bookkeeping referenced columns this schema lacks
+  // (provider_payment_id/amount_cents/currency) and an invalid enum value
+  // ("appstore"/"completed"), which made every redeem throw — removed.
   await sharedRpc("grant_store_product", {
     p_user_id: user.id,
     p_product_id: requireUuid(sharedProduct.id, "shared_product_id"),
-    p_provider: "appstore",
+    p_provider: "app_store",
     p_provider_transaction_id: providerPaymentId,
     p_status: "active",
     p_raw_receipt: {
       app_key: "sourcebase",
-      provider: "appstore",
+      provider: "app_store",
       transactionId,
       productId: appleProductId,
       environment: optionalString(transaction.environment),
@@ -1557,37 +1828,6 @@ async function redeemAppStorePurchase(
     },
   });
   const afterUnits = await sharedWalletBalanceUnits(user.id);
-
-  if (existing.some((row) => row.status === "completed")) {
-    return {
-      status: "ok",
-      alreadyProcessed: true,
-      transactionId,
-      productCode,
-      wallet_balance: afterUnits / 100,
-    };
-  }
-
-  const productId = requireUuid(product.id, "product_id");
-  const priceCents = numericValue(product.price_cents) ?? 0;
-  const currency = optionalString(product.currency) ?? "TRY";
-  if (existing.length > 0) {
-    await dbPatch(
-      "purchases",
-      `id=eq.${existing[0].id}`,
-      { status: "completed", updated_at: new Date().toISOString() },
-    );
-  } else {
-    await dbInsert("purchases", [{
-      user_id: user.id,
-      product_id: productId,
-      provider: "appstore",
-      provider_payment_id: providerPaymentId,
-      amount_cents: priceCents,
-      currency,
-      status: "completed",
-    }]);
-  }
 
   await dbInsert("wallet_transactions", [{
     user_id: user.id,
@@ -1599,7 +1839,7 @@ async function redeemAppStorePurchase(
     balance_before: beforeUnits / 100,
     balance_after: afterUnits / 100,
     metadata: {
-      provider: "appstore",
+      provider: "app_store",
       transactionId,
       productId: appleProductId,
       environment: optionalString(transaction.environment),
@@ -1716,6 +1956,7 @@ async function sharedSupabaseRest(path: string, init: RequestInit) {
   }
   const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
     ...init,
+    signal: AbortSignal.timeout(8000),
     headers: {
       apikey: serviceKey,
       authorization: `Bearer ${serviceKey}`,
@@ -1733,6 +1974,399 @@ async function sharedSupabaseRest(path: string, init: RequestInit) {
     );
   }
   return response;
+}
+
+// ---------------------------------------------------------------------------
+// Cross-app App Store JWS verification
+// Accepts transactions from any bundle ID in the ALLOWED_APPSTORE_BUNDLE_IDS
+// env var (comma-separated). Falls back to SOURCEBASE_APP_STORE_BUNDLE_ID or
+// the hardcoded SourceBase bundle so existing deployments require no config
+// change unless cross-app purchasing is needed.
+// ---------------------------------------------------------------------------
+
+function allowedBundleIds(): Set<string> {
+  const fromEnv = optionalString(
+    Deno.env.get("ALLOWED_APPSTORE_BUNDLE_IDS"),
+  );
+  if (fromEnv) {
+    const ids = fromEnv.split(",").map((s) => s.trim()).filter(Boolean);
+    if (ids.length > 0) return new Set(ids);
+  }
+  const single = optionalString(
+    Deno.env.get("SOURCEBASE_APP_STORE_BUNDLE_ID"),
+  ) ?? "tr.com.medasi.sourcebase";
+  return new Set([single]);
+}
+
+async function verifyAppStoreJws(
+  jws: string,
+): Promise<JsonMap & { txBundleId: string }> {
+  let transaction: JsonMap;
+  try {
+    transaction = await verifyAndDecodeAppleJws(jws, appleRootCertificates());
+  } catch (_error) {
+    throw new SafeError(
+      "APPSTORE_VERIFY_FAILED",
+      "App Store satın alması doğrulanamadı.",
+      400,
+    );
+  }
+
+  const txBundleId = optionalString(transaction.bundleId) ?? "";
+  if (!allowedBundleIds().has(txBundleId)) {
+    throw new SafeError(
+      "APPSTORE_BUNDLE_MISMATCH",
+      "Satın alma bu uygulama ekosistemi ile ilişkili değil.",
+      400,
+    );
+  }
+
+  return { ...transaction, txBundleId };
+}
+
+// ---------------------------------------------------------------------------
+// App Store Server Notifications (ASSN) handler
+// Apple sends a POST with { signedPayload: "<JWS>" } when subscription events
+// occur (renewal, expiry, refund, etc.).  No user auth header is present;
+// we authenticate via Apple's JWS signature chain instead.
+// Endpoint: POST /functions/v1/sourcebase  with action "appstore_server_notification"
+// The action is handled BEFORE authenticate() in the switch so that Apple's
+// requests (no Bearer token) don't get rejected.
+// ---------------------------------------------------------------------------
+
+async function handleAppStoreServerNotification(
+  payload: JsonMap,
+): Promise<JsonMap> {
+  const signedPayload = requireString(
+    payload.signedPayload ?? payload.signed_payload,
+    "signedPayload",
+  );
+
+  // The outer notification envelope is itself a JWS signed by Apple.
+  let envelope: JsonMap;
+  try {
+    envelope = await verifyAndDecodeAppleJws(
+      signedPayload,
+      appleRootCertificates(),
+    );
+  } catch (_error) {
+    throw new SafeError(
+      "ASSN_VERIFY_FAILED",
+      "App Store bildirimi doğrulanamadı.",
+      400,
+    );
+  }
+
+  const notificationType = optionalString(envelope.notificationType) ?? "";
+  const subtype = optionalString(envelope.subtype) ?? "";
+  const data = isRecord(envelope.data) ? envelope.data : {};
+  const bundleId = optionalString(data.bundleId) ?? "";
+
+  // Only process notifications for our registered bundle IDs.
+  if (!allowedBundleIds().has(bundleId)) {
+    return { status: "ignored", reason: "bundle_id_not_registered", bundleId };
+  }
+
+  // Decode the inner transaction JWS if present.
+  const signedTransactionInfo = optionalString(data.signedTransactionInfo);
+  let transaction: JsonMap | null = null;
+  if (signedTransactionInfo) {
+    try {
+      transaction = await verifyAndDecodeAppleJws(
+        signedTransactionInfo,
+        appleRootCertificates(),
+      );
+    } catch (_e) {
+      transaction = null;
+    }
+  }
+
+  // Decode the renewal info JWS if present.
+  const signedRenewalInfo = optionalString(data.signedRenewalInfo);
+  let renewalInfo: JsonMap | null = null;
+  if (signedRenewalInfo) {
+    try {
+      renewalInfo = await verifyAndDecodeAppleJws(
+        signedRenewalInfo,
+        appleRootCertificates(),
+      );
+    } catch (_e) {
+      renewalInfo = null;
+    }
+  }
+
+  if (!transaction) {
+    return { status: "ignored", reason: "no_transaction_info", notificationType };
+  }
+
+  const originalTransactionId = optionalString(
+    transaction.originalTransactionId ?? transaction.transactionId,
+  );
+  const appleProductId = optionalString(transaction.productId) ?? "";
+  const prefix = `${bundleId}.`;
+  const productCode = appleProductId.startsWith(prefix)
+    ? appleProductId.slice(prefix.length)
+    : appleProductId;
+
+  const expiresMs = Number(transaction.expiresDate ?? renewalInfo?.renewalDate ?? 0);
+  const expiresAt = Number.isFinite(expiresMs) && expiresMs > 0
+    ? new Date(expiresMs).toISOString()
+    : null;
+
+  const nowIso = new Date().toISOString();
+
+  // Handle storage subscription events.
+  if (originalTransactionId && STORAGE_PRODUCTS[productCode] !== undefined) {
+    const bonusBytes = STORAGE_PRODUCTS[productCode] ?? 0;
+
+    const isActive = [
+      "DID_RENEW",
+      "SUBSCRIBED",
+      "DID_CHANGE_RENEWAL_PREF",
+    ].includes(notificationType);
+
+    // Only UNAMBIGUOUS terminal events drop storage immediately. A cancellation
+    // (DID_CHANGE_RENEWAL_STATUS / AUTO_RENEW_DISABLED) keeps access until the
+    // paid period ends — Apple itself treats the sub as active until expiry, and
+    // the `expires_at > now()` quota filter drops it automatically at that time.
+    // DID_FAIL_TO_RENEW is excluded too (billing grace period may still be active).
+    const isExpired = [
+      "EXPIRED",
+      "REFUND",
+      "REVOKE",
+    ].includes(notificationType);
+
+    const newStatus = isExpired ? "expired" : isActive ? "active" : "active";
+
+    const existing = await dbSelect(
+      `storage_subscriptions?original_transaction_id=eq.${
+        encodeURIComponent(originalTransactionId)
+      }&select=id,user_id&limit=1`,
+    );
+
+    if (existing.length > 0) {
+      await dbPatch(
+        "storage_subscriptions",
+        `id=eq.${existing[0].id}`,
+        {
+          status: newStatus,
+          bonus_bytes: bonusBytes,
+          expires_at: expiresAt,
+          updated_at: nowIso,
+        },
+      );
+      // Re-run the single-active-tier cascade for this user so an upgrade /
+      // renewal notification supersedes any stale lower tier server-side.
+      const ownerId = optionalString((existing[0] as JsonMap).user_id);
+      if (ownerId && newStatus === "active") {
+        await cascadeStorageSubscriptions(ownerId);
+      }
+    }
+    // If no existing row the user hasn't redeemed yet; they will on next app open.
+  }
+
+  // Cross-app terminal events: revoke the matching shared entitlement so a
+  // refund / revoke / expiry reflects for ALL three apps (qlinik, praticase,
+  // sourcebase MC), which share public.purchases + wallet_entitlements. Matched
+  // precisely by Apple's (globally-unique) transaction ids and scoped to the
+  // notification's bundle so apps can never revoke each other's entitlements.
+  let revoked = 0;
+  if (
+    originalTransactionId &&
+    ["EXPIRED", "REFUND", "REVOKE"].includes(notificationType)
+  ) {
+    const txnId = optionalString(transaction.transactionId);
+    const appKey = bundleIdToAppKey(bundleId);
+    const newStatus = notificationType === "EXPIRED" ? "expired" : "revoked";
+    revoked = await revokeSharedEntitlementByTxn(
+      [originalTransactionId, txnId].filter(Boolean) as string[],
+      appKey,
+      newStatus,
+    );
+  }
+
+  // Cross-app RENEWAL grant (qlinik/praticase subscriptions). When a renewal
+  // arrives while the app is closed, extend the entitlement server-side instead
+  // of waiting for the next app-open redeem. Scoped to NON-storage products
+  // (storage handled above) and only when a prior purchase exists for this
+  // originalTransactionId (so we reuse its product_id — no fragile productId map).
+  // Idempotent via the `assn:<transactionId>` provider key + apply_purchase_grant
+  // (which zeroes the prior same-product period, so a double redeem can't stack).
+  // Fully defensive: any failure is swallowed (client redeem remains the backstop).
+  let renewed = 0;
+  if (
+    originalTransactionId &&
+    STORAGE_PRODUCTS[productCode] === undefined &&
+    ["DID_RENEW", "SUBSCRIBED", "DID_RENEW_PREF"].includes(notificationType)
+  ) {
+    const txnId = optionalString(transaction.transactionId) ??
+      originalTransactionId;
+    const appKey = bundleIdToAppKey(bundleId);
+    try {
+      renewed = await grantSharedRenewalByTxn(
+        originalTransactionId,
+        txnId,
+        appKey,
+        expiresAt,
+      );
+    } catch (_e) {
+      // client redeem on next app open is the backstop
+    }
+  }
+
+  return {
+    status: "ok",
+    notificationType,
+    subtype,
+    productCode,
+    bundleId,
+    revoked,
+    renewed,
+  };
+}
+
+// Grant a subscription renewal for qlinik/praticase from an ASSN, reusing the
+// product of a prior purchase for the same originalTransactionId. Returns 1 if
+// a new entitlement period was granted, 0 if skipped (no prior purchase, app
+// mismatch, or already processed). Idempotent on `assn:<transactionId>`.
+async function grantSharedRenewalByTxn(
+  originalTransactionId: string,
+  transactionId: string,
+  appKey: string,
+  expiresAt: string | null,
+): Promise<number> {
+  if (!appKey) return 0;
+  // Find the most recent prior purchase for this subscription lineage.
+  const prior = await sharedDbSelect(
+    `purchases?or=(provider_transaction_id.eq.${originalTransactionId},` +
+      `provider_transaction_id.eq.appstore:${originalTransactionId},` +
+      `provider_transaction_id.eq.assn:${originalTransactionId},` +
+      `raw_receipt->transaction->>original_transaction_id.eq.${originalTransactionId})` +
+      `&select=id,user_id,product_id,raw_receipt&order=created_at.desc&limit=5`,
+  );
+  const match = (prior as JsonMap[]).find((p) => {
+    const rr = isRecord(p.raw_receipt) ? p.raw_receipt as JsonMap : {};
+    const ak = optionalString(rr.app_key) ?? optionalString(rr.app) ?? "";
+    return ak === appKey || (ak === "" && appKey === "qlinik");
+  });
+  if (!match) return 0;
+  const userId = optionalString(match.user_id);
+  const productId = optionalString(match.product_id);
+  if (!userId || !productId) return 0;
+
+  // Insert the renewal purchase (idempotent on assn:<txn>); apply_purchase_grant
+  // expires the prior same-product period and grants a fresh one.
+  let newPurchaseId: string | null = null;
+  try {
+    const resp = await sharedSupabaseRest("purchases", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify([{
+        user_id: userId,
+        product_id: productId,
+        provider: "app_store",
+        provider_transaction_id: `assn:${transactionId}`,
+        status: "active",
+        started_at: new Date().toISOString(),
+        expires_at: expiresAt,
+        raw_receipt: {
+          app_key: appKey,
+          source: "assn_renewal",
+          original_transaction_id: originalTransactionId,
+          transaction_id: transactionId,
+        },
+      }]),
+    });
+    const rows = await resp.json();
+    if (Array.isArray(rows) && rows.length > 0) {
+      newPurchaseId = optionalString((rows[0] as JsonMap).id) ?? null;
+    }
+  } catch (_e) {
+    // Most likely the unique (provider, provider_transaction_id) index — this
+    // renewal was already processed. Treat as a no-op.
+    return 0;
+  }
+  if (!newPurchaseId) return 0;
+  await sharedRpc("apply_purchase_grant", { p_purchase_id: newPurchaseId });
+  return 1;
+}
+
+// Map an App Store bundle id to the shared raw_receipt.app_key used by each app.
+function bundleIdToAppKey(bundleId: string): string {
+  if (bundleId === "tr.com.medasi.sourcebase") return "sourcebase";
+  if (bundleId === "com.medasi.qlinik") return "qlinik";
+  if (bundleId === "com.medasi.praticase") return "praticase";
+  return "";
+}
+
+// Revoke active shared wallet_entitlements tied to the given Apple transaction
+// ids, scoped to one app_key. Returns the number of entitlements deactivated.
+async function revokeSharedEntitlementByTxn(
+  txnIds: string[],
+  appKey: string,
+  newStatus: "expired" | "revoked",
+): Promise<number> {
+  if (txnIds.length === 0) return 0;
+  // provider_transaction_id is stored either raw (qlinik/praticase) or
+  // `appstore:<id>` (sourcebase MC), so match both shapes.
+  const orParts: string[] = [];
+  for (const id of txnIds) {
+    orParts.push(`provider_transaction_id.eq.${id}`);
+    orParts.push(`provider_transaction_id.eq.appstore:${id}`);
+  }
+  const purchases = await sharedDbSelect(
+    `purchases?or=(${orParts.join(",")})&select=id,user_id,raw_receipt`,
+  );
+  const nowIso = new Date().toISOString();
+  let count = 0;
+  const affectedUsers = new Set<string>();
+  for (const p of purchases) {
+    const rr = isRecord((p as JsonMap).raw_receipt)
+      ? (p as JsonMap).raw_receipt as JsonMap
+      : {};
+    const rowAppKey = optionalString(rr.app_key) ?? optionalString(rr.app) ?? "";
+    // Only act when the receipt's app matches the notification's app (or the
+    // receipt has no app_key, which only legacy sourcebase rows do).
+    if (appKey && rowAppKey && rowAppKey !== appKey) continue;
+    const purchaseId = optionalString((p as JsonMap).id);
+    const userId = optionalString((p as JsonMap).user_id);
+    if (!purchaseId) continue;
+    const resp = await sharedSupabaseRest(
+      `wallet_entitlements?purchase_id=eq.${purchaseId}&status=eq.active`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          status: newStatus,
+          remaining_coin_amount: 0,
+          remaining_question_amount: 0,
+          updated_at: nowIso,
+        }),
+      },
+    );
+    const updated = await resp.json();
+    if (Array.isArray(updated)) count += updated.length;
+    if (userId) affectedUsers.add(userId);
+    // Keep the purchase record consistent with the terminal event so reports /
+    // future idempotency reflect reality (entitlement is the source of truth for
+    // balance, but the purchase status should not stay 'active' after a refund).
+    const purchaseStatus = newStatus === "expired" ? "expired" : "refunded";
+    try {
+      await sharedSupabaseRest(
+        `purchases?id=eq.${purchaseId}&status=eq.active`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ status: purchaseStatus, updated_at: nowIso }),
+        },
+      );
+    } catch (_e) { /* non-critical: entitlement already revoked */ }
+  }
+  for (const userId of affectedUsers) {
+    try {
+      await sharedRpc("sync_wallet_profile", { p_user_id: userId });
+    } catch (_e) { /* balance re-syncs on next read */ }
+  }
+  return count;
 }
 
 function numericValue(value: unknown) {
